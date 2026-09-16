@@ -118,6 +118,7 @@ function applyTextureRetro(src, tex) {
         if (shim.kind === "image") {
             shim.node.texture = tex
             applySize(shim)
+            syncShadowCopies(shim)
         }
     }
 }
@@ -235,44 +236,156 @@ function getBlurFilter(radius) {
     return f
 }
 
-// силуэтные копии под узлом: drop-shadow(0 0 r color) ≈ копия с tint+alpha+blur
-function applyDropShadow(shim, styleStr) {
-    const specs = parseDropShadows(styleStr)
-    const old = shim._shadowCopies
-    if (old) {
-        for (const c of old) { c.destroy({ children: true }) }
-        shim._shadowCopies = null
+// ---------- свечение/тени: запечённые силуэтные копии-СИБЛИНГИ ниже узла ----------
+// Три наблюдения из живой отладки: (1) ребёнок в Pixi рисуется НАД собственной
+// текстурой родителя — размытая копия-ребёнок ложилась ПОВЕРХ кнопки и «размывала»
+// её саму; (2) фильтры на детях Sprite в v8 молча не работают; (3) tint копии
+// УМНОЖАЕТСЯ на текстуру: тёмная кнопка × золотой tint = грязный тёмный ореол
+// (CSS drop-shadow красит силуэт ЧИСТЫМ цветом). Итог: силуэт текстуры один раз
+// запекается в БЕЛУЮ размытую текстуру (getGlowTexture), копия-сиблинг (вставлена
+// в родителя ПРЯМО ПЕРЕД узлом — узел рисуется поверх, чёткий силуэт как у CSS)
+// красится tint'ом в цвет тени. Текстовые копии — живой блюр на белом клоне стиля.
+const glowTexCache = new Map()   // src|radius|k → текстура (белая размытая силуэт-текстура)
+// Запекание ТОЛЬКО на CPU (canvas 2d + box-blur альфы): вызов renderer.render в
+// обработчике pointerout/over на WebGPU (GTX 1060, v8.19) клинил командный энкодер —
+// тикер зависал на первом же кадре. Здесь GPU не трогается вовсе
+function getGlowTexture(src, radiusVB, k) {
+    const key = src + "|" + radiusVB.toFixed(1) + "|" + k.toFixed(2)
+    let t = glowTexCache.get(key)
+    if (t) return t
+    const base = texCache.get(src)
+    if (!base || base === PIXI.Texture.EMPTY || !base.width) return null
+    const img = base.source.resource
+    if (!img || !img.width) return null
+    const rTex = Math.max(1, Math.min(64, radiusVB / k))
+    const r = Math.round(rTex)
+    const pad = r * 2 + 2
+    const w = base.width, h = base.height
+    const cv = document.createElement("canvas")
+    cv.width = w + pad * 2; cv.height = h + pad * 2
+    const ctx = cv.getContext("2d")
+    ctx.drawImage(img, pad, pad)
+    const id = ctx.getImageData(0, 0, cv.width, cv.height)
+    const W = cv.width, H = cv.height
+    let a = new Float32Array(W * H)
+    for (let i = 0; i < W * H; i++) a[i] = id.data[i * 4 + 3] / 255
+    for (let pass = 0; pass < 3; pass++) a = boxBlurAlpha(a, W, H, r)
+    for (let i = 0; i < W * H; i++) {
+        id.data[i * 4] = 255; id.data[i * 4 + 1] = 255; id.data[i * 4 + 2] = 255
+        id.data[i * 4 + 3] = Math.round(Math.min(1, a[i]) * 255)
     }
-    if (!specs.length) return
+    ctx.putImageData(id, 0, 0)
+    t = PIXI.Texture.from(cv)
+    t.source.style.scaleMode = "linear"
+    glowTexCache.set(key, t)
+    return t
+}
+// разделяемый box-blur ×3 (три прохода ≈ гауссиана) по альфа-каналу
+function boxBlurAlpha(buf, W, H, r) {
+    if (r < 1) return buf
+    const tmp = new Float32Array(W * H)
+    const out = new Float32Array(W * H)
+    const win = r * 2 + 1
+    for (let y = 0; y < H; y++) {
+        const row = y * W
+        let acc = 0
+        for (let x = -r; x <= r; x++) acc += buf[row + Math.min(W - 1, Math.max(0, x))]
+        for (let x = 0; x < W; x++) {
+            tmp[row + x] = acc / win
+            acc += buf[row + Math.min(W - 1, x + r + 1)] - buf[row + Math.max(0, x - r)]
+        }
+    }
+    for (let x = 0; x < W; x++) {
+        let acc = 0
+        for (let y = -r; y <= r; y++) acc += tmp[Math.min(H - 1, Math.max(0, y)) * W + x]
+        for (let y = 0; y < H; y++) {
+            out[y * W + x] = acc / win
+            acc += tmp[Math.min(H - 1, y + r + 1) * W + x] - tmp[Math.max(0, y - r) * W + x]
+        }
+    }
+    return out
+}
+function makeShadowCopy(shim, sp) {
+    let copy = null
+    if (shim.kind === "image" && shim.node instanceof PIXI.Sprite && shim.attrs.href) {
+        // запечённый силуэт годится только статичной картинке: у анимированного
+        // спрайта href — ЛИСТ кадров, силуэт листа был бы неверным
+        const k = shim.node.scale.x || 1
+        const baked = getGlowTexture(String(shim.attrs.href), sp.blur, k)
+        if (!baked) return null
+        copy = new PIXI.Sprite(baked)
+        // паддинг запечки: r*2+2, где r = round(clamp(sp.blur/k, 1..64)) — см. getGlowTexture
+        copy._glowPad = Math.round(Math.max(1, Math.min(64, sp.blur / k))) * 2 + 2
+    } else if (shim.kind === "text" || shim.kind === "html") {
+        // белый клон стиля: tint красит силуэт чистым цветом (как CSS drop-shadow)
+        const st = Object.assign({}, shim.node.style, { fill: 0xffffff, stroke: undefined })
+        copy = new PIXI.Text({ text: shim.node.text, style: st })
+        if (sp.blur > 0) copy.filters = [getBlurFilter(sp.blur)]
+    } else {
+        warnOnce("shadow" + shim.kind, "drop-shadow на " + shim.kind + " не поддержан — пропущен")
+        return null
+    }
+    const col = new PIXI.Color(cssColorToPixi(sp.color))
+    copy.tint = col
+    copy.alpha = col.alpha
+    copy._isShadowCopy = 1
+    return copy
+}
+function removeShadowCopies(shim) {
+    if (!shim._shadowCopies) return
+    for (const c of shim._shadowCopies) c.destroy({ children: true })
+    shim._shadowCopies = null
+}
+function mountShadowCopies(shim) {
+    removeShadowCopies(shim)
+    const specs = shim._shadowSpecs
+    if (!specs || !specs.length) return
+    if (!shim.parent || !shim.parent.node || !shim.node || shim.node.destroyed) return
     const copies = []
     for (const sp of specs) {
-        let copy = null
-        if (shim.node instanceof PIXI.Sprite) {
-            // копия с ТОЙ ЖЕ текстурой в (0,0) рисуется 1:1 в локальной системе узла —
-            // width/height ей задавать НЕЛЬЗЯ: сеттер ставит scale, а scale копии
-            // умножается на scale родителя → «распухание» кнопки при glow
-            copy = new PIXI.Sprite(shim.node.texture)
-        } else if (shim.kind === "text" || shim.kind === "html") {
-            copy = new PIXI.Text({ text: shim.node.text, style: shim.node.style })
-            copy.alpha = 1
-        } else {
-            warnOnce("shadow" + shim.kind, "drop-shadow на " + shim.kind + " не поддержан — пропущен")
-            continue
-        }
-        // копия — ребёнок узла: её anchor обязан совпасть с anchor узла, иначе текст
-        // с anchor middle рисуется от центра-верха и силуэт «расползается» вбок
-        const srcAnchor = shim.node.anchor
-        if (srcAnchor) copy.anchor.set(srcAnchor.x, srcAnchor.y)
-        const col = new PIXI.Color(cssColorToPixi(sp.color))
-        copy.tint = col
-        copy.alpha = col.alpha
-        if (sp.blur > 0) copy.filters = [getBlurFilter(sp.blur)]
-        copy.position.set(0, 0)
-        copy._isShadowCopy = 1
-        shim.node.addChildAt(copy, 0)
+        const copy = makeShadowCopy(shim, sp)
+        if (!copy) continue
+        copy._shadowDx = sp.dx
+        copy._shadowDy = sp.dy
         copies.push(copy)
     }
-    shim._shadowCopies = copies.length ? copies : null
+    if (!copies.length) return
+    shim._shadowCopies = copies
+    syncShadowCopies(shim)
+    const idx = shim.parent.node.getChildIndex(shim.node)
+    for (const c of copies) shim.parent.node.addChildAt(c, idx)
+}
+// синхронизация копий вслед за узлом — горячие точки (applyPosition/applySize/setFrame)
+// вызывают её на каждый тик, поэтому выход по отсутствию копий — первая проверка
+function syncShadowCopies(shim) {
+    const copies = shim._shadowCopies
+    if (!copies || !shim.node || shim.node.destroyed) return
+    const n = shim.node
+    for (const c of copies) {
+        c.visible = n.visible
+        if (c instanceof PIXI.Text) {
+            c.text = n.text
+        } else {
+            // запечённая текстура не меняется; сдвиг: левый-верх узла в родителе
+            // минус паддинг запечки, всё в масштабе узла
+            const kx = n.scale.x || 1, ky = n.scale.y || 1
+            const tlx = n.x - n.anchor.x * n.width
+            const tly = n.y - n.anchor.y * n.height
+            c.scale.set(kx, ky)
+            c.position.set(tlx + (c._shadowDx - c._glowPad) * kx, tly + (c._shadowDy - c._glowPad) * ky)
+            continue
+        }
+        if (n.anchor) c.anchor.set(n.anchor.x, n.anchor.y)
+        c.position.set(n.x + c._shadowDx, n.y + c._shadowDy)
+    }
+}
+
+// силуэтные копии под узлом: drop-shadow(0 0 r color) ≈ запечённый белый силуэт × tint
+function applyDropShadow(shim, styleStr) {
+    if (location.search.includes("noglow")) return // отладочная бисекция зависания WebGPU
+    shim._shadowSpecs = parseDropShadows(styleStr)
+    shim._shadowStyleRaw = styleStr || ""
+    mountShadowCopies(shim)
 }
 
 // ============================================================================
@@ -373,6 +486,12 @@ class ShimEl {
         const v = this.attrs[name]
         return v === undefined ? null : v
     }
+    // DOM-контракт element.id: всегда строка ("" у отсутствующего). Игра ищет спрайты
+    // в screenPic через свойство (f.id === obj[6]+"OI" в useObject/blessFx/alchemy/
+    // finPillars/trapsFx) — без геттера находка всегда false: рамка использования
+    // не удалялась, подсветка и смена спрайта «использованного» объекта не работали
+    get id() { const v = this.attrs.id; return v === undefined || v === null ? "" : String(v) }
+    set id(v) { this.setAttribute("id", String(v)) }
     removeAttribute(name) {
         delete this.attrs[name]
         applyAttr(this, name, name === "opacity" ? 1 : name === "display" ? "" : "")
@@ -397,6 +516,7 @@ class ShimEl {
         this.attrs["#text"] = String(v)
         if (this.kind === "text") this.node.text = String(v)
         else if (this.kind === "html") this.node.text = stripHtml(v)
+        syncShadowCopies(this)
     }
     getBBox() {
         if (this.kind === "anim" && this._frameW) {
@@ -443,10 +563,20 @@ class ShimEl {
     _syncInteractive() {
         const want = !!(this._onclick || this._over || this._out || this._down || this._up || this._move ||
             (this._listeners && this._listeners.size > 0))
-        if (want === this._interactive) return
         this._interactive = want ? 1 : 0
         if (this.node) {
-            this.node.eventMode = want ? "static" : "none"
+            // SVG visiblePainted: КАРТИНКА и ЗАЛИТАЯ фигура перехватывают клики (панель
+            // настроек не пускает клики к кнопкам меню под ней!), fill="none" (рамки,
+            // подсветки ячеек) и текст прозрачны для кликов, pointer-events="none" —
+            // всегда прозрачен. Обработчики добавляют интерактивность поверх этого.
+            // ПРОЗРАЧНЫЕ узлы — ровно "none" (не "passive"!): passive-ребёнок наследует
+            // static родителя, проходит hit-test и возвращает пустую цель — клик
+            // «проглатывается», не доходя до кнопки под текстом (ловили вживую)
+            const pe = this.attrs["pointer-events"]
+            const fill = this.attrs.fill
+            const blocking = this.kind === "image" ||
+                ((this.kind === "rect" || this.kind === "circle" || this.kind === "path" || this.kind === "poly") && !!fill && fill !== "none")
+            this.node.eventMode = pe === "none" ? "none" : (want || blocking) ? "static" : "none"
             if (want && !this._wired) { this._wired = 1; wirePixiEvents(this) }
         }
     }
@@ -491,7 +621,7 @@ function makeStyleProxy(shim) {
         get filter() { return store.filter || "" },
         set outline(v) { store.outline = v; applyOutline(shim, v) },
         get outline() { return store.outline || "" },
-        set display(v) { store.display = v; if (shim.node) shim.node.visible = (v !== "none") },
+        set display(v) { store.display = v; if (shim.node) shim.node.visible = (v !== "none"); syncShadowCopies(shim) },
         get display() { return store.display || "" },
         set opacity(v) { if (shim.node) shim.node.alpha = +v },
         get opacity() { return shim.node ? String(shim.node.alpha) : "1" },
@@ -538,6 +668,7 @@ function applyAttr(shim, name, value) {
                 shim.node.texture = getTexture(String(value))
                 applySize(shim)
                 applyPixelated()
+                syncShadowCopies(shim)
             } else if (shim.kind === "anim") {
                 // смена листа анимации (syncHeroAnim/setEnemyPose меняют href на живом
                 // спрайте): кадры пересобираются под новый лист, кадр восстанавливается
@@ -559,6 +690,7 @@ function applyAttr(shim, name, value) {
         }
         case "display": {
             if (shim.node) shim.node.visible = value !== "none"
+            syncShadowCopies(shim)
             return
         }
         case "clip-path": {
@@ -595,6 +727,8 @@ function applyAttr(shim, name, value) {
             if (shim.kind === "rect") redrawRect(shim)
             else if (shim.kind === "circle") redrawCircle(shim)
             else if (shim.kind === "text" || shim.kind === "html") applyTextStyle(shim)
+            // fill меняет «перехват кликов» (visiblePainted) — пересчитать eventMode
+            shim._syncInteractive()
             return
         }
         case "font-size": case "text-anchor": case "font-family": {
@@ -602,10 +736,15 @@ function applyAttr(shim, name, value) {
             return
         }
         case "text": {
-            if (shim.kind === "text" || shim.kind === "html") shim.node.text = String(value)
+            if (shim.kind === "text" || shim.kind === "html") { shim.node.text = String(value); syncShadowCopies(shim) }
             return
         }
-        case "pointer-events": case "preserveAspectRatio": case "clipPathUnits":
+        case "pointer-events": {
+            // единственная семантика, которую игра использует: "none" (прозрачность)
+            shim._syncInteractive()
+            return
+        }
+        case "preserveAspectRatio": case "clipPathUnits":
         case "stroke-linejoin": case "stroke-linecap": case "transform":
             return // семантика покрыта eventMode/деревом
         default:
@@ -689,11 +828,21 @@ function applySize(shim) {
         }
         return
     }
+    // Graphics-примитивы НЕ масштабируются width-сеттером: у пустой геометрии
+    // (полоса использования начинается с width 0) scale = w/0 → Infinity, и первый
+    // же рост ширины «выстреливает» прямоугольник за экран («прилетает справа»).
+    // SVG-семантика: атрибут width ПЕРЕОПРЕДЕЛЯЕТ геометрию — перерисовываем
+    if (shim.kind === "rect" || shim.kind === "circle" || shim.kind === "path" || shim.kind === "poly") {
+        if (shim.kind === "rect") redrawRect(shim)
+        else if (shim.kind === "circle") redrawCircle(shim)
+        syncShadowCopies(shim)
+        return
+    }
     if (shim.node && shim.node.width !== undefined) {
         shim.node.width = w
         shim.node.height = h
     }
-    if (shim.kind === "rect") redrawRect(shim)
+    syncShadowCopies(shim)
 }
 
 // кадр анимированного спрайта (текстура-подокно)
@@ -722,6 +871,7 @@ function setFrame(shim, still) {
         shim.node.texture = frames[s]
         shim.node.width = shim._frameW
         shim.node.height = +shim.attrs.height || frames[s].height
+        syncShadowCopies(shim)
     }
 }
 
@@ -895,6 +1045,7 @@ function applyTextStyle(shim) {
     shim.node.resolution = Math.min(2, window.devicePixelRatio || 1)
     shim.node.anchor.set(anchorX, 0)
     shim.node.position.set(num(shim.attrs.x), num(shim.attrs.y) - size * TEXT_BASELINE_K)
+    syncShadowCopies(shim)
 }
 
 // ----------------------------------------------------------------------------
@@ -928,18 +1079,33 @@ function attachShim(parent, shim, index) {
     if (index >= parent.children.length) parent.children.push(shim)
     else parent.children.splice(index, 0, shim)
     if (shim.node && parent.node) {
-        parent.node.addChildAt(shim.node, Math.min(index, parent.node.children.length))
+        // индекс в Pixi-дереве считается по СОСЕДЯМ-ШИМАМ С УЗЛАМИ, а не по индексу
+        // шима: в raw-дереве есть узлы вне шим-дерева (тени-копии, маски Graphics) —
+        // из-за расхождения новые узлы вставлялись ПЕРЕД уже существующими, и кнопки
+        // меню оказывались ПОВЕРХ панели настроек, воруя её клики
+        let rawIdx = parent.node.children.length
+        for (let k = index - 1; k >= 0; k--) {
+            const s = parent.children[k]
+            if (s !== shim && s.node && s.node.parent === parent.node) {
+                rawIdx = parent.node.getChildIndex(s.node) + 1
+                break
+            }
+        }
+        parent.node.addChildAt(shim.node, Math.min(rawIdx, parent.node.children.length))
         // маски-Graphics клипов переезжают вместе с пользователем (applyClipPath перевесит)
         if (shim._clipSrc && shim._clipSrc._maskG && shim._clipSrc._maskG.parent !== shim._layer.node) {
             const layer = shim._layer || layers[2]
             layer.node.addChild(shim._clipSrc._maskG)
         }
     }
+    // копии свечения/теней переезжают вместе с узлом (drag перебрасывает иконку в слой)
+    mountShadowCopies(shim)
     return shim
 }
 function detachShim(shim) {
     shim.parent = null
     if (shim.node && shim.node.parent) shim.node.parent.removeChild(shim.node)
+    removeShadowCopies(shim)
 }
 function destroyShimNode(shim) {
     if (shim._dead) return
@@ -960,6 +1126,7 @@ function destroyShimNode(shim) {
         }
         shim._clipSrc = null
     }
+    removeShadowCopies(shim)
     if (shim.node) shim.node.destroy({ children: true })
 }
 
@@ -982,8 +1149,14 @@ function wrapEvt(nativeOrFederated, targetShim) {
         code: src.code,
         key: src.key,
         isConnected: true,
-        preventDefault() { src.preventDefault && src.preventDefault() },
-        stopPropagation() { src.stopPropagation && src.stopPropagation() },
+        // ВАЖНО: НЕ прокидываем preventDefault/stopPropagation в нативное событие.
+        // Игра вызывает ev.preventDefault() в обработчиках mousedown (ползунок настроек,
+        // полосы прокрутки журнала/библиотеки) — в DOM-SVG это было безвредно, но у
+        // нативного pointerdown отмена preventDefault'ом подавляет ВСЕ совместимые
+        // события мыши до pointerup: document-mousemove/mouseup игрых мертвы, ползунок
+        // «прилипал» к курсору (mouseup не доходил, document-слушатели не снимались)
+        preventDefault() {},
+        stopPropagation() {},
     }
 }
 function wirePixiEvents(shim) {
@@ -1052,6 +1225,7 @@ function baseInteractive(shim, obj) {
 }
 // glow-подсветка кнопок (hover): золотое свечение через силуэтные копии
 function wireGlow(shim, obj) {
+    if (location.search.includes("noglow")) return // отладочная бисекция зависания WebGPU
     const glowNodes = obj.glowNodes || []
     const specs = [
         { blur: 8, color: "rgba(255,214,140,0.95)" },
@@ -1087,6 +1261,9 @@ function createImage(place, x, y, w, h, src, obj = {}) {
     const idVal = obj.id
     const objNoId = idVal !== undefined ? Object.assign({}, obj, { id: undefined }) : obj
     baseInteractive(shim, objNoId)
+    // картинки без обработчиков тоже ПЕРЕХВАТЫВАЮТ клики (visiblePainted): панель
+    // настроек не должна пропускать клики к кнопкам меню под собой
+    shim._syncInteractive()
     shim.setAttribute("id", idVal !== undefined ? String(idVal) + "I" : "")
     // двойной клик/правый клик — надеть/снять предмет (doubleClickItem из drag.js);
     // в SVG это были addEventListener("dblclick"/"contextmenu") на элементе
@@ -1150,9 +1327,7 @@ function createRect(place, x, y, w, h, stroke, strokeWidth, fill, obj = {}) {
     if (obj.fillOpacity !== undefined) shim.attrs["fill-opacity"] = num(obj.fillOpacity)
     redrawRect(shim)
     baseInteractive(shim, obj)
-    g.eventMode = (obj.func || obj.hover) ? "static" : "none"
-    if (obj.func) shim._onclick = obj.func
-    if (obj.hover) shim._syncInteractive()
+    // eventMode (перехват кликов/интерактивность) решает _syncInteractive
     place.appendChild(shim)
     return shim
 }
@@ -1164,8 +1339,6 @@ function createCircle(place, cx, cy, r, stroke, strokeWidth, fill, obj = {}) {
     shim.attrs.stroke = stroke; shim.attrs["stroke-width"] = strokeWidth; shim.attrs.fill = fill
     redrawCircle(shim)
     baseInteractive(shim, obj)
-    g.eventMode = (obj.func || obj.hover) ? "static" : "none"
-    if (obj.func) shim._onclick = obj.func
     place.appendChild(shim)
     return shim
 }
@@ -1234,7 +1407,8 @@ function createPath(place, obj, fill) {
     if (obj.y !== undefined) shim.attrs.y = obj.y
     if (fill) shim.attrs.fill = fill
     redrawPath(shim)
-    g.eventMode = "none"
+    // eventMode решает _syncInteractive: залитый path перехватывает клики (visiblePainted)
+    shim._syncInteractive()
     place.appendChild(shim)
     if (obj.clipPath) {
         // окно-клип [w,h] вокруг (x,y) — как svg.js createPath
@@ -1448,6 +1622,11 @@ function setupBackend(engineApi) {
     app = engineApi.app
     worldContainer = engineApi.worldContainer
     recalcWindowSize()
+    // Pixi по умолчанию делает preventDefault на нативном pointerdown — браузер в ответ
+    // подавляет ВСЕ совместимые события мыши до pointerup, и document-слушатели игры
+    // (перетаскивание ползунков/полос прокрутки) не получают ни mousemove, ни mouseup.
+    // Канвас на всю страницу, прокрутки/выделения нет — отключаем безопасно
+    app.renderer.events.autoPreventDefault = false
     // Pixi v8 делает app.stage корневым renderGroup по умолчанию; в 8.19 сочетание
     // этого кэша инструкций со stencil-масками (clipPath полос ХП/опыта) ломает
     // отрисовку sibling-ветки: worldContainer перестаёт рисоваться (чёрный экран

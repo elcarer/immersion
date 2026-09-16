@@ -504,11 +504,18 @@ async function init() {
         backgroundColor: "black",
         resizeTo: window, //растянуть на всё окно
         antialias: false, //отключаем сглаживание пиксельарта (???)
-        // МИГРАЦИЯ (2026-09-12): было "webgpu". На тестовой машине (GTX 1060, драйвер 616.92)
-        // WebGPU-девайс ТИХО терялся в бою — рендер навсегда становился чёрным до перезагрузки
-        // страницы. WebGL на этой карте стабилен, картинка попиксельно та же. В ядре
-        // zero_engine preference не менялся — вопрос обсуждается отдельно (SESSION_HANDOFF.md)
-        preference: "webgl"
+        // МИГРАЦИЯ (2026-09-12): вернулись на "webgpu" (решение пользователя). Прежний
+        // перевод на WebGL был основан на ложном диагнозе — «потеря девайса» оказалась
+        // двумя багами DOM-шима (переиспользование уничтоженного PIXI.Text из пула
+        // floatText и renderGroup+stencil-маски полос ХП), оба исправлены в шиме.
+        // Ядро zero_engine всегда использовало webgpu — расхождений больше нет
+        // МИГРАЦИЯ (2026-09-12, обновлено 2026-09-16): вернулись на "webgpu" (решение
+        // пользователя «да»). Прежний перевод на WebGL был основан на ложном диагнозе —
+        // «чёрный экран в бою» оказался двумя багами DOM-шима (переиспользование
+        // уничтоженного PIXI.Text из пула floatText и renderGroup+stencil-маски полос
+        // ХП), оба исправлены в шиме; сама «потеря девайса» не воспроизводилась.
+        // Ядро zero_engine всегда использовало webgpu — расхождений больше нет
+        preference: "webgpu"
     });
     document.body.appendChild(app.canvas);
     // Единый контейнер МИРА: всё, что живёт в мировых координатах (юниты, эффекты),
@@ -707,12 +714,20 @@ async function init() {
     function addSystem(fn) { moduleSystems.push(fn); }
     // Игровой цикл: порядок систем фиксирован движком
     app.ticker.add((ticker) => {
+      try {
         movementSystem(app, world, ticker.deltaMS); // 1. Двигаем объекты (с учётом FPS)
         spatialGridSystem(app, world); // 2. Строим пространственную сетку по новым координатам
         collisionSystem(world); // 3. Считаем столкновения на основе сетки и корректируем позиции/скорости
         animationSystem(world, ticker); // 4. Обновляем анимацию (передаём тикер целиком)
         renderSystem(app, world, worldContainer); // 5. Отрисовываем графику (+ culling вне вида)
         for (let i = 0; i < moduleSystems.length; i++) moduleSystems[i](ticker); // 6. Системы модулей
+      } catch (e) {
+        // Страховка миграции: исключение системы убивало rAF-цикл тикера насовсем
+        // (кадры останавливались молча). Логируем и продолжаем — ошибка одного тика
+        // не должна останавливать все следующие
+        window.__loopErr = String(e && e.stack || e).slice(0, 900)
+        console.error('[engine-loop]', e)
+      }
     });
     // Отладочный хендл: доступ к состоянию движка из консоли браузера (window.__ENGINE)
     window.__ENGINE = { app, ECS, world, COMPONENTS, DATA, SpatialHashGrid, particleContainer, worldContainer, STATIC_SPRITE_POOLS, ANIMATED_SPRITE_POOLS, events };
