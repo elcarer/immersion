@@ -14,7 +14,7 @@
 
 // Глобали ECS/world/COMPONENTS/DATA — из engine/build/engine (классический скрипт
 // грузится до всех модулей, так же как в zero_engine)
-import { cameraView, layers } from "./pixiBackend.js"
+import { cameraView, layers, applyStillTexture } from "./pixiBackend.js"
 
 const TYPE_CODES = { hero: 1, enemy: 2, bullet: 3, effect: 4, pet: 5, corpse: 6 }
 
@@ -78,9 +78,14 @@ function registerEcs(obj) {
     const half = cr ? Math.max(cr._w || 0, cr._h || 0) / 2 : 64
     ECS.addComponent(world, id, "cullPad", half + 64)
     // E-3: счётчики анимации — в компоненты (инициал из литерала спавна), затем
-    // поля объекта переопределяются акцессорами поверх компонентов
+    // поля объекта переопределяются акцессорами поверх компонентов.
+    // R1: у спавнов с frame-смещением (дэш-призраки и пр.) currentStill может быть
+    // не задан — тогда фактический кадр уже применён в шим (setFrame при создании):
+    // берём его, иначе первый renderSync мигнул бы кадром 0.
+    const initStill = obj.currentStill !== undefined ? +obj.currentStill
+        : (obj.img && obj.img._still !== undefined ? obj.img._still : 0)
     ECS.addComponent(world, id, "animCounter", +obj.animCounters || 0)
-    ECS.addComponent(world, id, "animStill", +obj.currentStill || 0)
+    ECS.addComponent(world, id, "animStill", initStill)
     defAnimAccessor(obj, "animCounters", "animCounter")
     defAnimAccessor(obj, "currentStill", "animStill")
     // E-3: маркеры типовых групп по типу НА СПАВНЕ (см. комментарий у createQuery)
@@ -137,11 +142,13 @@ export function createEntityList() {
     })
 }
 
-// Система синхронизации видимости: вызывается КАЖДЫЙ кадр рендера ПОСЛЕ всех тиков
-// игры (порядок задаёт index.js: gameTickSystem → ecsRenderSync). Прячет сущности,
-// целиком вышедшие за окно камеры (+cullPad), показывает вернувшиеся. Поведение
-// совпадает с SVG: за окном кадры не писались (браузер клиповал), у нас спрайт
-// исключается из рендера — визуально то же, по CPU/GPU сильно дешевле.
+// Система синхронизации рендера: вызывается КАЖДЫЙ кадр ПОСЛЕ всех тиков игры
+// (порядок задаёт index.js: gameTickSystem → ecsRenderSync). R1: ЕДИНСТВЕННОЕ место,
+// где боевые анимированные сущности получают позицию и кадр текстуры — из компонентов
+// (posX/posY/animStill), один раз за кадр. Промежуточные состояния между setAttribute-
+// записями внутри тика больше не доходят до GPU — класс причин ряби при скролле
+// устранён структурно. Видимость: сущности, целиком вышедшие за окно камеры
+// (+cullPad), исключаются из рендера (как клиппинг SVG, только дешевле).
 export function ecsRenderSync() {
     const ents = world.queries.battle && world.queries.battle.entities
     if (!ents) return
@@ -158,7 +165,23 @@ export function ecsRenderSync() {
         if (sprite._layer === layers[2]) continue
         const pad = COMPONENTS.cullPad[id]
         const x = COMPONENTS.posX[id], y = COMPONENTS.posY[id]
-        sprite.node.visible =
-            x >= left - pad && x <= right + pad && y >= top - pad && y <= bottom + pad
+        const node = sprite.node
+        if (x < left - pad || x > right + pad || y < top - pad || y > bottom + pad) {
+            node.visible = false
+            continue
+        }
+        node.visible = true
+        // R1: позиция/кадр — только для анимированных боевых сущностей (их узел
+        // больше никто не двигает). Статичные image-сущности живут по-старому:
+        // их posX/posY не обновляются из шима, двигать узел здесь нельзя.
+        if (sprite.kind === "anim" && sprite._clipRect) {
+            node.position.set(x, y)
+            const s = COMPONENTS.animStill[id]
+            if (s !== sprite._still) {
+                // _still фиксируем только при успешном применении (кадры ещё
+                // не загружены — ретрай на следующем кадре, как в applyTextureRetro)
+                if (applyStillTexture(sprite, s)) sprite._still = s
+            }
+        }
     }
 }

@@ -840,7 +840,18 @@ function applyPosition(shim) {
             const shift = rx - (+shim.attrs.x || 0)
             shim._shift = shift
             const fw = shim._frameW || 1
-            setFrame(shim, Math.round(shift / fw))
+            const s = Math.round(shift / fw)
+            // R1: боевая сущность (ECS) — узел не трогаем. Кадр пишется в компонент
+            // animStill, позицию уже записал vrect-проход (posX/posY); применяет
+            // ecsRenderSync один раз за кадр — промежуточные состояния между записями
+            // rect/img внутри тика больше не доходят до GPU (класс причин ряби).
+            const ecsId = cr._ecs
+            if (ecsId !== undefined && ecsId !== null && COMPONENTS.animStill) {
+                const times = parseInt(shim._times) || 1
+                COMPONENTS.animStill[ecsId] = Math.max(0, Math.min(times - 1, s))
+                return
+            }
+            setFrame(shim, s)
         }
         if (shim.node) shim.node.position.set(rx, ry)
         syncEcsPos(shim)
@@ -921,6 +932,30 @@ function applySize(shim) {
 }
 
 // кадр анимированного спрайта (текстура-подокно)
+// применение кадра к узлу: текстура-подокно + размер. Общая точка setFrame
+// (шим-путь небоевых анимаций) и ecsRenderSync (боевые сущности, раз в кадр).
+// Возвращает true, если кадр реально применён (иначе вызывающий не фиксирует _still).
+function applyStillTexture(shim, s) {
+    const frames = shim._frames
+    if (!frames || !frames.length) return false
+    // страховка: destroyed-спрайт (в Pixi v8 destroy обнуляет _anchor → «reading 'x'»)
+    // или текстура-кадр с null frame роняли GPU-батчер — пресекаем и логируем виновника
+    if (!shim.node || shim.node.destroyed) {
+        warnOnce("dead" + frames._src, "кадр на уничтоженном спрайте " + frames._src + " — пропуск")
+        return false
+    }
+    if (!frames[s] || !frames[s].frame) {
+        warnOnce("nullframe" + frames._src, "кадр " + s + " с null frame у " + frames._src + " — пересборка листа")
+        rebuildFrames(frames._src, frames._times, frames, frames._w, frames._h)
+        if (!frames[s] || !frames[s].frame) return false
+    }
+    shim.node.texture = frames[s]
+    shim.node.width = shim._frameW
+    shim.node.height = +shim.attrs.height || frames[s].height
+    syncShadowCopies(shim)
+    return true
+}
+
 function setFrame(shim, still) {
     const frames = shim._frames
     if (!frames || !frames.length) { shim._pendingStill = still; return }
@@ -929,25 +964,7 @@ function setFrame(shim, still) {
     if (s < 0) s = 0
     if (s > times - 1) s = times - 1
     if (shim._still === s) return
-    shim._still = s
-    if (shim.node && frames[s]) {
-        // страховка: destroyed-спрайт (в Pixi v8 destroy обнуляет _anchor → «reading 'x'»)
-        // или текстура-кадр с null frame роняют GPU-батчер — пресекаем и логируем виновника
-        if (shim.node.destroyed) {
-            warnOnce("dead" + frames._src, "setFrame на уничтоженном спрайте " + frames._src + " — пропуск")
-            return
-        }
-        if (!frames[s].frame) {
-            warnOnce("nullframe" + frames._src, "кадр " + s + " с null frame у " + frames._src + " — пересборка листа")
-            shim._still = undefined
-            rebuildFrames(frames._src, frames._times, frames, frames._w, frames._h)
-            if (!frames[s] || !frames[s].frame) return
-        }
-        shim.node.texture = frames[s]
-        shim.node.width = shim._frameW
-        shim.node.height = +shim.attrs.height || frames[s].height
-        syncShadowCopies(shim)
-    }
+    if (applyStillTexture(shim, s)) shim._still = s
 }
 
 // ECS: позиция окна кадра → компоненты posX/posY (мост ecsBridge ставит _ecs)
@@ -1389,6 +1406,10 @@ function createImage(place, x, y, w, h, src, obj = {}) {
     if (sprite.texture === PIXI.Texture.EMPTY) registerPending(String(src), shim)
     sprite.position.set(num(x), num(y))
     sprite.width = wN; sprite.height = hN
+    // R1: привязка к целым экранным пикселям у мировых слоёв — при дробном масштабе
+    // камеры (окно не кратно viewBox, зум) спрайты не «ползут» субпиксельно при
+    // скролле (рябь краёв). UI-слой (2) не трогаем — там точность макета важнее.
+    if (place._layer !== layers[2]) sprite.roundPixels = true
     shim.attrs.href = String(src)
     // контракт svg.js: id статичных картинок хранится С суффиксом «I» (getElementById
     // в game-коде ищет именно «…I»: expBarI/hpBarI — полосы ХП/опыта и т.д.)
@@ -1445,6 +1466,8 @@ function createAnimImage(place, x, y, w, h, src, obj = {}) {
     sprite.width = wN / n
     sprite.height = hN
     sprite.eventMode = "none"
+    // R1: мировые спрайты — целые экранные пиксели (см. createImage)
+    if (place._layer !== layers[2]) sprite.roundPixels = true
     applyPixelated()
     place.appendChild(shim)
     registerFrameUser(String(src), times, shim)
@@ -1959,7 +1982,7 @@ export {
     createRect, createCircle, createTextEl, createTextHtml, createPath, createGroup,
     spritePos, moveSprite, rectPos, getCTMExport, applyPixelated, cameraView,
     preloadGameTextures, backendHooks, dragState,
-    installGameTicks, gameTickSystem,
+    installGameTicks, gameTickSystem, applyStillTexture,
 }
 function getCTMExport() {
     return layers[2] ? layers[2].getScreenCTM() : null
