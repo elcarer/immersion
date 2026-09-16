@@ -15,7 +15,9 @@
 // viewBox.animVal.width/height напрямую вместо литералов 1920/1080.
 import { svgArr } from "../scripts/svg.js"
 import { status } from "../scripts/start.js"
-import { windowSize } from "../index.js"
+// МИГРАЦИЯ: windowSize переехал в pixiBackend (index.js с top-level await не может
+// быть в цикле импортов) — значение то же (окно 16:9)
+import { windowSize } from "../scripts/pixiBackend.js"
 
 const ZOOM_MIN = 1
 const ZOOM_MAX = 3

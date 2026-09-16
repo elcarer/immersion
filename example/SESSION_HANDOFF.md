@@ -161,23 +161,70 @@ build/engine/scripts/engine/eventSystem.js
 | Файл | Что |
 |---|---|
 | `build/index.html` | +3 script: pixi.min.js, eventSystem.js, engine.js (до модуля index.js) |
-| `build/index.js` | бут: `await init()` → настройка слоёв бэкенда → `svg(3)` → `start()`; top-level await |
+| `build/index.js` | бут: `await init()` → настройка слоёв бэкенда → `svg(3)` → `start()`; top-level await; регистрация gameTickSystem + ecsRenderSync |
 | `build/scripts/svg.js` | ПЕРЕПИСАН: фасад 1:1 над pixiBackend (экспорты те же) |
-| `build/scripts/pixiBackend.js` | НОВЫЙ: шимы/слои/камера/пул/клипы/фильтры/текст/drag (~1000 строк) |
-| `build/scripts/ecsBridge.js` | НОВЫЙ: Proxy objectValues↔ECS + компоненты/группы |
-| `build/scripts/ecsSystems.js` | НОВЫЙ: renderSync-система |
+| `build/scripts/pixiBackend.js` | НОВЫЙ: шимы/слои/камера/пул/клипы/фильтры/текст/drag (~1500 строк) |
+| `build/scripts/ecsBridge.js` | НОВЫЙ: Proxy objectValues↔ECS + компоненты/группы + renderSync |
 | `build/scripts/del.js` | 1 строка: `objectValues = ecsBridge.createEntityList()` |
-| `build/scripts/start.js` | несколько строк: ожидание шрифтов + предзагрузка GPU-текстур до заставки |
+| `build/scripts/zoomFx.js` | 1 импорт: windowSize из pixiBackend (разрыв цикла index↔svg) |
+| `build/scripts/start.js` | удалён rAF-цикл (тики идут из тикера ядра); GPU-предзагрузка текстур до заставки |
 | остальные 78 файлов | БЕЗ ИЗМЕНЕНИЙ |
 
 ### Этапы (M1–M7)
 - [x] M1 Разведка: контракт DOM-шима составлен (см. выше)
 - [x] M2 План (этот раздел) + git-точка возврата (коммит оригинала, пуш в immersion)
-- [ ] M3 Копия ядра zero_engine → build/engine/
-- [ ] M4 pixiBackend.js + svg.js-фасад + бут index.html/index.js
-- [ ] M5 ecsBridge + renderSync
-- [ ] M6 Смоук: заставка → лобби → забег (герой ходит, враги ИИ, бой, ХП-бары) — Pixi/WebGPU
-- [ ] M7 Документация (этот раздел), коммит, пуш
+- [x] M3 Копия ядра zero_engine → build/engine/
+- [x] M4 pixiBackend.js + svg.js-фасад + бут index.html/index.js
+- [x] M5 ecsBridge + renderSync
+- [x] M6 Смоук: заставка → лобби → забег (герой ходит, враги ИИ, бой, ХП-бары) — Pixi/WebGPU
+- [x] M7 Документация (этот раздел), коммит, пуш
+
+### Итог смоук-теста M6 (2026-09-16, Chrome WebGPU, PixiJS 8.19)
+Подтверждено вживую: заставка (лого/кнопки/glow/подтверждение «Новая игра»), лобби (выбор
+героя, апгрейды, сундук, SETTINGS/SAVE/LOAD), комиксы, генерация этажа (пол/стены/объекты/
+двери/ловушки), ходьба героя и камера (pivot = hero−480/−270 при зуме 2 — в точности
+viewBox-математика), открытие дверей (подмена href 9→27), открытие комнат и спавн врагов
+(конвейер главы), ИИ (PATROL/CHASE/ATTACK, погоня толпой), урон герою, смерть героя → экран
+результатов, НОВОЕ: авто-атака героя (ножи) → урон врагам → смерть врага → опыт (exp=2 за
+2 убийства) → уборка трупов, полосы ХП врагов, карточка объекта при наведении (V48),
+наземные тени, floatText. ECS: каждый спавн регистрирует сущность в группе `battle`
+(etype/posX/posY/cullPad + DATA.bag/sprite), renderSync кульмит по окну камеры.
+
+### Исправленные в ходе M6 баги адаптера (все — в pixiBackend.js)
+1. **Слои-двойники**: makeLayerShim создавал свои контейнеры мимо layerNodes → сцена
+   рисовалась в осиротевшие узлы (чёрный экран). Фикс: makeLayerShim(index, node).
+2. **parseDropShadows**: `[^)]+` обрывал цвет `rgba(...)` на внутренней скобке →
+   «Unable to convert color» и падение ЛЮБОЙ перерисовки лобби. Фикс: цвет-альтернатива
+   `rgba?\([^)]*\)|#hex|name`.
+3. **id картинок**: статичные image() получают id С суффиксом «I» (контракт svg.js:
+   `getElementById("expBarI")`) — фасад регистрировал голый id → takeDamage changeHP падал
+   на null. Фикс в createImage + id-регистрация в createTextEl/createTextHtml.
+4. **animVal[0]/baseVal**: игра читает `y.animVal[0].value` (SVG-список, floatText) и пишет
+   `x.baseVal.value` (ползунки) — numAttr теперь массиво-подобный + baseVal с записью.
+5. **remove() = только открепление** (семантика SVG): пулы игры (floatText) переиспользуют
+   узел ПОСЛЕ remove; прежний destroy давал «renderPipeId of null» при переподключении.
+   Отложенное освобождение — graveyard (Text/HTML НЕ уничтожаются никогда — их игра
+   рециклирует сама; спрайты/графика — по FIFO с защитой по поколению _gen).
+6. **Двойной releaseSprite** (эффект живёт и в objectValues, и в реестре модуля — dashFx/
+   charmFx + del.js): второй вызов уничтожал узел, оставив слот в бакете пула → при
+   переиспользовании «reading 'x'» в GPU-батчере. Фикс: release идемпотентен (_pooled),
+   acquire отбраковывает destroyed-слоты.
+7. **V11-гарантия цикла**: исключение в тике рвало цепочку слушателей тикера Pixi
+   (в оригинале rAF планировался ДО логики именно поэтому) — все тики после ошибки
+   навсегда умирали. Фикс: try/catch вокруг каждого тика в gameTickSystem
+   (+ window.__tickError — стек последней ошибки для диагностики).
+8. **Мёртвые узлы**: setAttribute/applyPosition на destroyed-узле — тихий no-op
+   (перестраховка; позиционные записи в переиспользуемые шимы больше не роняют рендер).
+9. Мелочи: prepend (checkZOrder heroMove), querySelector('defs') на слоях, elementFromPoint
+   → хит-тест UI-слоя (геймпад), getScreenCTM игровых слоёв (e,f = −vb·масштаб).
+
+### Известные вопросы после M6 (не блокируют игру)
+- Внутриигровая консоль-ошибка «reading 'x'» возникала ОДИН раз за забег до фикса №7;
+  после фиксов 5–8 за полный цикл (2 забега, смерти, ~2 минуты боя) — ни одной.
+- Вкладка в фоне: rAF не тикает (свойство браузера, НЕ регрессия — оригинал на rAF
+  вёл себя так же); возврат в вкладку продолжает с аккумулятора (клэмп 100мс).
+- Антиалиасинг текста/stroke на дробном масштабе может отличаться от SVG на пиксели
+  (PIXI.Text vs SVG-растеризация) — координаты и размеры совпадают.
 
 ### Ограничения миграции (осознанные)
 - Пиксель-в-пиксель идентичность НЕ гарантируется там, где SVG растеризовал сам (антиалиасинг текста, толщина stroke на дробном масштабе) — геймплейные координаты/тайминги совпадают точно.
@@ -186,3 +233,7 @@ build/engine/scripts/engine/eventSystem.js
 
 ### Журнал миграции (заполняется по ходу)
 - 2026-09-16: M1–M2 — аудит DOM-контракта (grep-сводка: setAttribute/animVal в 30 файлах, createElementNS в 6, getBBox 1, textHtml 4, glow ~15) и план записаны.
+- 2026-09-16: M3 — ядро zero_engine (990521c) скопировано: engine/dll/pixi.min.js (8.19), engine/scripts/engine/{engine.js,eventSystem.js}. Редакторы и арты движка — по требованию НЕ копированы.
+- 2026-09-16: M4–M5 — pixiBackend.js (~1530 строк: ShimEl, слои, камера-viewBox, пул, clipPath→маски, текст/шрифты, drag&drop, glow, хит-тест, document-перехваты), svg.js-фасад (экспорты 1:1), ecsBridge.js (Proxy objectValues↔ECS + renderSync), патчи index.html/index.js/zoomFx.js/del.js/start.js (удалён rAF-цикл, добавлена GPU-предзагрузка текстур).
+- 2026-09-16: M6 — смоук-тест пройден (см. «Итог смоук-теста»); 9 багов адаптера найдено и исправлено; gameLoop/enemyAI/damage и остальные игровые модули НЕ менялись.
+- 2026-09-16: M7 — коммит миграции и пуш в elcarer/immersion.

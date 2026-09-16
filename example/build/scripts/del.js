@@ -22,9 +22,13 @@ import { resetPortalFx } from "../scripts/portalFx.js"
 import { resetVoidBoss } from "../scripts/voidBoss.js"
 //V80: реестры наземных теней — только на текущем этаже
 import { resetGroundShadows } from "../scripts/groundShadow.js"
+// МИГРАЦИЯ M5: objectValues — Proxy-список, синхронизирующий ECS-сущности zero_engine
+// (компоненты etype/posX/posY/cullPad, группа battle). Контракт массива прежний:
+// push/splice/length=0, индексы, порядок. Подробности — ecsBridge.js
+import { createEntityList } from "../scripts/ecsBridge.js"
 
 let screenPic = []
-let objectValues = []
+let objectValues = createEntityList()
 //V4-кэши для checkZOrder (heroMove.js): пополняются при создании тайлов/эффектов, чистятся в del()
 let wallsOverlay = []
 let acidArr = []

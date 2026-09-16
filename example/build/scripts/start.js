@@ -16,6 +16,8 @@ import { settings,settingsTemp,settingsDel } from "../scripts/settings.js"
 //камеру этих слоёв надо вернуть к полному окну 1920×1080 (после выхода из забега viewBox
 //оставался на герое — меню показывалось без фона и лого). Циклический импорт легален
 import { resetWorldView } from "../scripts/zoomFx.js"
+//МИГРАЦИЯ (M4): предзагрузка GPU-текстур Pixi (тот же resources.json, HTTP-кэш горячий)
+import { preloadGameTextures } from "../scripts/pixiBackend.js"
 
 //V66c: эталонный шаблон мета-профиля — единый источник для первичного status и для «Новой
 //игры» (полный сброс профиля, решение пользователя). JSON-копия даёт каждому профилю СВОИ
@@ -65,26 +67,8 @@ let weapon = data.basicWeapons[0]
 status.inventory.doll = [,,,,,,,,,,,weapon,weapon,]
 let attack = data.attacks[weapon.attack]
 status.attack = {"img":attack.img,"target":undefined,"current":[],"stack":[{"timer":Math.trunc((attack.cooldown*1000)/16),"abil":attack}]}
-let globalTimer
-//V11: requestAnimationFrame вместо setInterval, НО логика идёт строго с фиксированным шагом 16мс
-//(как при setInterval(gameLoop,16)) — аккумулятор даёт ровно ~62.5 Гц на ЛЮБОЙ частоте монитора.
-//Простое сравнение с lastTick зависело от частоты: 144Гц → тик раз в 3 кадра (48Гц, игра медленнее),
-//75Гц → 37.5Гц, 120Гц → 60Гц. Это ломало восприятие скорости героя и врагов.
-let lastTick = 0
-let tickAcc = 0
-function loop(ts) {
-    //следующий кадр планируем ДО логики: если gameLoop выбросит исключение,
-    //цикл не умрёт (раньше с setInterval ошибка не останавливала игру, а rAF без этого зависал навсегда)
-    globalTimer = requestAnimationFrame(loop)
-    if (lastTick === 0) lastTick = ts
-    tickAcc += ts - lastTick
-    lastTick = ts
-    if (tickAcc > 100) tickAcc = 16 //долгая пауза (свёрнутая вкладка/фриз) — не навёртываем рывком
-    while (tickAcc >= 16) {
-        tickAcc -= 16
-        gameLoop()
-    }
-}
+// МИГРАЦИЯ (M4): rAF-цикл с аккумулятором удалён — тики игры идут из тикера ядра
+// zero_engine (index.js: gameTickSystem, тот же фиксированный шаг 16мс ~62.5Гц)
 function start() {
     //V64: полоса загрузки — фон hpBar.png (407×64) по центру экрана, заливка hpBarCol1.png
     //(315×24, смещение внутри фона +49/+20 — геометрия полос героя из takeDamage.js) —
@@ -121,11 +105,14 @@ function start() {
         },
         onComplete: (success) => {
              del()
-             //V59: заставка стартового экрана (фон → логотип → панель с кнопками)
-             drawStartScreen(true)
-             globalTimer&&cancelAnimationFrame(globalTimer)
-             globalTimer = requestAnimationFrame(loop)
-             buttonInit()
+             // МИГРАЦИЯ (M4): тики уже идут из тикера ядра (index.js). Перед заставкой
+             // заливаем текстуры в GPU (HTTP-кэш уже горячий после cacheResources) —
+             // без белых вспышек на спрайтах. Затем заставка и кнопки как раньше.
+             preloadGameTextures('./images/resources.json', './images/').then(() => {
+                 //V59: заставка стартового экрана (фон → логотип → панель с кнопками)
+                 drawStartScreen(true)
+                 buttonInit()
+             })
             }
         })
 }

@@ -31,8 +31,13 @@
   body {cursor:url('./images/UI/cur.png'), auto}
 </style>
 </head>
-<body> 
-    <script type="module" src="index.js"></script>
+<body>
+    <!-- МИГРАЦИЯ (2026-09-16): рендер переведён с SVG на PixiJS через ядро zero_engine.
+         Классические скрипты ядра грузятся ДО модуля игры (ставят глобали PIXI/ECS/world). -->
+    <script src="./engine/dll/pixi.min.js"></script>
+    <script src="./engine/scripts/engine/eventSystem.js"></script>
+    <script src="./engine/scripts/engine/engine.js"></script>
     <script type="text/javascript" src="pathfinding.js"></script>
+    <script type="module" src="index.js"></script>
   </body>
 </html>
