@@ -1,0 +1,99 @@
+import { floattext } from "../scripts/floatText.js"
+import { mapDel } from "../scripts/map.js"
+import { status } from "../scripts/start.js"
+import { activeSkillsDel } from "../scripts/activeSkills.js"
+import { tipDel } from "../scripts/tip.js"
+import { svgArr, releaseSprite } from "../scripts/svg.js"
+import { topMenuClose } from "../scripts/topMenu.js"
+import { delPins } from "../scripts/checkBuffs.js"
+import { bars, dropArr } from "../scripts/useObject.js"
+import { resetBossFight } from "../scripts/spiderBossFight.js"
+import { resetValkyrie } from "../scripts/valkyrie.js"
+import { resetEmoFx } from "../scripts/enemyAI.js"
+import { resetDashGhosts } from "../scripts/dashFx.js"
+import { resetCharmBullets } from "../scripts/charmFx.js"
+import { resetHowlZones } from "../scripts/howlFx.js"
+//V51: шлейфы «вампиризма» не переживают смену сцены
+import { resetVampFx } from "../scripts/vampFx.js"
+import { resetEnemyHover } from "../scripts/enemyHover.js"
+//V64: связка портал/рычаг/арены не переживает смену сцены
+import { resetPortalFx } from "../scripts/portalFx.js"
+//V65: Циклоп Пустоты и его Сгустки не переживают смену сцены
+import { resetVoidBoss } from "../scripts/voidBoss.js"
+//V80: реестры наземных теней — только на текущем этаже
+import { resetGroundShadows } from "../scripts/groundShadow.js"
+
+let screenPic = []
+let objectValues = []
+//V4-кэши для checkZOrder (heroMove.js): пополняются при создании тайлов/эффектов, чистятся в del()
+let wallsOverlay = []
+let acidArr = []
+//V16: кэш дверных спрайтов для openDoor (раньше openDoor каждый тик сканировал ВЕСЬ
+//screenPic — тысячи плиток открытых комнат — в поисках 8 вариантов дверей)
+let doorPics = []
+
+function del() {
+    let num = screenPic.length
+    for (let i = 0; i < num; i++) {
+        screenPic[i] && screenPic[i].remove && screenPic[i].remove() 
+    }
+    screenPic.length = 0
+
+    let num2 = objectValues.length
+    for (let i = 0; i < num2; i++) {
+        //V15: пули/эффекты — обратно в пул узлов, остальные — обычное удаление
+        if (objectValues[i].type === "bullet" || objectValues[i].type === "effect") {
+            releaseSprite(objectValues[i].img)
+        } else {
+            objectValues[i].rect && objectValues[i].rect.remove()
+            objectValues[i].img.remove()
+        }
+    }
+    objectValues.length = 0
+    if(svgArr[1].contains(status.hero.obj.img)) {
+        status.hero.obj.rect.remove()
+        status.hero.obj.img.remove()
+    }
+
+    let lengthText = floattext.length
+    for (let i = 0; i < lengthText; i++) {
+            floattext[i].obj.remove()
+    }
+    floattext.length = 0
+
+    //V66e: аргумент mapDel — nomusic (пропустить unduck), а не состояние забега: при смерти
+    //status.start===1 и musicDuck(0) проглатывался. Всегда 0: следом идёт playTrack (none/
+    //tavern/dungeon), который и задаёт финальную громкость синхронно в том же стеке
+    mapDel(0)
+    activeSkillsDel()
+    tipDel()
+    topMenuClose()
+    delPins()
+    bars.length = 0
+    dropArr.length = 0
+    wallsOverlay.length = 0
+    acidArr.length = 0
+    doorPics.length = 0
+    resetBossFight()
+    resetValkyrie()
+    resetEmoFx()
+    resetDashGhosts()
+    resetCharmBullets()
+    resetHowlZones()
+    resetVampFx()
+    resetEnemyHover() //V47: окно врага не переживает смену сцены
+    resetPortalFx() //V64: связка портал/рычаг/арены — только на текущем этаже
+    resetVoidBoss() //V65: босс 4 этажа и его Сгустки — только на текущем этаже
+    resetGroundShadows() //V80: реестры наземных теней — узлы уже снесены очисткой слоёв
+
+    status.time = 0
+
+    while (svgArr[0].firstChild) {
+        svgArr[0].removeChild(svgArr[0].firstChild)
+    }while (svgArr[1].firstChild) {
+        svgArr[1].removeChild(svgArr[1].firstChild)
+    }while (svgArr[2].firstChild) {
+        svgArr[2].removeChild(svgArr[2].firstChild)
+    }
+}
+export {screenPic,del,objectValues,wallsOverlay,acidArr,doorPics}
