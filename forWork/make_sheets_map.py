@@ -20,6 +20,9 @@ from PIL import Image
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))          # project2
 IMG = os.path.join(ROOT, 'example', 'build', 'images')
+# старые полосы удалены из билда (рендер читает листы); оригинал хранится здесь
+# для перегенерации/верификации карты
+LEGACY = os.path.join(ROOT, 'forWork', 'legacy_strips')
 SPR = os.path.join(ROOT, 'forWork', 'sprites')
 OUT_DIR = os.path.join(ROOT, 'example', 'build', 'images', 'sheets')
 OUT_JS = os.path.join(ROOT, 'example', 'build', 'scripts', 'sheetsMap.js')
@@ -51,7 +54,7 @@ def main():
     problems = []
 
     for kind in ('enemy', 'hero'):
-        base = os.path.join(IMG, kind)
+        base = os.path.join(LEGACY, kind)
         for ch in sorted(os.listdir(base)):
             p = os.path.join(base, ch)
             if not os.path.isdir(p):

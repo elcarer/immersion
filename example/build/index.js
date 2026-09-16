@@ -22,7 +22,9 @@ window.__ST = { status, objectValues, doorPics }
 // свой спавн через objectValues — конфигов нет, пустой список делает ядра no-op)
 globalThis.UNIT_CONFIGS = globalThis.UNIT_CONFIGS || []
 
-window.innerWidth >= window.innerHeight*16/9?windowSize.wt=window.innerHeight*16/9:windowSize.ht=window.innerWidth*9/16
+// размер растра — целый (дробный даёт дробный масштаб мира: мерцание при скролле;
+// формула дублируется в pixiBackend.recalcWindowSize)
+window.innerWidth >= window.innerHeight*16/9?windowSize.wt=Math.round(window.innerHeight*16/9):windowSize.ht=Math.round(window.innerWidth*9/16)
 
 document.body.style.overflow = 'hidden'
 document.oncontextmenu = function (){return false}

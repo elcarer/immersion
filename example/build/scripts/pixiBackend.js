@@ -216,9 +216,12 @@ function applyPixelated() {
 function recalcWindowSize() {
     windowSize.wt = window.innerWidth
     windowSize.ht = window.innerHeight
+    // РЯБЬ-ФИКС: размер растра должен быть ЦЕЛЫМ — дробный (innerHeight*16/9,
+    // например 937*16/9 = 1665.78) даёт дробный масштаб мира (1.735 вместо 2) —
+    // при скролле тексельная сетка ползёт по пиксельной сетке экрана (мерцание краёв)
     window.innerWidth >= window.innerHeight * 16 / 9
-        ? windowSize.wt = window.innerHeight * 16 / 9
-        : windowSize.ht = window.innerWidth * 9 / 16
+        ? windowSize.wt = Math.round(window.innerHeight * 16 / 9)
+        : windowSize.ht = Math.round(window.innerWidth * 9 / 16)
 }
 
 // ---------- Камера ----------
@@ -1760,8 +1763,11 @@ function setupBackend(engineApi) {
     // отладочная ручка для headless-тестов и консоли браузера (сцена/слои/реестры/кадры)
     window.__BACKEND = {
         get app() { return app },
-        worldContainer, layerNodes, layers, texCache, frameCache,
-        shimById, spritePool, cameraVB, SHEETS,
+        get layers() { return layers },
+        get layerNodes() { return layerNodes },
+        get cameraVB() { return cameraVB },
+        worldContainer, texCache, frameCache,
+        shimById, spritePool, SHEETS,
         windowSize: () => windowSize,
         framesInfo() {
             const out = []
@@ -1983,23 +1989,39 @@ let _gameTick = null
 let lastTick = 0
 let tickAcc = 0
 function installGameTicks(fn) { _gameTick = fn }
+function runGameTick() {
+    // V11-гарантия оригинала: исключение в gameLoop не убивает цикл (в SVG-версии
+    // rAF планировался ДО логики). Здесь — try/catch: рвёт ли цепочку тикера Pixi,
+    // чтобы ошибка одного тика не останавливала все следующие кадры.
+    try {
+        _gameTick()
+    } catch (e) {
+        console.error("[gameTick] исключение в тике игры:", e)
+        window.__tickError = String(e && e.stack || e).slice(0, 1200)
+    }
+}
 function gameTickSystem() {
     if (!_gameTick) return
     const ts = performance.now()
     if (lastTick === 0) lastTick = ts
-    tickAcc += ts - lastTick
+    const delta = ts - lastTick
     lastTick = ts
+    // РЯБЬ-ФИКС (отчёт юзера: «по два спрайта с запаздыванием» при скролле камеры).
+    // Аккумулятор 16мс на 60Гц мониторе даёт битый ритм 62.5Гц: ~24 кадра по одному
+    // тику, затем кадр с ДВУМЯ тиками — мир каждые ~0.4с прыгает на 4px вместо 2px,
+    // что при скролле видно как ритмичную рябь/двоение. Если кадр пришёл с дельтой
+    // 60Гц-диапазона (14..18мс) — тикаем РОВНО раз за кадр (60 тиков/с; −4% скорости
+    // против 62.5 — незаметно). Иначе (144Гц: дельта ~7мс, паузы >100мс) — прежний
+    // аккумулятор без изменений.
+    if (delta >= 14 && delta <= 18) {
+        runGameTick()
+        tickAcc = 0
+        return
+    }
+    tickAcc += delta
     if (tickAcc > 100) tickAcc = 16
     while (tickAcc >= 16) {
         tickAcc -= 16
-        // V11-гарантия оригинала: исключение в gameLoop не убивает цикл (в SVG-версии
-        // rAF планировался ДО логики). Здесь — try/catch: рвёт ли цепочку тикера Pixi,
-        // чтобы ошибка одного тика не останавливала все следующие кадры.
-        try {
-            _gameTick()
-        } catch (e) {
-            console.error("[gameTick] исключение в тике игры:", e)
-            window.__tickError = String(e && e.stack || e).slice(0, 1200)
-        }
+        runGameTick()
     }
 }
