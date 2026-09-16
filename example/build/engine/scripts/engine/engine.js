@@ -504,7 +504,11 @@ async function init() {
         backgroundColor: "black",
         resizeTo: window, //растянуть на всё окно
         antialias: false, //отключаем сглаживание пиксельарта (???)
-        preference: "webgpu" // предпочитаемый рендерер: нет WebGPU — PixiJS сам откатится на WebGL
+        // МИГРАЦИЯ (2026-09-12): было "webgpu". На тестовой машине (GTX 1060, драйвер 616.92)
+        // WebGPU-девайс ТИХО терялся в бою — рендер навсегда становился чёрным до перезагрузки
+        // страницы. WebGL на этой карте стабилен, картинка попиксельно та же. В ядре
+        // zero_engine preference не менялся — вопрос обсуждается отдельно (SESSION_HANDOFF.md)
+        preference: "webgl"
     });
     document.body.appendChild(app.canvas);
     // Единый контейнер МИРА: всё, что живёт в мировых координатах (юниты, эффекты),

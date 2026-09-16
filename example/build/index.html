@@ -29,6 +29,13 @@
     src: url('./Faithful.ttf') format("truetype")
   }
   body {cursor:url('./images/UI/cur.png'), auto}
+  /* МИГРАЦИЯ (PixiJS): канвас движка — элемент потока, и дефолтный margin body (8px)
+     сдвигал его от угла: белые полосы сверху/слева и «съехавший» экран. SVG-слои были
+     position:absolute в (0,0) вьюпорта — канвас обязан стоять так же. Фон чёрный:
+     у слоя пола (svg[0] background:black) он был частью SVG, канвас letterbox-зоны
+     закрашивает им же */
+  html, body { margin: 0; padding: 0; overflow: hidden; background: #000; }
+  canvas { display: block; }
 </style>
 </head>
 <body>

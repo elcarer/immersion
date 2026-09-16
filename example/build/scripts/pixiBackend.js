@@ -57,6 +57,17 @@ function warnOnce(key, msg) {
     }
 }
 
+// числовой аргумент игры: svg-контракт допускал строки с единицами ("128px","2px" —
+// doll/inventory/topMenu/lobby/tip/settings) — parseFloat; NaN («0pt» и мусор) → 0
+function num(v) {
+    if (typeof v === "string") {
+        const f = parseFloat(v)
+        return isFinite(f) ? f : 0
+    }
+    const n = +v
+    return isFinite(n) ? n : 0
+}
+
 // ---------- Текстуры ----------
 // шимы, созданные до загрузки текстуры (страховочная сетка: preload normally first)
 const pendingShims = new Map()   // src → ShimEl[] (статические)
@@ -237,9 +248,10 @@ function applyDropShadow(shim, styleStr) {
     for (const sp of specs) {
         let copy = null
         if (shim.node instanceof PIXI.Sprite) {
+            // копия с ТОЙ ЖЕ текстурой в (0,0) рисуется 1:1 в локальной системе узла —
+            // width/height ей задавать НЕЛЬЗЯ: сеттер ставит scale, а scale копии
+            // умножается на scale родителя → «распухание» кнопки при glow
             copy = new PIXI.Sprite(shim.node.texture)
-            copy.width = shim.node.width
-            copy.height = shim.node.height
         } else if (shim.kind === "text" || shim.kind === "html") {
             copy = new PIXI.Text({ text: shim.node.text, style: shim.node.style })
             copy.alpha = 1
@@ -247,6 +259,10 @@ function applyDropShadow(shim, styleStr) {
             warnOnce("shadow" + shim.kind, "drop-shadow на " + shim.kind + " не поддержан — пропущен")
             continue
         }
+        // копия — ребёнок узла: её anchor обязан совпасть с anchor узла, иначе текст
+        // с anchor middle рисуется от центра-верха и силуэт «расползается» вбок
+        const srcAnchor = shim.node.anchor
+        if (srcAnchor) copy.anchor.set(srcAnchor.x, srcAnchor.y)
         const col = new PIXI.Color(cssColorToPixi(sp.color))
         copy.tint = col
         copy.alpha = col.alpha
@@ -288,7 +304,32 @@ class ShimEl {
         while (p) { if (p.kind === "layer") return true; p = p.parent }
         return false
     }
-    get firstChild() { return this.children[0] || null }
+    get firstChild() {
+        // foreignObject-контракт: textHtml держит <div> ребёнком, игра задаёт ширину
+        // переноса через fo.firstChild.style.width (blessFx/library/enemyHover)
+        if (this.kind === "html" && this.children.length === 0) {
+            if (!this._htmlDiv) {
+                const shim = this
+                this._htmlDiv = {
+                    get style() {
+                        return {
+                            set width(v) {
+                                shim.attrs.width = num(v)
+                                if (shim.node) {
+                                    shim.node.style.wordWrapWidth = Math.max(10, num(v))
+                                    shim.node.style.wordWrap = true
+                                    shim.node.style.breakWords = true
+                                }
+                            },
+                            get width() { return shim.attrs.width || 0 },
+                        }
+                    },
+                }
+            }
+            return this._htmlDiv
+        }
+        return this.children[0] || null
+    }
     get lastElementChild() { return this.children[this.children.length - 1] || null }
     appendChild(shim) { return attachShim(this, shim, this.children.length) }
     append(...shims) { for (const s of shims) attachShim(this, s, this.children.length) }
@@ -358,7 +399,10 @@ class ShimEl {
         else if (this.kind === "html") this.node.text = stripHtml(v)
     }
     getBBox() {
-        if (this.node && this.node.width !== undefined) {
+        if (this.kind === "anim" && this._frameW) {
+            return { x: 0, y: 0, width: this._frameW, height: +(this.attrs.height || 0) }
+        }
+        if (this.node && isFinite(this.node.width)) {
             return { x: 0, y: 0, width: this.node.width, height: this.node.height }
         }
         return { x: 0, y: 0, width: 0, height: 0 }
@@ -465,7 +509,7 @@ function applyOutline(shim, v) {
     if (!m || !shim.node) return
     const w = +m[1], color = m[2]
     const g = new PIXI.Graphics()
-    const wd = shim.node.width || 0, ht = shim.node.height || 0
+    const wd = isFinite(shim.node.width) ? shim.node.width : 0, ht = isFinite(shim.node.height) ? shim.node.height : 0
     g.rect(-w / 2, -w / 2, wd + w, ht + w).stroke({ width: w, color })
     shim.node.addChild(g)
     shim._outlineG = g
@@ -494,7 +538,19 @@ function applyAttr(shim, name, value) {
                 shim.node.texture = getTexture(String(value))
                 applySize(shim)
                 applyPixelated()
+            } else if (shim.kind === "anim") {
+                // смена листа анимации (syncHeroAnim/setEnemyPose меняют href на живом
+                // спрайте): кадры пересобираются под новый лист, кадр восстанавливается
+                // по сохранённому смещению
+                shim._frames = getFrameTextures(String(value), parseInt(shim._times) || 1)
+                shim._still = undefined
+                setFrame(shim, Math.round((shim._shift || 0) / (shim._frameW || 1)))
             }
+            return
+        }
+        case "times": {
+            // «times» в SVG — атрибут-хранитель; в шиме ведёт _times (число кадров листа)
+            if (shim.kind === "anim") shim._times = value
             return
         }
         case "opacity": {
@@ -592,37 +648,43 @@ function applyPosition(shim) {
         return
     }
     if (shim.kind === "cliprect") {
-        shim._rx = +(shim.attrs.x || 0)
-        shim._ry = +(shim.attrs.y || 0)
+        shim._rx = num(shim.attrs.x)
+        shim._ry = num(shim.attrs.y)
         if (shim.parent && shim.parent.kind === "clip") updateClipMask(shim.parent)
         return
     }
+    // rect/circle: координаты живут ВНУТРИ геометрии Graphics (redrawRect/redrawCircle),
+    // position узла — нулевой; повторная запись x/y двигает ТОЛЬКО геометрию (в SVG
+    // атрибут x у rect сдвигает фигуру — двойной сдвиг «позиция+геометрия» ломал полосы
+    // прогресса и рамки, которые игра двигает через setAttribute("x"/"y"))
+    if (shim.kind === "rect") { redrawRect(shim); return }
+    if (shim.kind === "circle") { redrawCircle(shim); return }
+    // path/poly: x/y — хранилище (на d/points не влияют, как в SVG)
+    if (shim.kind === "path" || shim.kind === "poly") return
     if (shim.node && (shim.attrs.x !== undefined || shim.attrs.y !== undefined)) {
-        shim.node.position.set(+(shim.attrs.x || 0), +(shim.attrs.y || 0))
+        shim.node.position.set(num(shim.attrs.x), num(shim.attrs.y))
         syncEcsPos(shim)
     }
 }
 
 function applySize(shim) {
-    const w = +(shim.attrs.width || 0), h = +(shim.attrs.height || 0)
+    const w = num(shim.attrs.width), h = num(shim.attrs.height)
     if (shim.kind === "cliprect") {
         if (shim.parent && shim.parent.kind === "clip") updateClipMask(shim.parent)
         return
     }
     if (shim.kind === "anim") {
-        const cr = shim._clipRect
-        if (cr) {
-            cr.attrs.width = w
-            cr.attrs.height = h
-            cr._w = w / (parseInt(shim._times) || 1)
-            cr._h = h
-        }
+        // SVG-контракт: width/height на img — размер ЛИСТА (его читают animPlay/enemyHover
+        // через img.width.animVal для culling и hit-тестов). Окно кадра (clipRect) НЕ
+        // трогается — оно постоянно для сущности (кадр wait/run/attack одного врага
+        // одинаков); его перезапись листом ломала тени и коллизии (128 вместо 32)
         const n = parseInt(shim._times) || 1
         shim._frameW = w / n
         if (shim.node) { shim.node.width = shim._frameW; shim.node.height = h }
-        // пересобрать кадры под новый базовый размер
+        // пересобрать кадры под новый лист/число кадров (setFrame поставит текущий)
         if (shim.attrs.href) {
             shim._frames = getFrameTextures(String(shim.attrs.href), shim._times)
+            shim._still = undefined
             setFrame(shim, Math.round((shim._shift || 0) / (shim._frameW || 1)))
         }
         return
@@ -667,8 +729,8 @@ function setFrame(shim, still) {
 function syncEcsPos(shim) {
     const id = shim._ecs
     if (id === undefined || id === null) return
-    COMPONENTS.posX[id] = +(shim.attrs.x || 0)
-    COMPONENTS.posY[id] = +(shim.attrs.y || 0)
+    COMPONENTS.posX[id] = num(shim.attrs.x)
+    COMPONENTS.posY[id] = num(shim.attrs.y)
 }
 
 // ----------------------------------------------------------------------------
@@ -687,8 +749,8 @@ function makeClipMask(clipShim) {
 function updateClipMask(clipShim) {
     const rectShim = clipShim.children.find(c => c.kind === "cliprect")
     if (!rectShim || !clipShim._maskG) return
-    const x = +(rectShim.attrs.x || 0), y = +(rectShim.attrs.y || 0)
-    const w = +(rectShim.attrs.width || 0), h = +(rectShim.attrs.height || 0)
+    const x = num(rectShim.attrs.x), y = num(rectShim.attrs.y)
+    const w = num(rectShim.attrs.width), h = num(rectShim.attrs.height)
     // маска в КООРДИНАТАХ РОДИТЕЛЯ пользователя: у UI-слоя всё в общих viewBox-координатах,
     // у игровых слоёв — тоже (общий worldContainer) — Grafika-маску добавляем пользователю
     const g = clipShim._maskG
@@ -726,13 +788,13 @@ function applyClipPath(shim, value) {
 // ----------------------------------------------------------------------------
 function redrawRect(shim) {
     const g = shim.node
-    const x = +(shim.attrs.x || 0), y = +(shim.attrs.y || 0)
-    const w = +(shim.attrs.width || 0), h = +(shim.attrs.height || 0)
-    const rx = shim.attrs.rx !== undefined ? +shim.attrs.rx : 0
+    const x = num(shim.attrs.x), y = num(shim.attrs.y)
+    const w = num(shim.attrs.width), h = num(shim.attrs.height)
+    const rx = num(shim.attrs.rx)
     const fill = shim.attrs.fill
     const stroke = shim.attrs.stroke
-    const sw = +(shim.attrs["stroke-width"] || 0)
-    const fo = shim.attrs["fill-opacity"] !== undefined ? +shim.attrs["fill-opacity"] : 1
+    const sw = num(shim.attrs["stroke-width"])
+    const fo = num(shim.attrs["fill-opacity"] ?? 1)
     g.clear()
     if (w > 0 && h > 0) {
         const path = rx > 0 ? g.roundRect(x, y, w, h, rx) : g.rect(x, y, w, h)
@@ -743,9 +805,9 @@ function redrawRect(shim) {
 }
 function redrawCircle(shim) {
     const g = shim.node
-    const cx = +(shim.attrs.cx || 0), cy = +(shim.attrs.cy || 0), r = +(shim.attrs.r || 0)
+    const cx = num(shim.attrs.cx), cy = num(shim.attrs.cy), r = num(shim.attrs.r)
     const fill = shim.attrs.fill, stroke = shim.attrs.stroke
-    const sw = +(shim.attrs["stroke-width"] || 0)
+    const sw = num(shim.attrs["stroke-width"])
     g.clear()
     if (r > 0) {
         const p = g.circle(cx, cy, r)
@@ -759,7 +821,7 @@ function redrawPoly(shim) {
     const flat = []
     for (let i = 0; i + 1 < pts.length; i += 2) flat.push(pts[i], pts[i + 1])
     const fill = shim.attrs.fill, stroke = shim.attrs.stroke
-    const sw = +(shim.attrs["stroke-width"] || 0)
+    const sw = num(shim.attrs["stroke-width"])
     g.clear()
     if (flat.length >= 6) {
         const p = g.poly(flat)
@@ -797,7 +859,7 @@ function redrawPath(shim) {
     const g = shim.node
     const pts = pathPoints(shim.attrs.d)
     const fill = shim.attrs.fill !== undefined ? shim.attrs.fill : "rgba(0, 0, 0, 0.65)"
-    const stroke = shim.attrs.stroke, sw = +(shim.attrs["stroke-width"] || 0)
+    const stroke = shim.attrs.stroke, sw = num(shim.attrs["stroke-width"])
     g.clear()
     if (pts.length >= 6) {
         const p = g.poly(pts)
@@ -813,7 +875,7 @@ const TEXT_BASELINE_K = 0.8 // SVG y = baseline; Pixi anchor(0,0) = верх г�
 function applyTextStyle(shim) {
     if (!shim.node) return
     const o = shim._textOpts || {}
-    const size = +(shim.attrs["font-size"] || o.size || 24)
+    const size = num(shim.attrs["font-size"]) || num(o.size) || 24
     const fill = shim.attrs.fill || "#ffffff"
     const stroke = shim.attrs.stroke
     const sw = +(shim.attrs["stroke-width"] || 0)
@@ -832,13 +894,28 @@ function applyTextStyle(shim) {
     shim.node.style = st
     shim.node.resolution = Math.min(2, window.devicePixelRatio || 1)
     shim.node.anchor.set(anchorX, 0)
-    shim.node.position.set(+(shim.attrs.x || 0), +(shim.attrs.y || 0) - size * TEXT_BASELINE_K)
+    shim.node.position.set(num(shim.attrs.x), num(shim.attrs.y) - size * TEXT_BASELINE_K)
 }
 
 // ----------------------------------------------------------------------------
 // Дерево: подключение/отключение шимов
 // ----------------------------------------------------------------------------
 function attachShim(parent, shim, index) {
+    // страховка: пул вернул УНИЧТОЖЕННЫЙ текстовый шим (уже невозможно по фиксу
+    // layer.removeChild, но старые пулы могли запомнить шим из прежней сцены) —
+    // пересоздаём PIXI.Text по сохранённым атрибутам, иначе рендер падает на destroyed
+    if (shim.node && shim.node.destroyed) {
+        if (shim.kind === "text" || shim.kind === "html") {
+            shim.node = new PIXI.Text({ text: shim.attrs["#text"] || "" })
+            shim._wired = 0
+            shim._interactive = 0
+            shim._shadowCopies = null
+            shim._outlineG = null
+            applyTextStyle(shim)
+        } else {
+            return shim // не-текст уничтоженный не прикрепляем
+        }
+    }
     if (shim.parent) {
         const old = shim.parent
         const i = old.children.indexOf(shim)
@@ -911,18 +988,39 @@ function wrapEvt(nativeOrFederated, targetShim) {
 }
 function wirePixiEvents(shim) {
     const n = shim.node
-    n.on("pointertap", e => { shim._onclick && shim._onclick(wrapEvt(e, shim)); fire(shim, "dblclick", e, shim) })
-    n.on("pointerover", e => { shim._over && shim._over(wrapEvt(e, shim)) })
-    n.on("pointerout", e => { shim._out && shim._out(wrapEvt(e, shim)) })
+    // DOM-мост: Pixi-события дублируются в _listeners под DOM-именами — addEventListener
+    // на шимах (ползунки настроек/журнала/библиотеки, drag предметов, мини-карта,
+    // glow-кнопки) жил на mouseenter/mousedown/click и БЕЗ него эти механики мертвы
+    n.on("pointertap", e => {
+        shim._onclick && shim._onclick(wrapEvt(e, shim))
+        fire(shim, "click", e, shim)
+    })
+    n.on("pointerover", e => {
+        shim._over && shim._over(wrapEvt(e, shim))
+        fire(shim, "mouseover", e, shim)
+        fire(shim, "mouseenter", e, shim)
+    })
+    n.on("pointerout", e => {
+        shim._out && shim._out(wrapEvt(e, shim))
+        fire(shim, "mouseout", e, shim)
+        fire(shim, "mouseleave", e, shim)
+    })
     n.on("pointerdown", e => {
         shim._down && shim._down(wrapEvt(e, shim))
+        fire(shim, "mousedown", e, shim)
         // dblclick-детект (Pixi v8 не эмитит dblclick сам)
         const now = performance.now()
         if (now - (shim._lastTap || 0) < 350) fire(shim, "dblclick", e, shim)
         shim._lastTap = now
     })
-    n.on("pointerup", e => { shim._up && shim._up(wrapEvt(e, shim)) })
-    n.on("pointermove", e => { shim._move && shim._move(wrapEvt(e, shim)) })
+    n.on("pointerup", e => {
+        shim._up && shim._up(wrapEvt(e, shim))
+        fire(shim, "mouseup", e, shim)
+    })
+    n.on("pointermove", e => {
+        shim._move && shim._move(wrapEvt(e, shim))
+        fire(shim, "mousemove", e, shim)
+    })
     n.on("rightclick", e => { fire(shim, "contextmenu", e, shim) })
 }
 function fire(shim, type, e, target) {
@@ -935,21 +1033,22 @@ function fire(shim, type, e, target) {
 // ----------------------------------------------------------------------------
 function baseInteractive(shim, obj) {
     if (!obj) return
-    if (obj.id !== undefined) { shim.attrs.id = obj.id; if (obj.id !== "") shimById.set(String(obj.id), shim) }
+    if (obj.id !== undefined) { shim.attrs.id = obj.id; if (obj.id !== "" ) shimById.set(String(obj.id), shim) }
     if (obj.opacity !== undefined) { shim.attrs.opacity = obj.opacity; shim.node.alpha = +obj.opacity }
-    if (obj.func || obj.hover || obj.funcShow || obj.funcDrag || obj.funcDbl || obj.hoverOpa) shim._syncInteractive()
+    if (obj.blur) applyDropShadow(shim, String(obj.blur).replace(/^filter:\s*/, ""))
     if (obj.func) shim._onclick = obj.func
     if (obj.funcShow) { shim._over = obj.funcShow; if (obj.funcShowOut) shim._out = obj.funcShowOut }
-    if (obj.hover) shim._syncInteractive()
-    if (obj.blur) applyDropShadow(shim, String(obj.blur).replace(/^filter:\s*/, ""))
-    if (obj.glow) wireGlow(shim, obj)
     if (obj.hoverOpa) {
         const base = obj.hoverOpa
         shim.node.alpha = base
         shim._over = () => { shim.node.alpha = 1 }
         shim._out = () => { shim.node.alpha = base }
-        shim._syncInteractive()
     }
+    if (obj.glow) wireGlow(shim, obj)
+    // ОДНА синхронизация В КОНЦЕ: обработчики уже присвоены. Раньше sync шёл первым —
+    // want считался по пустым полям, _interactive оставался 0, pointertap-слушатели
+    // не вешались: клики по rect-чекбоксам/полосам громкости были мертвы
+    shim._syncInteractive()
 }
 // glow-подсветка кнопок (hover): золотое свечение через силуэтные копии
 function wireGlow(shim, obj) {
@@ -973,11 +1072,15 @@ function wireGlow(shim, obj) {
 function createImage(place, x, y, w, h, src, obj = {}) {
     const sprite = new PIXI.Sprite()
     const shim = new ShimEl("image", sprite)
-    shim.attrs.x = x; shim.attrs.y = y; shim.attrs.width = w; shim.attrs.height = h
-    sprite.position.set(x, y)
-    sprite.width = w; sprite.height = h
+    const wN = num(w), hN = num(h)
+    shim.attrs.x = num(x); shim.attrs.y = num(y); shim.attrs.width = wN; shim.attrs.height = hN
+    // ВАЖНО: texture ДО width/height — width-сеттер делит на ширину текстуры, при
+    // пустой (0) он даёт scale=1 и размер игнорируется: картинка рисовалась в
+    // НАТИВНОМ размере файла (тени 30px вместо ~14, кнопки 208px вместо 500px)
     sprite.texture = getTexture(String(src))
     if (sprite.texture === PIXI.Texture.EMPTY) registerPending(String(src), shim)
+    sprite.position.set(num(x), num(y))
+    sprite.width = wN; sprite.height = hN
     shim.attrs.href = String(src)
     // контракт svg.js: id статичных картинок хранится С суффиксом «I» (getElementById
     // в game-коде ищет именно «…I»: expBarI/hpBarI — полосы ХП/опыта и т.д.)
@@ -985,6 +1088,13 @@ function createImage(place, x, y, w, h, src, obj = {}) {
     const objNoId = idVal !== undefined ? Object.assign({}, obj, { id: undefined }) : obj
     baseInteractive(shim, objNoId)
     shim.setAttribute("id", idVal !== undefined ? String(idVal) + "I" : "")
+    // двойной клик/правый клик — надеть/снять предмет (doubleClickItem из drag.js);
+    // в SVG это были addEventListener("dblclick"/"contextmenu") на элементе
+    if (obj.funcDbl) {
+        shim.addEventListener("dblclick", () => obj.funcDbl(obj.item))
+        shim.addEventListener("contextmenu", () => obj.funcDbl(obj.item))
+        shim._syncInteractive()
+    }
     if (obj.funcDrag) draggableShim(shim, obj.funcDrag, obj.item)
     if (obj.borderColor) applyOutline(shim, "2px solid " + obj.borderColor)
     place.appendChild(shim)
@@ -995,33 +1105,34 @@ function createImage(place, x, y, w, h, src, obj = {}) {
 function createAnimImage(place, x, y, w, h, src, obj = {}) {
     const times = obj.times
     const n = parseInt(times)
+    const wN = num(w), hN = num(h)
     // виртуальный rect (окно кадра/логическая позиция) — без Pixi-узла
     const clipRect = new ShimEl("vrect", null)
-    clipRect.attrs.width = w / n
-    clipRect.attrs.height = h
-    clipRect._w = w / n
-    clipRect._h = h
+    clipRect.attrs.width = wN / n
+    clipRect.attrs.height = hN
+    clipRect._w = wN / n
+    clipRect._h = hN
     const sprite = new PIXI.Sprite()
     const shim = new ShimEl("anim", sprite)
     shim._times = times
-    shim._frameW = w / n
+    shim._frameW = wN / n
     shim._clipRect = clipRect
     clipRect._img = shim
-    shim.attrs.x = x; shim.attrs.y = y; shim.attrs.width = w; shim.attrs.height = h
+    shim.attrs.x = num(x); shim.attrs.y = num(y); shim.attrs.width = wN; shim.attrs.height = hN
     shim.attrs.href = String(src)
-    const xShift = obj.frame ? (w / n) * obj.frame : 0
+    const xShift = obj.frame ? (wN / n) * obj.frame : 0
     shim._shift = xShift
-    clipRect.attrs.x = x; clipRect.attrs.y = y
-    clipRect._rx = x; clipRect._ry = y
+    clipRect.attrs.x = num(x); clipRect.attrs.y = num(y)
+    clipRect._rx = num(x); clipRect._ry = num(y)
     if (obj.id !== undefined && obj.id !== "") {
         shim.attrs.id = String(obj.id) + "I"
         shimById.set(shim.attrs.id, shim)
     }
-    sprite.position.set(x, y)
+    sprite.position.set(num(x), num(y))
     shim._frames = getFrameTextures(String(src), times)
-    setFrame(shim, Math.round(xShift / (w / n)))
-    sprite.width = w / n
-    sprite.height = h
+    setFrame(shim, Math.round(xShift / (wN / n)))
+    sprite.width = wN / n
+    sprite.height = hN
     sprite.eventMode = "none"
     applyPixelated()
     place.appendChild(shim)
@@ -1033,10 +1144,10 @@ function createAnimImage(place, x, y, w, h, src, obj = {}) {
 function createRect(place, x, y, w, h, stroke, strokeWidth, fill, obj = {}) {
     const g = new PIXI.Graphics()
     const shim = new ShimEl("rect", g)
-    shim.attrs.x = x; shim.attrs.y = y; shim.attrs.width = w; shim.attrs.height = h
+    shim.attrs.x = num(x); shim.attrs.y = num(y); shim.attrs.width = num(w); shim.attrs.height = num(h)
     shim.attrs.stroke = stroke; shim.attrs["stroke-width"] = strokeWidth; shim.attrs.fill = fill
-    if (obj.rx !== undefined) shim.attrs.rx = obj.rx
-    if (obj.fillOpacity !== undefined) shim.attrs["fill-opacity"] = obj.fillOpacity
+    if (obj.rx !== undefined) shim.attrs.rx = num(obj.rx)
+    if (obj.fillOpacity !== undefined) shim.attrs["fill-opacity"] = num(obj.fillOpacity)
     redrawRect(shim)
     baseInteractive(shim, obj)
     g.eventMode = (obj.func || obj.hover) ? "static" : "none"
@@ -1049,7 +1160,7 @@ function createRect(place, x, y, w, h, stroke, strokeWidth, fill, obj = {}) {
 function createCircle(place, cx, cy, r, stroke, strokeWidth, fill, obj = {}) {
     const g = new PIXI.Graphics()
     const shim = new ShimEl("circle", g)
-    shim.attrs.cx = cx; shim.attrs.cy = cy; shim.attrs.r = r
+    shim.attrs.cx = num(cx); shim.attrs.cy = num(cy); shim.attrs.r = num(r)
     shim.attrs.stroke = stroke; shim.attrs["stroke-width"] = strokeWidth; shim.attrs.fill = fill
     redrawCircle(shim)
     baseInteractive(shim, obj)
@@ -1063,7 +1174,7 @@ function createTextEl(place, x, y, w, h, stroke, strokeWidth, fill, textContent,
     const t = new PIXI.Text({ text: String(textContent) })
     const shim = new ShimEl("text", t)
     shim._textOpts = obj
-    shim.attrs.x = x; shim.attrs.y = y
+    shim.attrs.x = num(x); shim.attrs.y = num(y)
     shim.attrs.stroke = stroke; shim.attrs["stroke-width"] = strokeWidth; shim.attrs.fill = fill
     shim.attrs["font-size"] = obj.size || 24
     shim.attrs["font-family"] = obj.font || "baseFont2"
@@ -1095,7 +1206,7 @@ function createTextHtml(place, x, y, w, h, stroke, strokeWidth, fill, textConten
     const t = new PIXI.Text({ text: stripHtml(textContent) })
     const shim = new ShimEl("html", t)
     shim._textOpts = obj
-    shim.attrs.x = x; shim.attrs.y = y; shim.attrs.width = w; shim.attrs.height = h
+    shim.attrs.x = num(x); shim.attrs.y = num(y); shim.attrs.width = num(w); shim.attrs.height = num(h)
     shim.attrs.stroke = stroke; shim.attrs["stroke-width"] = strokeWidth; shim.attrs.fill = fill
     shim.attrs["font-size"] = obj.size || 24
     shim.attrs["font-family"] = obj.font || "baseFont2"
@@ -1223,7 +1334,7 @@ function moveDragShim(cx, cy) {
     dragSelected.setAttribute("x", pos.x - dragData.offX)
     dragSelected.setAttribute("y", pos.y - dragData.offY)
 }
-function endDragShim(shim) {
+function endDragShim(shim, clientX, clientY) {
     if (!dragSelected) return
     const el = dragSelected
     const data = dragData
@@ -1231,7 +1342,9 @@ function endDragShim(shim) {
     dragData = null
     applyDropShadow(el, "")
     el._styleRaw = "none"
-    data.funcDrag({ target: el, clientX: 0, clientY: 0 }, data.item, data.origX, data.origY)
+    // реальные клиентские координаты отпускания (как у mouseup в SVG): часть вызовов
+    // funcDrag читает evt.clientX/clientY
+    data.funcDrag({ target: el, clientX: clientX || 0, clientY: clientY || 0 }, data.item, data.origX, data.origY)
 }
 // контейнер перетаскиваемых данных для фасада
 const backendHooks = { tipDel: null }
@@ -1245,7 +1358,7 @@ function installDragListeners() {
             moveDragShim(e.clientX, e.clientY)
         }
     })
-    cv.addEventListener("pointerup", e => { if (dragSelected) endDragShim(dragSelected) })
+    cv.addEventListener("pointerup", e => { if (dragSelected) endDragShim(dragSelected, e.clientX, e.clientY) })
 }
 
 // ----------------------------------------------------------------------------
@@ -1262,6 +1375,8 @@ function hitTestUI(cx, cy) {
             if (deep) return deep
             if (c._interactive) {
                 const b = c.node.getBounds()
+                // NaN/бесконечные bounds (сломанная геометрия) — не хит
+                if (!isFinite(b.x) || !isFinite(b.width)) continue
                 if (cx >= b.x && cx <= b.x + b.width && cy >= b.y && cy <= b.y + b.height) return c
             }
         }
@@ -1279,10 +1394,17 @@ function makeLayerShim(index, node) {
     c.interactiveChildren = true
     const shim = new ShimEl("layer", c)
     // removeChild на СЛОЕ — путь очистки сцены (del.js: while firstChild removeChild):
-    // шим отсоединяется и его Pixi-узел уничтожается (иначе утечка GPU между этажами)
+    // шим отсоединяется и его Pixi-узел уничтожается (иначе утечка GPU между этажами).
+    // ВАЖНО: text/html НЕ уничтожаются — игровые пулы (floatText и др.) переиспользуют
+    // свои шимы ПОСЛЕ del(): уничтоженный PIXI.Text, вставленный пулом обратно в дерево,
+    // валил рендер каждый кадр («null._x» в updateLocalTransform) — чёрный экран
     shim.removeChild = child => {
         const i = shim.children.indexOf(child)
-        if (i !== -1) { shim.children.splice(i, 1); detachShim(child); destroyShimNode(child) }
+        if (i !== -1) {
+            shim.children.splice(i, 1)
+            detachShim(child)
+            if (child.kind !== "text" && child.kind !== "html") destroyShimNode(child)
+        }
         return child
     }
     shim._vb = index === 2 ? uiVB : cameraVB
@@ -1326,6 +1448,12 @@ function setupBackend(engineApi) {
     app = engineApi.app
     worldContainer = engineApi.worldContainer
     recalcWindowSize()
+    // Pixi v8 делает app.stage корневым renderGroup по умолчанию; в 8.19 сочетание
+    // этого кэша инструкций со stencil-масками (clipPath полос ХП/опыта) ломает
+    // отрисовку sibling-ветки: worldContainer перестаёт рисоваться (чёрный экран
+    // при живом HUD) после первого changeHP. Сняем renderGroup — маски и мир
+    // сосуществуют корректно
+    app.stage.renderGroup = null
     // слои камеры поверх particleContainer движка (не используется игрой)
     layerNodes = [new PIXI.Container(), new PIXI.Container(), new PIXI.Container()]
     worldContainer.addChild(layerNodes[0])
