@@ -269,10 +269,15 @@ function getGlowTexture(src, radiusVB, k) {
     const W = cv.width, H = cv.height
     let a = new Float32Array(W * H)
     for (let i = 0; i < W * H; i++) a[i] = id.data[i * 4 + 3] / 255
-    for (let pass = 0; pass < 3; pass++) a = boxBlurAlpha(a, W, H, r)
+    // СВЕЧЕНИЕ ТОЛЬКО ПО КРАЮ (просьба пользователя): ореол = размытая альфа
+    // минус исходная — внутри силуэта копия прозрачна (не заливает ячейку,
+    // как было с плотным зелёным квадратом у скилл-иконок), светит контур
+    let b = new Float32Array(a)
+    for (let pass = 0; pass < 3; pass++) b = boxBlurAlpha(b, W, H, r)
     for (let i = 0; i < W * H; i++) {
+        const ring = Math.max(0, b[i] - a[i])
         id.data[i * 4] = 255; id.data[i * 4 + 1] = 255; id.data[i * 4 + 2] = 255
-        id.data[i * 4 + 3] = Math.round(Math.min(1, a[i]) * 255)
+        id.data[i * 4 + 3] = Math.round(Math.min(1, ring) * 255)
     }
     ctx.putImageData(id, 0, 0)
     t = PIXI.Texture.from(cv)
@@ -742,13 +747,37 @@ function applyAttr(shim, name, value) {
             if (shim.kind === "text" || shim.kind === "html") { shim.node.text = String(value); syncShadowCopies(shim) }
             return
         }
+        case "transform": {
+            // единственная используемая игрой форма: "rotate(deg cx cy)" — вихрь
+            // дротиков Валькирии (valkyrie.js). Вокруг точки (cx,cy) родителя:
+            // pivot = центр − угол спрайта, position = центр
+            const m = /rotate\(\s*([-\d.]+)(?:[,\s]+([-\d.]+)[,\s]+([-\d.]+))?\s*\)/.exec(String(value || ""))
+            if (!m || !shim.node) {
+                if (shim.node) { // сброс transform
+                    shim._trCx = undefined; shim._trCy = undefined
+                    shim.node.rotation = 0
+                    shim.node.pivot.set(0, 0)
+                    shim.node.position.set(num(shim.attrs.x), num(shim.attrs.y))
+                }
+                return
+            }
+            const deg = +m[1]
+            const hasC = m[2] !== undefined
+            const cx = hasC ? +m[2] : num(shim.attrs.x)
+            const cy = hasC ? +m[3] : num(shim.attrs.y)
+            shim._trCx = cx; shim._trCy = cy
+            shim.node.rotation = deg * Math.PI / 180
+            shim.node.pivot.set(cx - num(shim.attrs.x), cy - num(shim.attrs.y))
+            shim.node.position.set(cx, cy)
+            return
+        }
         case "pointer-events": {
             // единственная семантика, которую игра использует: "none" (прозрачность)
             shim._syncInteractive()
             return
         }
         case "preserveAspectRatio": case "clipPathUnits":
-        case "stroke-linejoin": case "stroke-linecap": case "transform":
+        case "stroke-linejoin": case "stroke-linecap":
             return // семантика покрыта eventMode/деревом
         default:
             return
@@ -810,7 +839,9 @@ function applyPosition(shim) {
         return
     }
     if (shim.node && (shim.attrs.x !== undefined || shim.attrs.y !== undefined)) {
-        shim.node.position.set(num(shim.attrs.x), num(shim.attrs.y))
+        // при активном rotate-транформе позиция узла = центр вращения
+        if (shim._trCx !== undefined) shim.node.position.set(shim._trCx, shim._trCy)
+        else shim.node.position.set(num(shim.attrs.x), num(shim.attrs.y))
         syncEcsPos(shim)
     }
 }

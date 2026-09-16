@@ -381,7 +381,8 @@ function helpWord3(color,stat,x,y) {
     tempTip.push(textHtml(svgArr[2],x-280,y-190,260,280,"none","2px","#CCCCCC",T(superStatArr[stat-5]),{"id":"wordNameText","size":32,"font":"baseFont4","anchor":"middle"}))
 }
 function addToSkill(x,y,descFull,color) {
-    tempTip.push(textHtml(svgArr[2],x+30,y+340,340,260,"none","2px","#CCCCCC",descFull,{"id":"deckSkillText","size":40,"font":"baseFont4","anchor":"middle"}))
+    //MIGRATION: шрифт 40px не влезал во фрейм тултипа способности (репорт) — уменьшен до 32
+    tempTip.push(textHtml(svgArr[2],x+30,y+340,340,260,"none","2px","#CCCCCC",descFull,{"id":"deckSkillText","size":32,"font":"baseFont4","anchor":"middle"}))
 }
 //V94: rarityColor отдаётся наружу — обводка редкости на ячейках (лобби/инвентарь/кукла/
 //алхимия/экран предметов) обязана совпадать по цвету с рамкой тултипа, один источник
