@@ -23,10 +23,42 @@ ECS.registerComponent("etype", Uint8Array)
 ECS.registerComponent("posX", Float32Array)
 ECS.registerComponent("posY", Float32Array)
 ECS.registerComponent("cullPad", Float32Array)
+// E-3 (animPlay): горячие счётчики анимации — типизированные компоненты. Поля
+// obj.animCounters / obj.currentStill переопределяются акцессорами поверх них
+// (defAnimAccessor), поэтому ~14 игровых файлов продолжают писать их как раньше —
+// запись идёт в компонент. Состояние одно — в компоненте.
+ECS.registerComponent("animCounter", Float32Array)
+ECS.registerComponent("animStill", Float32Array)
+// E-3 (moveBullet/damage/damageHero/enemyMove/enemyAI): грубые множества по типу
+// на момент спавна. ВАЖНО: игра мутирует obj.type НА МЕСТЕ (enemy→corpse в enemyDie,
+// enemy→pet в encounters, босс enemy→up→upped→enemy в spiderBossFight) БЕЗ перерегистрации,
+// поэтому группы — только coarse-множество, а ВНУТРЕННИЕ фильтры по obj.type в системах
+// сохранены 1:1: лишние (stale) члены группы отсеиваются фильтром, как в старом скане
+// objectValues. Объекты, ЧЬИ типы совпали на спавне, в группе есть всегда.
+ECS.registerComponent("isEnemy", Uint8Array)
+ECS.registerComponent("isPet", Uint8Array)
+ECS.registerComponent("isBullet", Uint8Array)
+ECS.registerComponent("isFx", Uint8Array)
 if (!DATA.bag) DATA.bag = new Array(100000)
 if (!DATA.sprite) DATA.sprite = new Array(100000)
 // Группа боевых сущностей — читается renderSync и будущими системами (E-3)
 ECS.createQuery(world, "battle", ["etype", "posX", "posY", "cullPad"])
+// E-3: группа анимированных сущностей — по ней крутится animPlay (не сканируя objectValues)
+ECS.createQuery(world, "ganim", ["etype", "animCounter", "animStill"])
+// E-3: типовые группы систем (двигаются маркерами, см. комментарий выше)
+ECS.createQuery(world, "genemy", ["isEnemy"])
+ECS.createQuery(world, "gpet", ["isPet"])
+ECS.createQuery(world, "gbullet", ["isBullet"])
+ECS.createQuery(world, "gfx", ["isFx"])
+
+// акцессор поля объекта поверх компонента: единое состояние в типизированном массиве
+function defAnimAccessor(obj, field, comp) {
+    Object.defineProperty(obj, field, {
+        configurable: true, enumerable: true,
+        get() { return COMPONENTS[comp][this._ecs] },
+        set(v) { COMPONENTS[comp][this._ecs] = v },
+    })
+}
 
 function registerEcs(obj) {
     const id = ECS.addEntity(world)
@@ -45,6 +77,17 @@ function registerEcs(obj) {
     // animPlay: спрайт прячется только когда ЦЕЛИКОМ за окном камеры)
     const half = cr ? Math.max(cr._w || 0, cr._h || 0) / 2 : 64
     ECS.addComponent(world, id, "cullPad", half + 64)
+    // E-3: счётчики анимации — в компоненты (инициал из литерала спавна), затем
+    // поля объекта переопределяются акцессорами поверх компонентов
+    ECS.addComponent(world, id, "animCounter", +obj.animCounters || 0)
+    ECS.addComponent(world, id, "animStill", +obj.currentStill || 0)
+    defAnimAccessor(obj, "animCounters", "animCounter")
+    defAnimAccessor(obj, "currentStill", "animStill")
+    // E-3: маркеры типовых групп по типу НА СПАВНЕ (см. комментарий у createQuery)
+    obj.type === "enemy" && ECS.addComponent(world, id, "isEnemy", 1)
+    obj.type === "pet" && ECS.addComponent(world, id, "isPet", 1)
+    obj.type === "bullet" && ECS.addComponent(world, id, "isBullet", 1)
+    obj.type === "effect" && ECS.addComponent(world, id, "isFx", 1)
 }
 
 function unregisterEcs(obj) {

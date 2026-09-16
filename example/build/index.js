@@ -7,11 +7,16 @@
 // cacheResources → заставка. Тики игры идут фиксированным шагом 16мс из тикера
 // движка (gameTickSystem), затем ecsRenderSync расставляет видимость по камере —
 // порядок «вся логика кадра → синхронизация рендера» сохранён.
-import { start } from "./scripts/start.js"
+import { start, status } from "./scripts/start.js"
+import { objectValues, doorPics } from "./scripts/del.js"
 import { svg } from "./scripts/svg.js"
 import { setupBackend, windowSize, installGameTicks, gameTickSystem } from "./scripts/pixiBackend.js"
 import { ecsRenderSync } from "./scripts/ecsBridge.js"
 import { gameLoop } from "./scripts/gameLoop.js"
+
+// отладочная ручка headless-тестов: status/objectValues — module-scoped, в консоль
+// их достать нечем
+window.__ST = { status, objectValues, doorPics }
 
 // ядро zero_engine в ядерных системах читает глобальный UNIT_CONFIGS (у этой игры
 // свой спавн через objectValues — конфигов нет, пустой список делает ядра no-op)

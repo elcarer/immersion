@@ -17,17 +17,35 @@ function enemyMove() {
     howlTick()
     //V16: viewBox камеры читаем ОДИН раз за тик (раньше — внутри цикла, на каждого врага),
     //позиции врагов — из кэша rectPos вместо animVal
+    //E-3: враги/питомцы — из групп genemy/gpet (маркеры на спавне) со снимком на входе
+    //(старая семантика «граница зафиксирована»); фильтры type сохранены 1:1 — игра мутирует
+    //obj.type на месте (charm enemy→pet, смерть enemy→corpse), stale-члены группы отсеивает фильтр
     const vb = svgArr[0].viewBox.animVal
-    let length = objectValues.length
-    for (let i = 0; i < length; i++) {
-        const o = objectValues[i]
-        if (o.type !== "enemy" && o.type !== "pet") continue
-        const pos = rectPos(o.rect)
-        //V31: размер окна камеры из viewBox (зависит от зума, zoomFx.js), не литералы
-        //V78: pet тикается и вне кадра — иначе отставший за экран питомец навсегда
-        //замер бы на месте и не догнал бы героя; на врагов гейт не тронут
-        if (o.type !== "pet" && (pos[0] < vb.x || pos[0] > vb.x + vb.width || pos[1] < vb.y || pos[1] > vb.y + vb.height)) continue
-        enemyTick(o)
+    const gE = world.queries.genemy && world.queries.genemy.entities
+    if (gE) {
+        const snap = gE.slice()
+        for (let i = 0; i < snap.length; i++) {
+            const o = DATA.bag[snap[i]]
+            if (!o || (o.type !== "enemy" && o.type !== "pet")) continue
+            const pos = rectPos(o.rect)
+            //V31: размер окна камеры из viewBox (зависит от зума, zoomFx.js), не литералы
+            //V78: pet тикается и вне кадра — иначе отставший за экран питомец навсегда
+            //замер бы на месте и не догнал бы героя; у врагов гейт остался (условие 1:1:
+            //очарованный враг (type стал "pet", сидит в genemy) вне кадра тоже тикается)
+            if (o.type !== "pet" && (pos[0] < vb.x || pos[0] > vb.x + vb.width || pos[1] < vb.y || pos[1] > vb.y + vb.height)) continue
+            enemyTick(o)
+        }
+    }
+    const gP = world.queries.gpet && world.queries.gpet.entities
+    if (gP) {
+        const snap = gP.slice()
+        for (let i = 0; i < snap.length; i++) {
+            const o = DATA.bag[snap[i]]
+            //V78: pet тикается и вне кадра — иначе отставший за экран питомец навсегда
+            //замер бы на месте и не догнал бы героя; у врагов гейт остался выше
+            if (!o || o.type !== "pet") continue
+            enemyTick(o)
+        }
     }
 }
 export { enemyMove }

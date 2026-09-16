@@ -241,10 +241,13 @@ function crowdRankOf(enemy) {
     const hpx = status.hero.x + 16
     const hpy = status.hero.y + 25
     const crew = [] // [расстояние-до-героя, id] — только живые ходячие в кадре
-    const n0 = objectValues.length
-    for (let i = 0; i < n0; i++) {
-        const o = objectValues[i]
-        if (o.type !== "enemy") continue
+    //E-3: перебор врагов из группы genemy (маркер на спавне); фильтр type — 1:1
+    const gE = world.queries.genemy && world.queries.genemy.entities
+    if (!gE) return { size: 0, rank: -1 }
+    const snap = gE.slice()
+    for (let i = 0; i < snap.length; i++) {
+        const o = DATA.bag[snap[i]]
+        if (!o || o.type !== "enemy") continue
         if (o.lying !== undefined || o.shadowFx) continue
         if (o.state === ENEMY_STATE.STUN || o.state === ENEMY_STATE.ATTACK) continue
         //V57: боссы вне «толпы» (fix «Демон путается и не может подойти к герою»):
@@ -731,9 +734,11 @@ function pickShadowLanding(enemy) {
     const matrix = status.matrixLevel
     const walkable = (cx, cy) => !!(matrix && matrix[cy] && matrix[cy][cx] === 1)
     const taken = new Set()
-    for (let i = 0; i < objectValues.length; i++) {
-        const o = objectValues[i]
-        if (o === enemy || o.type !== "enemy" || o.lying !== undefined) continue
+    //E-3: перебор врагов из группы genemy (маркер на спавне); фильтр type — 1:1
+    const gE = world.queries.genemy && world.queries.genemy.entities
+    if (gE) for (let i = 0; i < gE.length; i++) {
+        const o = DATA.bag[gE[i]]
+        if (!o || o === enemy || o.type !== "enemy" || o.lying !== undefined) continue
         const c = enemyCellOf(o)
         taken.add(c[0] + "," + c[1])
     }
@@ -970,10 +975,13 @@ export function callAllies(enemy) {
     const range = call * 32
     const cx = enemy.rect.x.animVal.value + enemy.rect.width.animVal.value / 2
     const cy = enemy.rect.y.animVal.value + enemy.rect.height.animVal.value / 2
-    const length = objectValues.length
-    for (let i = 0; i < length; i++) {
-        const o = objectValues[i]
-        if (o === enemy || o.type !== "enemy") continue
+    //E-3: перебор врагов из группы genemy (маркер на спавне); фильтр type — 1:1
+    const gE = world.queries.genemy && world.queries.genemy.entities
+    if (!gE) return
+    const snap = gE.slice()
+    for (let i = 0; i < snap.length; i++) {
+        const o = DATA.bag[snap[i]]
+        if (!o || o === enemy || o.type !== "enemy") continue
         const ox = o.rect.x.animVal.value + o.rect.width.animVal.value / 2
         const oy = o.rect.y.animVal.value + o.rect.height.animVal.value / 2
         if ((cx - ox) * (cx - ox) + (cy - oy) * (cy - oy) <= range * range) {
@@ -1294,10 +1302,13 @@ export function separateEnemiesTick() {
     if (!matrix || !matrix[0]) return
     const vb = svgArr[0].viewBox.animVal
     const list = []
-    const n0 = objectValues.length
-    for (let i = 0; i < n0; i++) {
-        const o = objectValues[i]
-        if (o.type !== "enemy") continue                    // питомцы/пули/трупы — нет
+    //E-3: перебор врагов из группы genemy (маркер на спавне) со снимком; фильтры type — 1:1
+    const gE0 = world.queries.genemy && world.queries.genemy.entities
+    if (!gE0) return
+    const snap0 = gE0.slice()
+    for (let i = 0; i < snap0.length; i++) {
+        const o = DATA.bag[snap0[i]]
+        if (!o || o.type !== "enemy") continue              // питомцы/пули/трупы — нет
         if (o.lying !== undefined || o.shadowFx || o.dashFly) continue   // DOWN-мумии, фазы тени, летящий рывок
         if (o.state === ENEMY_STATE.STUN || o.state === ENEMY_STATE.ATTACK) continue
         //V58: флаг class.boss вместо проверки имени

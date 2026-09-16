@@ -8,15 +8,24 @@ import { auraMissEnd } from "../scripts/valkyrie.js"
 import { ENEMY_STATE, enemyChase, enemySeesHero, enemyNoticeHero, setEnemyState, setEnemyPose, waitPose, animInterval } from "../scripts/enemyAI.js"
 
 function animPlay() {
-    let lengthObjectValues = objectValues.length
+    //E-3: система крутится по ECS-группе ganim (сущности с компонентами
+    //animCounter/animStill), а не сканирует objectValues. Счётчики анимации —
+    //типизированные компоненты; поля объекта (animCounters/currentStill) — акцессоры
+    //поверх них (мост в ecsBridge), поэтому остальной игровой код не менялся.
+    //Обход ОБРАТНЫЙ: удаление сущности посреди тика (конец once-анимации) двигает в
+    //группе swap-and-pop-ом ПОСЛЕДНИЙ элемент — он уже обработан; новые спавны
+    //(addAnim/crushBurst) попадают в конец группы и пропускаются тиком — как в старом
+    //цикле с границей, зафиксированной на входе.
     //V8: окна камеры берём один раз на кадр. ВАЖНО: спрайты могут жить на РАЗНЫХ слоях —
     //игровые (svg[0]/svg[1], viewBox двигается камерой) и UI (svg[2], viewBox 0 0 1920 1080).
     //Проверка «вне экрана» по чужому слою замораживала спрайты врагов на экране результатов
     //(камера оставалась у выхода, UI-координаты 150..534 считались за кадром).
     let vbCam = svgArr[0].viewBox.animVal
     let vbUI = svgArr[2].viewBox.animVal
-    for (let i = 0; i < lengthObjectValues; i++) {
-        let d = objectValues[i]
+    const ents = world.queries.ganim && world.queries.ganim.entities
+    if (!ents) return
+    for (let i = ents.length - 1; i >= 0; i--) {
+        let d = DATA.bag[ents[i]]
         if(d&&d.currentAnim!==undefined&&d.stop!=1&&!(d.once===1&&(d.currentAnim.times&&d.currentStill>d.currentAnim.times-1))) {
         d.animCounters--
         let stop = 0
@@ -27,16 +36,15 @@ function animPlay() {
                 d.currentStill++
                 //добавить новую анимацию
                 if (d.currentAnim.attackNew&&d.currentStill===d.currentAnim.attackNew.step) {
-                    addAnim (d.currentAnim.attackNew.anim,status.hero.obj,objectValues[i],objectValues[i].direction)
+                    addAnim (d.currentAnim.attackNew.anim,status.hero.obj,d,d.direction)
                 }
                 //удалить анимацию
                 if (d.currentAnim.times&&d.currentStill>d.currentAnim.times-1) {
-                    let result = checkEndAnim(d,i)
+                    let result = checkEndAnim(d)
                     if (result==="stop") {stop = 1;d.stop=1}
                     if (d.type === "corpse") {
-                        objectValues.splice(i,1)
-                        lengthObjectValues--
-                        i--
+                        const idx = objectValues.indexOf(d)
+                        idx !== -1 && objectValues.splice(idx,1)
                         continue
                     }
                     if ((d.type === "bullet" || d.type === "effect") && d.currentAnim.once === 1) {
@@ -46,9 +54,8 @@ function animPlay() {
                             crushBurst(d)
                         }
                         releaseSprite(d.img)
-                        objectValues.splice(i,1)
-                        lengthObjectValues--
-                        i--
+                        const idx = objectValues.indexOf(d)
+                        idx !== -1 && objectValues.splice(idx,1)
                         continue
                     }
                 }
@@ -86,7 +93,7 @@ function animPlay() {
         }
     }
 }
-function checkEndAnim (d,i) {
+function checkEndAnim (d) {
     if (d.type === "hero" && d.currentAnim.img === "./images/hero/rogue/others/wait.png") {
         let i = status.info.activeSkills.findIndex(f => f.skill.title === "skill.0.1.title")
         if(i !== -1 && status.info.invisible === 0 && status.info.activeSkills[i].cooldown === 0) {

@@ -17,6 +17,13 @@
 // компоненты posX/posY (регистрация в ecsBridge.js), группы читает renderSync.
 // ============================================================================
 
+// Анимации героев/врагов рисуются из спрайтшитов (лист на персонажа): карта
+// «URL старой полосы → клетка листа» сгенерирована офлайн (forWork/make_sheets_map.py)
+// и выверена пофреймово по альфа-bbox — окно кадра игры лежит в клетке со смещением
+// (dx,dy), пиксели идентичны старой полосе. Полосы вне карты (атаки/эффекты, rat wait,
+// spider/spiderRed wait|damage) читают старые файлы как раньше.
+import { SHEETS } from "./sheetsMap.js"
+
 const SVG_NS = "http://www.w3.org/2000/svg"
 
 let app = null
@@ -101,7 +108,7 @@ function getTexture(src) {
 function applyTextureRetro(src, tex) {
     for (const frames of frameCache.values()) {
         if (frames._src === src) {
-            rebuildFrames(src, frames._times, frames)
+            rebuildFrames(src, frames._times, frames, frames._w, frames._h)
             const users = frameUsers.get(frames._src + "|" + frames._times)
             if (users) for (const shim of users) {
                 if (shim._dead || !shim.node) continue
@@ -122,28 +129,42 @@ function applyTextureRetro(src, tex) {
         }
     }
 }
-function getFrameTextures(src, times) {
+function getFrameTextures(src, times, w, h) {
     const key = src + "|" + times
     let frames = frameCache.get(key)
     if (!frames) {
         frames = []
         frames._src = src
         frames._times = times
+        frames._w = num(w)
+        frames._h = num(h)
         frameCache.set(key, frames)
-        rebuildFrames(src, times, frames)
+        rebuildFrames(src, times, frames, w, h)
     }
     return frames
 }
-function rebuildFrames(src, times, frames) {
-    const base = texCache.get(src) || getTexture(src)
-    const n = parseInt(times)
-    const fw = Math.max(1, Math.floor(base.width / n))
-    const fh = base.height
+// w/h — размер ЛИСТА из игры (окно кадра = w/times × h); для ремапнутых полос это
+// единственный источник геометрии кадра (лист сам по себе другой сетки)
+function rebuildFrames(src, times, frames, w, h) {
+    const map = SHEETS[src]
+    const n = parseInt(times) || 1
+    let base, fw, fh
+    if (map) {
+        base = texCache.get(map.sheet) || getTexture(map.sheet)
+        fw = Math.max(1, Math.floor((num(w) || frames._w || map.fw * n) / n))
+        fh = Math.max(1, num(h) || frames._h || map.fh)
+    } else {
+        base = texCache.get(src) || getTexture(src)
+        fw = Math.max(1, Math.floor(base.width / n))
+        fh = base.height
+    }
     frames.length = 0
     for (let i = 0; i < n; i++) {
         frames.push(new PIXI.Texture({
             source: base.source,
-            frame: new PIXI.Rectangle(i * fw, 0, fw, fh),
+            frame: map
+                ? new PIXI.Rectangle(i * map.cell + map.dx, map.row * map.cell + map.dy, fw, fh)
+                : new PIXI.Rectangle(i * fw, 0, fw, fh),
         }))
     }
     return base
@@ -156,7 +177,18 @@ async function preloadGameTextures(fromFile, basePath) {
         const resp = await fetch(fromFile)
         if (!resp.ok) throw new Error("HTTP " + resp.status)
         const list = await resp.json()
-        const loads = list.map(p => PIXI.Assets.load(basePath + p).then(t => { texCache.set(basePath + p, t) }).catch(() => {}))
+        // анимации героев/врагов читаются из спрайтшитов: GPU грузит ЛИСТЫ вместо
+        // полос (полосы остаются только в HTTP-прогреве cacheResources)
+        const seen = new Set()
+        const paths = []
+        for (const p of list) {
+            const m = SHEETS[basePath + p]
+            const q = m ? m.sheet.slice(basePath.length) : p
+            if (seen.has(q)) continue
+            seen.add(q)
+            paths.push(q)
+        }
+        const loads = paths.map(p => PIXI.Assets.load(basePath + p).then(t => { texCache.set(basePath + p, t) }).catch(() => {}))
         // порциями по 64, чтобы не держать сотни декодеров одновременно
         for (let i = 0; i < loads.length; i += 64) await Promise.all(loads.slice(i, i + 64))
     } catch (e) {
@@ -862,7 +894,7 @@ function applySize(shim) {
         if (shim.node) { shim.node.width = shim._frameW; shim.node.height = h }
         // пересобрать кадры под новый лист/число кадров (setFrame поставит текущий)
         if (shim.attrs.href) {
-            shim._frames = getFrameTextures(String(shim.attrs.href), shim._times)
+            shim._frames = getFrameTextures(String(shim.attrs.href), shim._times, w, h)
             shim._still = undefined
             setFrame(shim, Math.round((shim._shift || 0) / (shim._frameW || 1)))
         }
@@ -905,7 +937,7 @@ function setFrame(shim, still) {
         if (!frames[s].frame) {
             warnOnce("nullframe" + frames._src, "кадр " + s + " с null frame у " + frames._src + " — пересборка листа")
             shim._still = undefined
-            rebuildFrames(frames._src, frames._times, frames)
+            rebuildFrames(frames._src, frames._times, frames, frames._w, frames._h)
             if (!frames[s] || !frames[s].frame) return
         }
         shim.node.texture = frames[s]
@@ -1405,7 +1437,7 @@ function createAnimImage(place, x, y, w, h, src, obj = {}) {
         shimById.set(shim.attrs.id, shim)
     }
     sprite.position.set(num(x), num(y))
-    shim._frames = getFrameTextures(String(src), times)
+    shim._frames = getFrameTextures(String(src), times, wN, hN)
     setFrame(shim, Math.round(xShift / (wN / n)))
     sprite.width = wN / n
     sprite.height = hN
@@ -1725,6 +1757,39 @@ function makeLayerShim(index, node) {
 function setupBackend(engineApi) {
     app = engineApi.app
     worldContainer = engineApi.worldContainer
+    // отладочная ручка для headless-тестов и консоли браузера (сцена/слои/реестры/кадры)
+    window.__BACKEND = {
+        get app() { return app },
+        worldContainer, layerNodes, layers, texCache, frameCache,
+        shimById, spritePool, cameraVB, SHEETS,
+        windowSize: () => windowSize,
+        framesInfo() {
+            const out = []
+            for (const [key, frames] of frameCache) {
+                out.push({ key, n: frames.length, src: frames._src, w: frames._w, h: frames._h,
+                    tex: frames[0] ? { url: frames[0].source._filename || null, frame: frames[0].frame } : null })
+            }
+            return out
+        },
+        // экранные координаты кликабельных узлов UI (доверенные клики CDP)
+        dumpUI() {
+            const out = []
+            const walk = (shim, d) => {
+                if (!shim || d > 8 || out.length > 250) return
+                let b = null
+                try { b = shim.node && shim.node.getBounds ? shim.node.getBounds() : null } catch (e) {}
+                const t = shim.textContent !== undefined ? String(shim.textContent).slice(0, 24) : undefined
+                if (shim.attrs.id || t || b) {
+                    out.push({ id: shim.attrs.id || undefined, text: t || undefined,
+                        href: shim.attrs.href ? String(shim.attrs.href).slice(0, 60) : undefined, b })
+                }
+                const kids = shim.children || []
+                for (const c of kids) walk(c, d + 1)
+            }
+            for (const l of layers) if (l) walk(l, 0)
+            return out
+        },
+    }
     recalcWindowSize()
     // Pixi по умолчанию делает preventDefault на нативном pointerdown — браузер в ответ
     // подавляет ВСЕ совместимые события мыши до pointerup, и document-слушатели игры
@@ -1764,11 +1829,6 @@ function setupBackend(engineApi) {
     }
     document.getElementById = id => nativeGetElementById(id) || shimById.get(id) || null
     document.elementFromPoint = (x, y) => hitTestUI(x, y) || nativeElementFromPoint(x, y)
-    // отладочный хендл (консоль браузера): сцена, слои, реестры
-    window.__BACKEND = {
-        app, worldContainer, layerNodes, layers, texCache, frameCache,
-        shimById, spritePool, cameraVB, windowSize: () => windowSize,
-    }
 }
 
 // svg(3): создать слои (вызывает svg.js-фасад)

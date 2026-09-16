@@ -19,14 +19,25 @@ import { setEliteDamageMult } from "../scripts/sets.js"
 //V75 «Зеркало» (шкафчик): снаряды врагов с шансом 20% разворачиваются к стрелявшему
 import { blessActive } from "../scripts/blessFx.js"
 
+// E-3: перебор пуль из группы gbullet (маркер isBullet на спавне) со снимком на входе;
+// старый фильтр «type === bullet» заменён членством в группе, остальные условия — 1:1.
+// Удаление — indexOf+splice (мост чистит группы), снимок даёт старую семантику
+// «граница зафиксирована на входе».
+function despawn(o) {
+    const idx = objectValues.indexOf(o)
+    idx !== -1 && objectValues.splice(idx, 1)
+}
 function damageHero() {
-    let lengthBullets = objectValues.length
+    const ents = world.queries.gbullet && world.queries.gbullet.entities
+    if (!ents) return
+    const snap = ents.slice()
     //V16: позиция героя из кэша один раз за тик (не на каждый снаряд)
     const heroPos = status.hero.obj.type === "hero" ? rectPos(status.hero.obj.rect) : null
-    for (let j = 0; j < lengthBullets; j++) {
-        if (objectValues[j].type === "bullet" && objectValues[j].result !== 1 && (objectValues[j].currentStill > 0 || objectValues[j].stats.type === "magic") && objectValues[j].target === status.hero.obj && status.hero.obj.type === "hero") {
+    for (let j = 0; j < snap.length; j++) {
+        const bullet = DATA.bag[snap[j]]
+        if (bullet && bullet.result !== 1 && (bullet.currentStill > 0 || bullet.stats.type === "magic") && bullet.target === status.hero.obj && status.hero.obj.type === "hero") {
             let rectM = status.hero.obj.rect
-            let rectB = objectValues[j].rect
+            let rectB = bullet.rect
             let bPos = rectPos(rectB)
             if (checkCollision(heroPos[0],bPos[0],
                 rectM._w,rectB._w,
@@ -34,29 +45,27 @@ function damageHero() {
                 rectM._h,rectB._h)) {
                 //V75 «Зеркало» (шкафчик): снаряд врага с шансом 20% разворачивается и летит
                 //в стрелявшего — урона герою в этот тик нет, продолжаем со следующим снарядом
-                if (mirrorBless(objectValues[j])) continue
-                objectValues[j].currentAnim.effect && playEffect(objectValues[j],data.effects[objectValues[j].currentAnim.effect])
+                if (mirrorBless(bullet)) continue
+                bullet.currentAnim.effect && playEffect(bullet,data.effects[bullet.currentAnim.effect])
                 playback(strike[15].vol,0,0,status.settings.soundVolume)
-                objectValues[j].atacker.stats.poison && checkPoison(objectValues[j])
+                bullet.atacker.stats.poison && checkPoison(bullet)
                 //V26 горение (stats.flame): та же точка наложения, что и яд
-                objectValues[j].atacker.stats.flame && applyFlame(objectValues[j].atacker.stats.flame)
+                bullet.atacker.stats.flame && applyFlame(bullet.atacker.stats.flame)
                 //попадание состоялось — промах для ауры валькирии не засчитывается
-                objectValues[j].atacker && (objectValues[j].atacker.auraMiss = 0)
+                bullet.atacker && (bullet.atacker.auraMiss = 0)
                 //V51 «вампиризм» (stats.vampirism): враг лечится только если атака
                 //реально отняла ХП герою (уклон/неуязвимость рывка/полный съёт щитом —
                 //крови нет; блок с половиной урона — лечит). Кулдаун 3с внутри vampDrain
                 let heroHpBefore = status.info.hp
-                countDamage(objectValues[j])
-                objectValues[j].atacker && objectValues[j].atacker.stats.vampirism > 0 &&
-                    status.info.hp < heroHpBefore && vampDrain(objectValues[j].atacker)
+                countDamage(bullet)
+                bullet.atacker && bullet.atacker.stats.vampirism > 0 &&
+                    status.info.hp < heroHpBefore && vampDrain(bullet.atacker)
                 stunHero()
-                objectValues[j].result = 1
-                if(objectValues[j].type === "bullet") {
-                    objectValues[j].stats.pool && dropPool(heroPos[0],heroPos[1]+36)
-                    releaseSprite(objectValues[j].img)
-                    objectValues.splice(j,1)
-                    lengthBullets--
-                    j--
+                bullet.result = 1
+                if(bullet.type === "bullet") {
+                    bullet.stats.pool && dropPool(heroPos[0],heroPos[1]+36)
+                    releaseSprite(bullet.img)
+                    despawn(bullet)
                 }
             }
         }

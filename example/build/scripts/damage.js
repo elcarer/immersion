@@ -42,21 +42,28 @@ let dmgSeen = new Set()
 function damage() {
     //V2/V7: один проход по objectValues — собираем списки врагов/снарядов/сплэшей.
     //Раньше был вложенный цикл «враги × весь массив» с чтением href.animVal на каждой паре.
+    //E-3: проход заменён типовыми группами ECS (genemy/gbullet/gfx — маркеры на спавне);
+    //внутренние фильтры по obj.type сохранены 1:1 (игра мутирует type на месте — см. ecsBridge).
     dmgEnemies.length = 0
     dmgBullets.length = 0
     dmgSplash9.length = 0
     dmgSplash13.length = 0
-    let lengthAll = objectValues.length
-    for (let j = 0; j < lengthAll; j++) {
-        let o = objectValues[j]
-        if (o.type === "enemy") {
-            dmgEnemies.push(o)
-        } else if (o.type === "bullet") {
-            o.target !== status.hero.obj && dmgBullets.push(o)
-        } else if (o.type === "effect") {
-            o.effectImg === "./images/effects/9.png" && dmgSplash9.push(o)
-            o.effectImg === "./images/effects/13.png" && dmgSplash13.push(o)
-        }
+    const gE = world.queries.genemy && world.queries.genemy.entities
+    if (gE) for (let j = 0; j < gE.length; j++) {
+        const o = DATA.bag[gE[j]]
+        if (o && o.type === "enemy") dmgEnemies.push(o)
+    }
+    const gB = world.queries.gbullet && world.queries.gbullet.entities
+    if (gB) for (let j = 0; j < gB.length; j++) {
+        const o = DATA.bag[gB[j]]
+        if (o && o.type === "bullet" && o.target !== status.hero.obj) dmgBullets.push(o)
+    }
+    const gF = world.queries.gfx && world.queries.gfx.entities
+    if (gF) for (let j = 0; j < gF.length; j++) {
+        const o = DATA.bag[gF[j]]
+        if (!o || o.type !== "effect") continue
+        o.effectImg === "./images/effects/9.png" && dmgSplash9.push(o)
+        o.effectImg === "./images/effects/13.png" && dmgSplash13.push(o)
     }
     //V7: пространственный хэш врагов по клеткам — снаряд проверяет только ближайшие клетки
     //V16: числовой ключ (cy*10000+cx) вместо строки, Map переиспользуется между тиками
@@ -418,10 +425,14 @@ function relicReflect(enemy,amount) {
 function createSplash(enemy,effect,damage,other=0,range=0,selfTo=0,srcName=undefined) {
     other === 0 && playEffect(enemy,data.effects[effect])
     //V16: позиции из кэша (rectPos/_w/_h) вместо animVal-чтений на каждый враг
+    //E-3: перебор врагов из группы genemy (маркер на спавне), фильтр type — 1:1
     const ePos = rectPos(enemy.rect)
-    let lengthEnemy = objectValues.length
-    for (let i = 0; i < lengthEnemy; i++) {
-        const o = objectValues[i]
+    const gE = world.queries.genemy && world.queries.genemy.entities
+    if (!gE) return
+    const snap = gE.slice()
+    for (let i = 0; i < snap.length; i++) {
+        const o = DATA.bag[snap[i]]
+        if (!o) continue
         //V79: неуязвимость (Циклоп, invulnActive) — сплэш способностей не проходит
         if (o.type !== "enemy" || (o === enemy && !selfTo) || o.invulnActive) continue
         const oPos = rectPos(o.rect)

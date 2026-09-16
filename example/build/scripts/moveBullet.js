@@ -6,16 +6,28 @@ import { data } from "../scripts/data.js"
 import { svgArr,image, moveSprite, releaseSprite, rectPos } from "../scripts/svg.js"
 import { createEgg } from "../scripts/spiderBossFight.js"
 
+// E-3: обе системы крутятся по группе gbullet (маркер isBullet — пули на спавне),
+// а не сканируют весь objectValues. Снимок группы на входе = старая семантика
+// «граница цикла зафиксирована»: пули, выпущенные за тик, обрабатываются со следующего.
+// ВНУТРЕННИЕ фильтры по currentAnim.bullet/bullet сохранены 1:1 (игра мутирует
+// obj.type на месте — см. ecsBridge), удаление — indexOf+splice (группа чистится мостом).
+function despawn(o) {
+    const idx = objectValues.indexOf(o)
+    idx !== -1 && objectValues.splice(idx, 1)
+}
 function moveBullet() {
-    let length = objectValues.length
-    for (let i = 0; i < length; i++) {
-        if (objectValues[i].currentAnim && objectValues[i].currentAnim.bullet !== "all" && (objectValues[i].currentAnim.bullet || objectValues[i].bullet)) {
-            let rect = objectValues[i].rect
+    const ents = world.queries.gbullet && world.queries.gbullet.entities
+    if (!ents) return
+    const snap = ents.slice()
+    for (let i = 0; i < snap.length; i++) {
+        const b = DATA.bag[snap[i]]
+        if (b && b.currentAnim && b.currentAnim.bullet !== "all" && (b.currentAnim.bullet || b.bullet)) {
+            let rect = b.rect
             //V16: позиция снаряда из кэша (rectPos) — она же нужна в коллизиях ниже
             let bPos = rectPos(rect)
             let bulletSpeed
-            objectValues[i].currentAnim.bulletSpeed ? bulletSpeed = objectValues[i].currentAnim.bulletSpeed : bulletSpeed = 3
-            if(objectValues[i].currentAnim.poisonMove === 1 && status.time % 31 === 0) {
+            b.currentAnim.bulletSpeed ? bulletSpeed = b.currentAnim.bulletSpeed : bulletSpeed = 3
+            if(b.currentAnim.poisonMove === 1 && status.time % 31 === 0) {
                 let x = bPos[0] + Math.trunc(Math.random() * 64)
                 let y = bPos[1] + Math.trunc(Math.random() * 64)
                 screenPic.push(image(svgArr[0],x,y,32,15,"./images/effects/acid.png",{"id":screenPic.length-1}))
@@ -23,43 +35,41 @@ function moveBullet() {
 
                 Math.trunc(Math.random() * 15) === 0 && checkCollision(x - 512, status.hero.x, 1056, 32, y - 256, status.hero.y, 563, 25) && createEgg(x,y)
             }
-            if (objectValues[i].currentAnim.bullet === "right" || objectValues[i].bullet === "right") {
-                moveSprite(objectValues[i].img, bulletSpeed, 0)
+            if (b.currentAnim.bullet === "right" || b.bullet === "right") {
+                moveSprite(b.img, bulletSpeed, 0)
             }
-            if (objectValues[i].currentAnim.bullet === "left" || objectValues[i].bullet === "left") {
-                moveSprite(objectValues[i].img, -bulletSpeed, 0)
+            if (b.currentAnim.bullet === "left" || b.bullet === "left") {
+                moveSprite(b.img, -bulletSpeed, 0)
             }
-            if (objectValues[i].currentAnim.bullet === "down" || objectValues[i].bullet === "down") {
-                moveSprite(objectValues[i].img, 0, bulletSpeed)
+            if (b.currentAnim.bullet === "down" || b.bullet === "down") {
+                moveSprite(b.img, 0, bulletSpeed)
             }
-            if (objectValues[i].currentAnim.bullet === "top" || objectValues[i].bullet === "top") {
-                moveSprite(objectValues[i].img, 0, -bulletSpeed)
+            if (b.currentAnim.bullet === "top" || b.bullet === "top") {
+                moveSprite(b.img, 0, -bulletSpeed)
             }
-            if (objectValues[i].currentAnim.bullet === "topright" || objectValues[i].bullet === "topright") {
-                moveSprite(objectValues[i].img, bulletSpeed, -bulletSpeed)
+            if (b.currentAnim.bullet === "topright" || b.bullet === "topright") {
+                moveSprite(b.img, bulletSpeed, -bulletSpeed)
             }
-            if (objectValues[i].currentAnim.bullet === "downright" || objectValues[i].bullet === "downright") {
-                moveSprite(objectValues[i].img, bulletSpeed, bulletSpeed)
+            if (b.currentAnim.bullet === "downright" || b.bullet === "downright") {
+                moveSprite(b.img, bulletSpeed, bulletSpeed)
             }
-            if (objectValues[i].currentAnim.bullet === "topleft" || objectValues[i].bullet === "topleft") {
-                moveSprite(objectValues[i].img, -bulletSpeed, -bulletSpeed)
+            if (b.currentAnim.bullet === "topleft" || b.bullet === "topleft") {
+                moveSprite(b.img, -bulletSpeed, -bulletSpeed)
             }
-            if (objectValues[i].currentAnim.bullet === "downleft" || objectValues[i].bullet === "downleft") {
-                moveSprite(objectValues[i].img, -bulletSpeed, bulletSpeed)
+            if (b.currentAnim.bullet === "downleft" || b.bullet === "downleft") {
+                moveSprite(b.img, -bulletSpeed, bulletSpeed)
             }
             //"crushAttack" (Шип): осколки летят по диагонали crushAttack клеток (32px)
             //от точки исчезновения основного снаряда и удаляются, пролетев это расстояние
-            if (objectValues[i].crush) {
-                objectValues[i].crushDist += bulletSpeed * Math.SQRT2
-                if (objectValues[i].crushDist >= objectValues[i].crushRange) {
-                    releaseSprite(objectValues[i].img)
-                    objectValues.splice(i,1)
-                    length--
-                    i--
+            if (b.crush) {
+                b.crushDist += bulletSpeed * Math.SQRT2
+                if (b.crushDist >= b.crushRange) {
+                    releaseSprite(b.img)
+                    despawn(b)
                     continue
                 }
             }
-            if(objectValues[i].currentAnim.effect !== undefined) {
+            if(b.currentAnim.effect !== undefined) {
                 //V16: позиция ПОСЛЕ движения этого тика (блоки движения выше двигали спрайт)
                 bPos = rectPos(rect)
                 let remove = 0
@@ -71,11 +81,9 @@ function moveBullet() {
                             rectM.width.animVal.value,rect.width.animVal.value,
                             rectM.y.animVal.value,bPos[1],
                             rectM.height.animVal.value,rect.height.animVal.value)) {
-                                playEffect(objectValues[i],data.effects[objectValues[i].currentAnim.effect])
-                                releaseSprite(objectValues[i].img)
-                                objectValues.splice(i,1)
-                                length--
-                                i--
+                                playEffect(b,data.effects[b.currentAnim.effect])
+                                releaseSprite(b.img)
+                                despawn(b)
                                 remove = 1
                                 break
                         }
@@ -88,10 +96,8 @@ function moveBullet() {
                         status.info.cloude.width.animVal.value,rect.width.animVal.value,
                         status.info.cloude.y.animVal.value,bPos[1],
                         status.info.cloude.height.animVal.value,rect.height.animVal.value))) {
-                        releaseSprite(objectValues[i].img)
-                        objectValues.splice(i,1)
-                        length--
-                        i--
+                        releaseSprite(b.img)
+                        despawn(b)
                     }
                 }
             }
@@ -99,10 +105,13 @@ function moveBullet() {
     }
 }
 function moveMagicBullet() {
-        let length = objectValues.length
-        for (let i = 0; i < length; i++) {
-            if (objectValues[i].currentAnim && objectValues[i].currentAnim.bullet && objectValues[i].currentAnim.bullet === "all") {
-                let rect = objectValues[i].rect
+        const ents = world.queries.gbullet && world.queries.gbullet.entities
+        if (!ents) return
+        const snap = ents.slice()
+        for (let i = 0; i < snap.length; i++) {
+            const b = DATA.bag[snap[i]]
+            if (b && b.currentAnim && b.currentAnim.bullet && b.currentAnim.bullet === "all") {
+                let rect = b.rect
                 let bPos = rectPos(rect)
                 //V68 (репорт юзера): самонаводящийся магический снаряд героя, выпущенный В
                 //объект карты (цель — СПРАЙТ объекта из screenPic, DOM-узел), после разрушения
@@ -110,30 +119,28 @@ function moveMagicBullet() {
                 //снаряд вечно кружил на её последних координатах (destroyObjects снимает только
                 //снаряд-инициатор). isConnected === false только у отрезанного от DOM узла;
                 //у врагов/героя (обычные JS-объекты) поля нет — проверку не проходят
-                if (objectValues[i].target && objectValues[i].target.type !== "corpse" && objectValues[i].target.isConnected !== false) {
+                if (b.target && b.target.type !== "corpse" && b.target.isConnected !== false) {
                     let rectE
-                    objectValues[i].target.img ? rectE = objectValues[i].target.rect : rectE = objectValues[i].target
+                    b.target.img ? rectE = b.target.rect : rectE = b.target
                     if (bPos[0] < rectE.x.animVal.value) {
-                        moveSprite(objectValues[i].img, objectValues[i].currentAnim.bulletSpeed, 0)
+                        moveSprite(b.img, b.currentAnim.bulletSpeed, 0)
                         bPos = rectPos(rect)
                     }
                     if (bPos[0] > rectE.x.animVal.value) {
-                        moveSprite(objectValues[i].img, -objectValues[i].currentAnim.bulletSpeed, 0)
+                        moveSprite(b.img, -b.currentAnim.bulletSpeed, 0)
                         bPos = rectPos(rect)
                     }
                     if (bPos[1] < rectE.y.animVal.value) {
-                        moveSprite(objectValues[i].img, 0, objectValues[i].currentAnim.bulletSpeed)
+                        moveSprite(b.img, 0, b.currentAnim.bulletSpeed)
                         bPos = rectPos(rect)
                     }
                     if (bPos[1] > rectE.y.animVal.value) {
-                        moveSprite(objectValues[i].img, 0, -objectValues[i].currentAnim.bulletSpeed)
+                        moveSprite(b.img, 0, -b.currentAnim.bulletSpeed)
                     }
             } else {
-                playEffect(objectValues[i],data.effects[objectValues[i].currentAnim.effect])
-                releaseSprite(objectValues[i].img)
-                objectValues.splice(i,1)
-                length--
-                i--
+                playEffect(b,data.effects[b.currentAnim.effect])
+                releaseSprite(b.img)
+                despawn(b)
             }
         }
     }

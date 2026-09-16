@@ -507,3 +507,74 @@ AudioParam.value. Вероятная причина у пользователя 
 «undefined», descFull внутри фрейма), библиотека: вкладки враги/объекты/
 достижения — названия, статы, описания в своих фреймах; endScreen — спрайт
 убитого гоблина виден; floatText поверх стен; кулдаун-дуга строится (юнит).
+
+## ПЯТАЯ ВОЛНА — СПРАЙТШИТЫ + E-3 (2026-09-16, задача юзера)
+
+Две задачи одним этапом: (1) анимации героев/врагов переведены с отдельных
+файлов-полос на **спрайтшиты zero_engine** (один лист-сетка на персонажа +
+манифест); (2) **этап E-3** — системы animPlay → moveBullet → damage/damageHero →
+enemyMove/enemyAI переведены с bag-объектов на ECS-компоненты/группы.
+
+### Спрайтшиты (рендер из листов)
+- Листы юзера: `forWork/sprites/<имя>_<64|128>.png` + манифесты (.json: size
+  клетки, columns, fps, animations[{name,row,frames}]; 11 строк: wait, walk_*,
+  attack_*, death, damage). 28 листов = 24 врага + 4 героя. abil/-иконки героев
+  и атаки/эффекты листами НЕ накрыты — остаются старыми файлами.
+- `forWork/make_sheets_map.py` (генератор): строит карту «URL старой полосы →
+  клетка листа», офсет окна кадра (dx,dy) внутри клетки вычисляет по альфа-bbox
+  кадра 0 и ВЕРИФИЦИРУЕТ пофреймово (пиксель-в-пиксель со старой полосой; у
+  мелких персонажей клетка 64 при окне 32×51 → offset (16,11), у 128-ых — (0,0)).
+  Копирует PNG в `build/images/sheets/`, эмитит `build/scripts/sheetsMap.js`
+  (плоская карта, ~292 полосы), гонит штатный `images/resources-update.py`.
+- Шим (`pixiBackend.js`): `rebuildFrames` для полос из карты строит кадры как
+  подокна ЛИСТА `(i*cell+dx, row*cell+dy, w/times, h)` — тайминг кадров не
+  изменился (по-прежнему тикает animPlay), сменился только источник текстуры
+  (1 лист на персонажа вместо ~12 файлов). `preloadGameTextures` грузит в GPU
+  ЛИСТЫ вместо полос (подмена по карте, дедуп); полосы остаются в HTTP-прогреве
+  cacheResources. Полосы вне карты (rat wait, spider/spiderRed wait|damage — их
+  в игре и нет) читают старые файлы.
+
+### E-3 — системы на компонентах/группах (`ecsBridge.js` + 6 системных файлов)
+- Компоненты: `animCounter` (Float32), `animStill` (Float32) — горячие счётчики
+  анимации. Поля `obj.animCounters`/`obj.currentStill` переопределяются
+  АКЦЕССОРАМИ поверх компонентов (`defAnimAccessor`) — ~14 игровых файлов
+  продолжают писать их как раньше, состояние одно — в типизированном массиве.
+- Группы (маркеры на спавне в registerEcs): `ganim` (все анимированные),
+  `genemy`/`gpet`/`gbullet`/`gfx` (по типу НА СПАВНЕ). ВАЖНО: игра мутирует
+  obj.type НА МЕСТЕ (enemy→corpse в enemyDie, enemy→pet в encounters, босс
+  enemy→up→upped→enemy в spiderBossFight) БЕЗ перерегистрации — поэтому группы
+  только coarse-множества, а ВНУТРЕННИЕ фильтры по obj.type в системах сохранены
+  1:1 (stale-члены отсеиваются фильтром, как в старом скане objectValues).
+- `animPlay.js`: цикл по `world.queries.ganim.entities` ОБРАТНО (удаление
+  сущности в swap-and-pop двигает уже обработанный хвост; новые спавны
+  (addAnim/crushBurst) попадают в конец и пропускаются тиком — семантика старой
+  «фиксированной границы»). Удаления (труп/снаряд end-of-once) — indexOf+splice.
+  checkEndAnim(d) — неиспользуемый индекс выброшен.
+- `moveBullet.js`: moveBullet/moveMagicBullet по снимку `gbullet`; despawn-хелпер.
+- `damageHero.js`: по снимку `gbullet` (урон герою проверен живьём: 25→0).
+- `damage.js`: сбор dmgEnemies/dmgBullets/dmgSplash9/13 — по группам
+  genemy/gbullet/gfx (вместо полного прохода objectValues); createSplash — по
+  genemy-снимку.
+- `enemyMove.js`: враги из genemy (с камера-гейтом 1:1; очарованный pet из
+  genemy тикается вне кадра, как в V78), питомцы — отдельным проходом gpet.
+- `enemyAI.js`: 4 скана (crowdRankOf, pickShadowLanding, callAllies,
+  separateEnemiesTick) — по genemy-снимкам.
+- Отладка: `window.__BACKEND` (app/texCache/frameCache/SHEETS/framesInfo/dumpUI —
+  экранные координаты UI-узлов) и `window.__ST` (status/objectValues/doorPics) в
+  index.js — для headless-тестов; старый `__BACKEND` в конце setupBackend
+  ЗАТИРАЛ новый (поймано) — слит в один.
+
+### Проверки (headless Chrome + CDP, WebGPU renderer=2)
+- 28 листов в GPU после preload; кадр героя = подокно листа точно по карте
+  ((16,11,32×51) wait, (16,203,32×51) walk_left = row 3 — математика сходится).
+- Заставка → лобби (выбор героя карточками doll/T*) → комиксы → этаж; герой
+  ходит 4 направлениями (move/* из листов), кадры тикают (still 0..3).
+- Дверь → спавн 5-6 врагов (genemy=5..6): PATROL/CHASE/ATTACK, погоня; авто-атака
+  героя убила врага (exp 0→1 — пуля через moveBullet+damage на группах); враги
+  убили героя (25→0 — damageHero на gbullet); экран результатов отрисован
+  (спрайт убитого гоблина, звёзды, золото, время).
+- Скриншот живой сцены: герой и гоблины из листов пиксель-корректны.
+- warns=0, loopErr отсутствует во всех прогонах; FPS 143-145 (headless).
+- Грабли тестов: node --check МОЛЧА парсит .js как CJS — только
+  `node --input-type=module --check < file`; кэш Chrome модулем отравляется
+  чужим сервером — Network.clearBrowserCache + свежий --user-data-dir.
