@@ -327,6 +327,7 @@ function makeShadowCopy(shim, sp) {
     }
     const col = new PIXI.Color(cssColorToPixi(sp.color))
     copy.tint = col
+    copy._baseAlpha = col.alpha
     copy.alpha = col.alpha
     copy._isShadowCopy = 1
     return copy
@@ -363,6 +364,10 @@ function syncShadowCopies(shim) {
     const n = shim.node
     for (const c of copies) {
         c.visible = n.visible
+        // копия — sibling и НЕ наследует alpha узла: opacity шима (hoverOpa,
+        // setAttribute("opacity") — подсветка доступных способностей 0.3)
+        // обязана ослаблять и свечение, иначе копия светит полной альфой
+        c.alpha = (c._baseAlpha !== undefined ? c._baseAlpha : 1) * n.alpha
         if (c instanceof PIXI.Text) {
             c.text = n.text
         } else {
@@ -513,9 +518,9 @@ class ShimEl {
     // ---------- текст ----------
     get textContent() { return this.attrs["#text"] || "" }
     set textContent(v) {
-        this.attrs["#text"] = String(v)
-        if (this.kind === "text") this.node.text = String(v)
-        else if (this.kind === "html") this.node.text = stripHtml(v)
+        this.attrs["#text"] = domText(v)
+        if (this.kind === "text") this.node.text = domText(v)
+        else if (this.kind === "html") this.node.text = stripHtml(domText(v))
         syncShadowCopies(this)
     }
     getBBox() {
@@ -563,20 +568,14 @@ class ShimEl {
     _syncInteractive() {
         const want = !!(this._onclick || this._over || this._out || this._down || this._up || this._move ||
             (this._listeners && this._listeners.size > 0))
+        if (want === this._interactive) return
         this._interactive = want ? 1 : 0
         if (this.node) {
-            // SVG visiblePainted: КАРТИНКА и ЗАЛИТАЯ фигура перехватывают клики (панель
-            // настроек не пускает клики к кнопкам меню под ней!), fill="none" (рамки,
-            // подсветки ячеек) и текст прозрачны для кликов, pointer-events="none" —
-            // всегда прозрачен. Обработчики добавляют интерактивность поверх этого.
-            // ПРОЗРАЧНЫЕ узлы — ровно "none" (не "passive"!): passive-ребёнок наследует
-            // static родителя, проходит hit-test и возвращает пустую цель — клик
-            // «проглатывается», не доходя до кнопки под текстом (ловили вживую)
-            const pe = this.attrs["pointer-events"]
-            const fill = this.attrs.fill
-            const blocking = this.kind === "image" ||
-                ((this.kind === "rect" || this.kind === "circle" || this.kind === "path" || this.kind === "poly") && !!fill && fill !== "none")
-            this.node.eventMode = pe === "none" ? "none" : (want || blocking) ? "static" : "none"
+            // КОНТРАКТ ОРИГИНАЛА (svg.js 6161717): ВСЕ примитивы по умолчанию
+            // pointer-events="none", и только элементы с обработчиками
+            // (func/hover/funcShow/funcDrag/funcDbl) получают "auto" — перехватывают
+            // клики. Никакого visiblePainted: тултипы/рамки/декор не мешают кликам
+            this.node.eventMode = want ? "static" : "none"
             if (want && !this._wired) { this._wired = 1; wirePixiEvents(this) }
         }
     }
@@ -686,6 +685,7 @@ function applyAttr(shim, name, value) {
         }
         case "opacity": {
             if (shim.node) shim.node.alpha = value === undefined || value === "" ? 1 : +value
+            syncShadowCopies(shim)
             return
         }
         case "display": {
@@ -726,8 +726,11 @@ function applyAttr(shim, name, value) {
         case "rx": case "stroke-width": case "fill-opacity": case "fill": case "stroke": {
             if (shim.kind === "rect") redrawRect(shim)
             else if (shim.kind === "circle") redrawCircle(shim)
+            // poly/path: игра ставит stroke/fill ПОСЛЕ points/d (minimapFx-кнопка,
+            // секторы кулдаунов) — без перерисовки фигура оставалась пустой (0×0)
+            else if (shim.kind === "poly") redrawPoly(shim)
+            else if (shim.kind === "path") redrawPath(shim)
             else if (shim.kind === "text" || shim.kind === "html") applyTextStyle(shim)
-            // fill меняет «перехват кликов» (visiblePainted) — пересчитать eventMode
             shim._syncInteractive()
             return
         }
@@ -800,6 +803,12 @@ function applyPosition(shim) {
     if (shim.kind === "circle") { redrawCircle(shim); return }
     // path/poly: x/y — хранилище (на d/points не влияют, как в SVG)
     if (shim.kind === "path" || shim.kind === "poly") return
+    if (shim.kind === "text" || shim.kind === "html") {
+        // повторная запись x/y у текста обязана сохранить базлайн-вычет и якорь
+        // (та же формула, что в applyTextStyle, иначе текст съезжает вниз/влево)
+        applyTextStyle(shim)
+        return
+    }
     if (shim.node && (shim.attrs.x !== undefined || shim.attrs.y !== undefined)) {
         shim.node.position.set(num(shim.attrs.x), num(shim.attrs.y))
         syncEcsPos(shim)
@@ -979,15 +988,55 @@ function redrawPoly(shim) {
         if (stroke && stroke !== "none" && sw > 0) p.stroke({ width: sw, color: stroke })
     }
 }
-// парсер d: M/L/H/V/Z (+relative) — достаточно для игры (прогоны и линии)
+// парсер d: M/L/H/V/Z + A/a (эллиптическая дуга — радиальные секторы кулдаунов
+// способностей: getSectorPath в activeSkills). Дуга сэмплируется полилинией
 function pathPoints(d) {
     const pts = []
-    const tokens = String(d).match(/[MLHVZmlhvz]|[-+]?[\d.]+(?:e[-+]?\d+)?/g) || []
+    const tokens = String(d).match(/[MLHVZAmlhvza]|[-+]?[\d.]+(?:e[-+]?\d+)?/g) || []
     let i = 0, cx = 0, cy = 0, cmd = ""
     let sx = 0, sy = 0
+    const addArc = (x2, y2, rx, ry, rotDeg, largeArc, sweep, rel) => {
+        const x1 = cx, y1 = cy
+        if (rel) { x2 += x1; y2 += y1 }
+        rx = Math.abs(rx); ry = Math.abs(ry)
+        if (rx < 1e-6 || ry < 1e-6) { pts.push(x2, y2); cx = x2; cy = y2; return }
+        // F.6.5 (W3C): центр дуги по конечным точкам и радиусам
+        const phi = rotDeg * Math.PI / 180
+        const cosP = Math.cos(phi), sinP = Math.sin(phi)
+        const dx2 = (x1 - x2) / 2, dy2 = (y1 - y2) / 2
+        const x1p = cosP * dx2 + sinP * dy2
+        const y1p = -sinP * dx2 + cosP * dy2
+        const lam = (x1p * x1p) / (rx * rx) + (y1p * y1p) / (ry * ry)
+        if (lam > 1) { const s = Math.sqrt(lam); rx *= s; ry *= s }
+        const num0 = rx * rx * ry * ry - rx * rx * y1p * y1p - ry * ry * x1p * x1p
+        const co = (largeArc !== sweep ? 1 : -1) * Math.sqrt(Math.max(0, num0 / (rx * rx * ry * ry)))
+        const cxp = co * rx * y1p / ry
+        const cyp = -co * rx * x1p / ry
+        const ccx = cosP * cxp - sinP * cyp + (x1 + x2) / 2
+        const ccy = sinP * cxp + cosP * cyp + (y1 + y2) / 2
+        const ang = (ux, uy, vx, vy) => {
+            const dot = ux * vx + uy * vy, len = Math.sqrt(ux * ux + uy * uy) * Math.sqrt(vx * vx + vy * vy)
+            let a = Math.acos(Math.min(1, Math.max(-1, dot / (len || 1))))
+            if (ux * vy - uy * vx < 0) a = -a
+            return a
+        }
+        const th1 = ang(1, 0, (x1p - cxp) / rx, (y1p - cyp) / ry)
+        let dth = ang((x1p - cxp) / rx, (y1p - cyp) / ry, (-x1p - cxp) / rx, (-y1p - cyp) / ry)
+        if (!sweep && dth > 0) dth -= 2 * Math.PI
+        if (sweep && dth < 0) dth += 2 * Math.PI
+        // сэмплирование: шаг ~10°, минимум 8 сегментов
+        const steps = Math.max(8, Math.ceil(Math.abs(dth) / (Math.PI / 18)))
+        for (let k = 1; k <= steps; k++) {
+            const th = th1 + dth * k / steps
+            const px = ccx + rx * Math.cos(th) * cosP - ry * Math.sin(th) * sinP
+            const py = ccy + rx * Math.cos(th) * sinP + ry * Math.sin(th) * cosP
+            pts.push(px, py)
+        }
+        cx = x2; cy = y2
+    }
     while (i < tokens.length) {
         const t = tokens[i]
-        if (/[MLHVZmlhvz]/.test(t)) { cmd = t; i++; if (cmd === "Z" || cmd === "z") { pts.push(sx, sy); continue } }
+        if (/[MLHVZAmlhvza]/.test(t)) { cmd = t; i++; if (cmd === "Z" || cmd === "z") { pts.push(sx, sy); continue } }
         const rel = cmd === cmd.toLowerCase() && cmd.toLowerCase() !== "z"
         switch (cmd.toLowerCase()) {
             case "m": case "l": {
@@ -1000,6 +1049,11 @@ function pathPoints(d) {
             }
             case "h": { const x = +tokens[i] + (rel ? cx : 0); pts.push(x, cy); cx = x; i += 1; break }
             case "v": { const y = +tokens[i] + (rel ? cy : 0); pts.push(cx, y); cy = y; i += 1; break }
+            case "a": {
+                addArc(+tokens[i + 5], +tokens[i + 6], +tokens[i], +tokens[i + 1], +tokens[i + 2], +tokens[i + 3], +tokens[i + 4], rel)
+                i += 7
+                break
+            }
             default: i++
         }
     }
@@ -1030,21 +1084,28 @@ function applyTextStyle(shim) {
     const stroke = shim.attrs.stroke
     const sw = +(shim.attrs["stroke-width"] || 0)
     const family = (shim.attrs["font-family"] || (o.font || "baseFont2")) + ", sans-serif"
-    const anchorX = shim.attrs["text-anchor"] === "middle" ? 0.5 : 0
+    // КОМТРАКТ ОРИГИНАЛА: <text> — y это БАЗЛАЙН (якорь по x из text-anchor);
+    // textHtml (foreignObject) — блок от ЛЕВОГО ВЕРХНЕГО угла (x,y), text-anchor
+    // на foreignObject НЕ действовал: если рисовать html от центра/базлайна,
+    // текст «вылезает» влево-вверх из своих фреймов (helpWord/ addToSkill/library)
+    const isHtml = shim.kind === "html"
+    const anchorX = !isHtml && shim.attrs["text-anchor"] === "middle" ? 0.5 : 0
     const st = {
         fontFamily: family,
         fontSize: size,
         fill,
         stroke: stroke && stroke !== "none" && sw > 0 ? { color: stroke, width: sw, join: "round" } : undefined,
-        breakWords: shim.kind === "html",
-        wordWrap: shim.kind === "html",
-        wordWrapWidth: shim.kind === "html" ? Math.max(10, +(shim.attrs.width || o.w || 100)) : undefined,
-        lineHeight: shim.kind === "html" ? size * 1.15 : undefined,
+        breakWords: isHtml,
+        wordWrap: isHtml,
+        wordWrapWidth: isHtml ? Math.max(10, +(shim.attrs.width || o.w || 100)) : undefined,
+        lineHeight: isHtml ? size * 1.15 : undefined,
     }
     shim.node.style = st
     shim.node.resolution = Math.min(2, window.devicePixelRatio || 1)
     shim.node.anchor.set(anchorX, 0)
-    shim.node.position.set(num(shim.attrs.x), num(shim.attrs.y) - size * TEXT_BASELINE_K)
+    const px = num(shim.attrs.x)
+    const py = isHtml ? num(shim.attrs.y) : num(shim.attrs.y) - size * TEXT_BASELINE_K
+    shim.node.position.set(px, py)
     syncShadowCopies(shim)
 }
 
@@ -1083,12 +1144,19 @@ function attachShim(parent, shim, index) {
         // шима: в raw-дереве есть узлы вне шим-дерева (тени-копии, маски Graphics) —
         // из-за расхождения новые узлы вставлялись ПЕРЕД уже существующими, и кнопки
         // меню оказывались ПОВЕРХ панели настроек, воруя её клики
-        let rawIdx = parent.node.children.length
-        for (let k = index - 1; k >= 0; k--) {
-            const s = parent.children[k]
-            if (s !== shim && s.node && s.node.parent === parent.node) {
-                rawIdx = parent.node.getChildIndex(s.node) + 1
-                break
+        let rawIdx
+        if (index <= 0) {
+            // prepend (SVG: в начало = на самый нижний слой) — checkZOrder героя
+            // опускает стены/накладки под себя именно prepend'ом
+            rawIdx = 0
+        } else {
+            rawIdx = parent.node.children.length
+            for (let k = index - 1; k >= 0; k--) {
+                const s = parent.children[k]
+                if (s !== shim && s.node && s.node.parent === parent.node) {
+                    rawIdx = parent.node.getChildIndex(s.node) + 1
+                    break
+                }
             }
         }
         parent.node.addChildAt(shim.node, Math.min(rawIdx, parent.node.children.length))
@@ -1343,8 +1411,13 @@ function createCircle(place, cx, cy, r, stroke, strokeWidth, fill, obj = {}) {
     return shim
 }
 
+// DOM-семантика textContent: присвоение null/undefined даёт ПУСТУЮ строку,
+// а не текст "undefined" (игра создаёт тексты с T(undefined) — подсказки
+// способностей: внизу фрейма рисовалось слово «undefined»)
+function domText(v) { return v === undefined || v === null ? "" : String(v) }
+
 function createTextEl(place, x, y, w, h, stroke, strokeWidth, fill, textContent, obj = {}) {
-    const t = new PIXI.Text({ text: String(textContent) })
+    const t = new PIXI.Text({ text: domText(textContent) })
     const shim = new ShimEl("text", t)
     shim._textOpts = obj
     shim.attrs.x = num(x); shim.attrs.y = num(y)
@@ -1352,7 +1425,7 @@ function createTextEl(place, x, y, w, h, stroke, strokeWidth, fill, textContent,
     shim.attrs["font-size"] = obj.size || 24
     shim.attrs["font-family"] = obj.font || "baseFont2"
     shim.attrs["text-anchor"] = obj.anchor || "start"
-    shim.attrs["#text"] = String(textContent)
+    shim.attrs["#text"] = domText(textContent)
     if (obj.id !== undefined) { shim.attrs.id = obj.id; if (obj.id !== "") shimById.set(String(obj.id), shim) }
     applyTextStyle(shim)
     if (obj.funcShow) { shim._over = obj.funcShow; if (obj.funcShowOut) shim._out = obj.funcShowOut }
@@ -1376,7 +1449,7 @@ function stripHtml(html) {
         .replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&nbsp;/g, " ")
 }
 function createTextHtml(place, x, y, w, h, stroke, strokeWidth, fill, textContent, obj = {}) {
-    const t = new PIXI.Text({ text: stripHtml(textContent) })
+    const t = new PIXI.Text({ text: stripHtml(domText(textContent)) })
     const shim = new ShimEl("html", t)
     shim._textOpts = obj
     shim.attrs.x = num(x); shim.attrs.y = num(y); shim.attrs.width = num(w); shim.attrs.height = num(h)
@@ -1384,7 +1457,7 @@ function createTextHtml(place, x, y, w, h, stroke, strokeWidth, fill, textConten
     shim.attrs["font-size"] = obj.size || 24
     shim.attrs["font-family"] = obj.font || "baseFont2"
     shim.attrs["text-anchor"] = obj.anchor || "start"
-    shim.attrs["#text"] = stripHtml(textContent)
+    shim.attrs["#text"] = stripHtml(domText(textContent))
     if (obj.id !== undefined) { shim.attrs.id = obj.id; if (obj.id !== "") shimById.set(String(obj.id), shim) }
     applyTextStyle(shim)
     if (obj.func) shim._onclick = obj.func

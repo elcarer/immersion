@@ -14,7 +14,7 @@
 
 // Глобали ECS/world/COMPONENTS/DATA — из engine/build/engine (классический скрипт
 // грузится до всех модулей, так же как в zero_engine)
-import { cameraView } from "./pixiBackend.js"
+import { cameraView, layers } from "./pixiBackend.js"
 
 const TYPE_CODES = { hero: 1, enemy: 2, bullet: 3, effect: 4, pet: 5, corpse: 6 }
 
@@ -109,6 +109,10 @@ export function ecsRenderSync() {
         const id = ents[i]
         const sprite = DATA.sprite[id]
         if (!sprite || !sprite.node) continue
+        // UI-сущности (спрайты убитых врагов на экране очков — их кладёт endGame
+        // в svgArr[2] с ЭКРАННЫМИ координатами) камерой слоя 1 не кульлятся:
+        // их (150..1800, 280..600) «вне окна камеры» гасило каждый кадр
+        if (sprite._layer === layers[2]) continue
         const pad = COMPONENTS.cullPad[id]
         const x = COMPONENTS.posX[id], y = COMPONENTS.posY[id]
         sprite.node.visible =
