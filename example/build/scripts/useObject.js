@@ -183,10 +183,29 @@ function checkStoneSkin(damageTrap) {
     return damageTrap
 }
 let dropArr = []
+//E-15: транспорт «это кучка из сундука босса» в takeDrop: ключ — хэндл кучки,
+//значение — фиксированная редкость; предмет генерируется при ПОДБОРЕ с фильтром
+//«оружие» (itemGenerate(rarity, {type: 11})). WeakMap: неподобранные кучки не
+//держат память — хэндлы умирают при разборе сцены, записи собирает GC
+const bossWeaponDrops = new WeakMap()
+
 function drop(obj,lvl=0) {
-    let drop = generateDrop(lvl)
-    drop === false && obj[2] !== 11 && encounters(obj)
-    drop === false && status.info.searshFood && Math.random() < status.info.searshFood && (drop = lootTable[4])
+    //E-15: сундук босса (тип 9 с меткой obj[10]=1, ставится newGame в самой большой
+    //комнате) — гарантированная кучка ПРЕДМЕТА вместо обычного generateDrop: случайное
+    //ОРУЖИЕ, редкость по этажу (1 этаж — редкое, 2 — эпическое, 3 — легендарное/сет);
+    //спрайт кучки — по редкости (item2/3/4.png), фильтр уезжает в takeDrop
+    let drop
+    let bossRarity = 0
+    if(obj[2] === 9 && obj[10] === 1) {
+        bossRarity = status.levelFloor + 2
+        //E-15: свои кучки юзера (16×42): 1 этаж bossitem1 (редкое), 2 — bossitem2
+        //(эпическое), 3 — bossitem3 (легендарное); индекс = этаж
+        drop = bossLootTable[status.levelFloor]
+    } else {
+        drop = generateDrop(lvl)
+        drop === false && obj[2] !== 11 && encounters(obj)
+        drop === false && status.info.searshFood && Math.random() < status.info.searshFood && (drop = lootTable[4])
+    }
     if (drop) {
         //R3: поиск по id-ключу за O(1)
         let img = picById(obj[6]+"OI")
@@ -198,6 +217,7 @@ function drop(obj,lvl=0) {
         let y = by + obj[4]*32 + Math.trunc(Math.random() * 16) - 16
         screenPic.push(worldImage(svgArr[1],x,y,drop.w,drop.h,drop.img,{"id":screenPic.length-1}))
         dropArr.push(screenPic[screenPic.length - 1])
+        bossRarity > 0 && bossWeaponDrops.set(dropArr[dropArr.length - 1], bossRarity)
         //V69: дроп упал в стену/пустоту — переносим на свободную клетку рядом
         placeDrop(screenPic[screenPic.length - 1],x,y,drop.w,drop.h)
         //V75: Хлебосол/Золотое эхо — шанс доп. кучки еды/золота рядом
@@ -213,6 +233,14 @@ let lootTable = [
     {"w":32,"h":36,"img":"./images/dungeon/drop/scroll.png"},
     {"w":28,"h":32,"img":"./images/dungeon/drop/key.png"},
     {"w":32,"h":36,"img":"./images/dungeon/drop/item4.png"}
+]
+//E-15: кучки сундука босса — спрайты юзера (16×42), индекс = этаж (0..2):
+//bossitem1 — редкое оружие 1 этажа, bossitem2 — эпическое 2 этажа, bossitem3 —
+//легендарное 3 этажа; рисуются на месте старых item2/3/4.png
+let bossLootTable = [
+    {"w":16,"h":42,"img":"./images/dungeon/drop/bossitem1.png"},
+    {"w":16,"h":42,"img":"./images/dungeon/drop/bossitem2.png"},
+    {"w":16,"h":42,"img":"./images/dungeon/drop/bossitem3.png"}
 ]
 function generateDrop(lvl) {
     //V67: копия «везучести» (Вечный сапфир, источник в 1-й ячейке инвентаря) работает как свои
@@ -240,4 +268,4 @@ function checkConsumable() {
     if (rand < 99) return lootTable[6]
     return lootTable[5]
 }
-export {useObject,stopUseObject,bars,dropArr}
+export {useObject,stopUseObject,bars,dropArr,bossWeaponDrops}

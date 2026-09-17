@@ -1,5 +1,6 @@
 import { status } from "../scripts/start.js"
-import { dropArr } from "../scripts/useObject.js"
+//E-15: bossWeaponDrops — кучки из сундука босса: подбор генерирует предмет с фильтром
+import { dropArr, bossWeaponDrops } from "../scripts/useObject.js"
 import { checkCollision } from "../scripts/damage.js"
 import { floatText } from "../scripts/floatText.js"
 import { itemGenerate } from "../scripts/itemGenerate.js"
@@ -30,16 +31,24 @@ function takeDrop() {
         let h2 = 32
         if (checkCollision(x1, x2, w1, w2, y1, y2, h1, h2)) {
             let useDrop = false
-            dropArr[i].getAttribute("href") === "./images/dungeon/drop/gold.png" && (useDrop = takeGold())
-            dropArr[i].getAttribute("href") === "./images/dungeon/drop/food.png" && (useDrop = takeFood())
-            dropArr[i].getAttribute("href") === "./images/dungeon/drop/scroll.png" && (useDrop = takeScroll())
-            dropArr[i].getAttribute("href") === "./images/dungeon/drop/key.png" && (useDrop = takeKey())
-            dropArr[i].getAttribute("href") === "./images/dungeon/drop/item1.png" && (useDrop = takeItem(1))
-            dropArr[i].getAttribute("href") === "./images/dungeon/drop/item2.png" && (useDrop = takeItem(2))
-            dropArr[i].getAttribute("href") === "./images/dungeon/drop/item3.png" && (useDrop = takeItem(3))
-            dropArr[i].getAttribute("href") === "./images/dungeon/drop/item4.png" && (useDrop = takeItem(4))
-            //V67: item5.png — кучка РЕЛИКВИИ (дроп босса 4 этажа, 10%)
-            dropArr[i].getAttribute("href") === "./images/dungeon/drop/item5.png" && (useDrop = takeItem(5))
+            //E-15: кучка из сундука босса — случайное ОРУЖИЕ фиксированной редкости
+            //(фильтр в itemGenerate); href-цепочка ниже — обычные кучки
+            let bossRarity = bossWeaponDrops.get(dropArr[i])
+            if (bossRarity !== undefined) {
+                useDrop = takeItem(bossRarity, {"type": 11})
+                useDrop && bossWeaponDrops.delete(dropArr[i])
+            } else {
+                dropArr[i].getAttribute("href") === "./images/dungeon/drop/gold.png" && (useDrop = takeGold())
+                dropArr[i].getAttribute("href") === "./images/dungeon/drop/food.png" && (useDrop = takeFood())
+                dropArr[i].getAttribute("href") === "./images/dungeon/drop/scroll.png" && (useDrop = takeScroll())
+                dropArr[i].getAttribute("href") === "./images/dungeon/drop/key.png" && (useDrop = takeKey())
+                dropArr[i].getAttribute("href") === "./images/dungeon/drop/item1.png" && (useDrop = takeItem(1))
+                dropArr[i].getAttribute("href") === "./images/dungeon/drop/item2.png" && (useDrop = takeItem(2))
+                dropArr[i].getAttribute("href") === "./images/dungeon/drop/item3.png" && (useDrop = takeItem(3))
+                dropArr[i].getAttribute("href") === "./images/dungeon/drop/item4.png" && (useDrop = takeItem(4))
+                //V67: item5.png — кучка РЕЛИКВИИ (дроп босса 4 этажа, 10%)
+                dropArr[i].getAttribute("href") === "./images/dungeon/drop/item5.png" && (useDrop = takeItem(5))
+            }
             if(useDrop) {
                 playback(strike[3].vol,0,0,7*status.settings.soundVolume)
                 dropArr[i].remove()
@@ -94,7 +103,7 @@ function takeFood() {
     }
     return false
 }
-function takeItem(rarity) {
+function takeItem(rarity, filter) {
     let countInv = 0
     let length = status.inventory.inv.length
     for (let i = 0; i < length; i++) {
@@ -112,7 +121,8 @@ function takeItem(rarity) {
         //V67: реликвия генерируется отдельно (без характеристик); V68: реликвии уникальны —
         //generate выбирает только из невыпадавших, пустой пул (страховка, bossDrop обычно
         //уже положил item4) даёт обычный легендарный предмет
-        let item = rarity === 5 ? (relicGenerate() || itemGenerate(4)) : itemGenerate(rarity)
+        //E-15: filter — фильтры генерации ({type: 11} = оружие у сундуков боссов)
+        let item = rarity === 5 ? (relicGenerate() || itemGenerate(4)) : itemGenerate(rarity, filter)
         //V67 «Вечный сапфир»: предмет мог встать в 1-ю ячейку инвентаря (или дать ей освободиться
         //нельзя тут — добавление только занимает) — пересчёт копии сразу
         changeDopStat()

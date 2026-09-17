@@ -941,6 +941,8 @@ const PAIRS = [
     ["enemy.26.desc", "Когда здоровье падает до половины, разделяется надвое: осколки вдвое меньше, и каждый получает её остаток здоровья как максимум. Осколки делятся ещё раз.", "When its health drops to half, it splits in two: the pieces are half its size and each receives its remaining health as its maximum. The pieces split once more."],
     ["attack.22.name", "Звезда пустоты", "Void Star"],
     ["attack.23.name", "Звезда пустоты", "Void Star"],
+    //V91/E-15: снаряд мини-грибов Гриба пустоты (спрайт ×0.2 от «Звезды пустоты»)
+    ["attack.24.name", "Звезда пустоты", "Void Star"],
     ["journ.medusaSplit", "Медуза пустоты разделяется надвое!", "The Void Medusa splits in two!"],
     //V91: третий босс 4 этажа — «Гриб пустоты»
     ["enemy.27.name", "Гриб пустоты", "Void Mushroom"],

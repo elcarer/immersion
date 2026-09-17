@@ -147,10 +147,11 @@ for (let i = 0; i < 60; i++) {
   await S(400)
 }
 console.log("мини:", JSON.stringify(mini))
-// мини = 1/5 босса: кадр 102/4 = 25.5 × 26; статы 1/10, скорость полная, без boss/elite/spore
+// мини = 1/5 босса: кадр 102/4 = 25.5 × 26; урон = 1/10 статов босса +10 (E-15):
+// на 1 странице босс [20,26] → мини [12,13]; без boss/elite/spore
 const mj = mini
 const miniOk = mj.minis === expectMinis && mj.m0 &&
-  mj.m0.hp === 100 && mj.m0.maxHp === 100 && mj.m0.dmg[0] === 2 && mj.m0.dmg[1] === 3 &&
+  mj.m0.hp === 100 && mj.m0.maxHp === 100 && mj.m0.dmg[0] === 12 && mj.m0.dmg[1] === 13 &&
   mj.m0.exp === 1 && mj.m0.speed === 11 && mj.m0.boss !== 1 && mj.m0.elite !== 1 &&
   mj.m0.spore === undefined && mj.m0.w === 25.5 && mj.m0.h === 26
 console.log(`minis: ${miniOk ? "OK" : "FAIL"}`)

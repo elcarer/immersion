@@ -28,8 +28,11 @@ fetch("./images/resources.json").then(r => r.ok ? r.json() : Promise.reject(0)).
 function spriteCount(key) {
     return spriteCounts ? spriteCounts[key] || 0 : 0
 }
-function itemGenerate(rarity) {
-    let type = Math.trunc(Math.random() * 13)
+//E-15: filter (необязателен) — фильтры генерации: {type: N} фиксирует слот
+//(11 = оружие, 12 = левая рука, 0-10 = прочие слоты); без фильтра — как раньше,
+//случайный слот 0-12. Остальные ветки (редкости, сеты, спрайты) работают без изменений
+function itemGenerate(rarity, filter) {
+    let type = filter && filter.type !== undefined ? filter.type : Math.trunc(Math.random() * 13)
     let stat
     type < 10 && (stat = itemsParams[type][Math.trunc(Math.random() * 2)])
     let count = Math.trunc(Math.random() * 3) + rarity

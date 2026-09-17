@@ -578,7 +578,9 @@ function configEnemesRoomObject(room,newData,enemyNum,i) {
     let level = newData.scenes[status.levelFloor]
     //мега-сундук и спуск ставятся ДО пула (V64a): они занимают фиксированные клетки у центра
     //и занятость не проверяют — портал из пула обязан видеть их в cellBusy
-    if(enemyNum >= 6) {
+    //E-15: в САМОЙ большой комнате (последняя в roomsArr — там босс этажей 1-2 и спуск)
+    //регулярный мега-сундук не ставится — вместо него «сундук босса» (ниже, с меткой [10])
+    if(enemyNum >= 6 && i !== level.roomsArr.length - 1) {
         level.objects.push([level.floor[room[0]][5]-1,level.floor[room[0]][6]-1,9,2,2,undefined])
         level.objects[level.objects.length-1][9] = room
     }
@@ -589,6 +591,13 @@ function configEnemesRoomObject(room,newData,enemyNum,i) {
         exitY < level.floor[room[0]][1]+1 && (exitY = level.floor[room[0]][1]+1)
         level.objects.push([level.floor[room[0]][5]-1,exitY,13,2,2,undefined])
         level.objects[level.objects.length-1][9] = room
+        //E-15: сундук босса — гарантированный 2×2 сундук в самой большой комнате этажей
+        //1-3 (та же клетка у центра, где раньше стоял мега-сундук). Метка [10]=1 (у типа 9
+        //поле свободно — занято только у ловушек 14): при вскрытии даёт случайное ОРУЖИЕ,
+        //редкость по этажу — 1 этаж редкое / 2 эпическое / 3 легендарное (useObject.drop)
+        level.objects.push([level.floor[room[0]][5]-1,level.floor[room[0]][6]-1,9,2,2,undefined])
+        level.objects[level.objects.length-1][9] = room
+        level.objects[level.objects.length-1][10] = 1
     }
     let lengthCommon = Math.trunc(Math.random()*(enemyNum/2)) + 1
     for (let i = 0; i < lengthCommon; i++) {

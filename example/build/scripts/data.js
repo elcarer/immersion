@@ -781,6 +781,15 @@ let data = {"heroes":[
         {"img":"./images/attacks/void/all.png","bullet":"left","effect":0,"bulletSpeed":5,"times":4,"speed":10,"w":96,"h":24,"x":-12,"y":0},
         {"img":"./images/attacks/void/all.png","bullet":"right","effect":0,"bulletSpeed":5,"times":4,"speed":10,"w":96,"h":24,"x":12,"y":0},
     ]},
+    //E-15: мини-копия «Звезды пустоты» для мини-грибов Гриба пустоты — спрайт ×0.2 от 21
+    //(по принципу осколков Медузы: 22 ×0.5, 23 ×0.25; 76/384 = 19/96 — кадр 19×19 ровный);
+    //урон считается по stats.dmg стрелка, перенаправление — в spawnSporeMini (voidBoss.js)
+    {"name":"attack.24.name","base":1,"cooldown":1.6,"range":9,"img":"./images/attacks/void/icon.png", "anims":[
+        {"img":"./images/attacks/void/all.png","bullet":"top","effect":0,"bulletSpeed":5,"times":4,"speed":10,"w":76,"h":19,"x":0,"y":-10},
+        {"img":"./images/attacks/void/all.png","bullet":"down","effect":0,"bulletSpeed":5,"times":4,"speed":10,"w":76,"h":19,"x":0,"y":10},
+        {"img":"./images/attacks/void/all.png","bullet":"left","effect":0,"bulletSpeed":5,"times":4,"speed":10,"w":76,"h":19,"x":-10,"y":0},
+        {"img":"./images/attacks/void/all.png","bullet":"right","effect":0,"bulletSpeed":5,"times":4,"speed":10,"w":76,"h":19,"x":10,"y":0},
+    ]},
 ],
 "effects":[
     {"img":"./images/effects/0.png","once":1,"times":4,"speed":10,"w":96,"h":24,"x":0,"y":0},

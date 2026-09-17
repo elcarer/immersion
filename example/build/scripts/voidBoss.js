@@ -65,8 +65,8 @@ const BLOB_SIZE = 64
 const BLOB_RADIAL = 1.6
 //поворот за тик, рад (направление случайное — по/против часовой)
 const BLOB_ROT = 0.045
-//урон Сгустка: 6 + случайное 0..12 = 6..18 (по ТЗ)
-const BLOB_DMG_MIN = 6
+//урон Сгустка: 16 + случайное 0..12 = 16..28 (E-15: было 6..18, юзер дал +10)
+const BLOB_DMG_MIN = 16
 const BLOB_DMG_SPREAD = 13
 
 let bossRef = null   // объект Циклопа из objectValues (для Медузы остаётся null — V85)
@@ -90,6 +90,11 @@ const SPORE_LAND_TICKS = Math.round(8000 / 16) //8с жизни на полу д
 const SPORE_FLY_TICKS = 36       //полёт ~0.6с
 const SPORE_ARC = 56             //высота дуги полёта, px
 const MINI_K = 1 / 5             //мини-гриб = 1/5 босса (по ТЗ)
+//E-15: снаряд мини — уменьшенная копия «Звезды пустоты» (24, спрайт ×0.2 от 21 —
+//по принципу осколков Медузы 22/23); урон считается по stats.dmg стрелка
+const MINI_ATTACK = 24
+//E-15: прибавка к урону мини поверх 1/10 статов босса (2-4 слишком мало → 12-14 на 4 главе)
+const MINI_DMG_BONUS = 10
 
 let sporeBossRef = null
 let sporeCd = 0
@@ -390,12 +395,14 @@ function spawnSporeMini(cell) {
             for (let iA = 0; iA < arr.length; iA++) {
                 arr[iA].w = Math.round(arr[iA].w * MINI_K)
                 arr[iA].h = Math.round(arr[iA].h * MINI_K)
+                //E-15: снаряд мини — уменьшенная копия атаки (как у осколков Медузы)
+                arr[iA].attackNew && (arr[iA].attackNew.anim[0] = MINI_ATTACK)
             }
         }
     }
     let miniHp = Math.max(1, Math.trunc(boss.stats.maxHp / 10))
     let stats = {"hp": miniHp, "maxHp": miniHp,
-        "dmg": [Math.max(1, Math.round(boss.stats.dmg[0] / 10)), Math.max(1, Math.round(boss.stats.dmg[1] / 10))],
+        "dmg": [Math.max(1, Math.round(boss.stats.dmg[0] / 10)) + MINI_DMG_BONUS, Math.max(1, Math.round(boss.stats.dmg[1] / 10)) + MINI_DMG_BONUS],
         "exp": Math.max(1, Math.trunc(boss.stats.exp / 10)),
         "speed": boss.stats.speed, "range": boss.stats.range,
         "attacksCd": [], "noStunTime": boss.stats.noStunTime, "desc": cls.stats.desc}
