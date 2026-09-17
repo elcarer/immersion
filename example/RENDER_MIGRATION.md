@@ -163,7 +163,23 @@ dropSafe, spiderBossFight) получили нативный путь без е�
 - Отложено на R4: mapRender (панель карты — UI-слой), экраны/панели в screenPic
   (лобби/comix/endGame/HUD), растущий rect полосы юза.
 
-### R4. UI нативно (тексты, полосы, иконки, миникарта, drag)
+### R4. UI нативно (тексты, полосы, иконки, миникарта, drag) — ЧАСТИЧНО ВЫПОЛНЕН (2026-09-17)
+Сделано (коммиты 6dd0c23 / 4fbeb4e / 2316c99):
+- **R4.1 карта**: панель «Карта» нативно — все прямоугольники (комнаты/коридоры/стены/
+  двери) ОДНИМ PIXI.Graphics (createNativeGraphics + фасад nativeGraphics), объекты
+  и иконка героя — нативные спрайты worldImage, свечение через style drop-shadow
+  (glow-запекалка по duck-typing). map.js не тронут (хэндлы с remove совместимы).
+- **R4.2 полосы**: createWorldBar (спрайт заливки + маска-Graphics + setBarProgress,
+  anchor left/right) — ХП/опыт (changeHP больше НЕ пересоздаёт clipPath в defs на
+  каждое изменение), boss-полоса (hpBar.js), полоса загрузки (start.js). Опыт
+  заполняется справа, как в SVG-клипе; WorldSprite.remove уносит маску с собой.
+- **R4.3 floatText**: NativeText (PIXI.Text + текстовый DOM-поднабор с базлайн-
+  математикой applyTextStyle) + фасад nativeText; пул с revive() (remove уничтожает
+  узел, реюз перезапускает хэндл). Лимит 50, реюз после смерти волны — без ошибок.
+Осталось: R4.4 тексты/тултипы/журнал/библиотека/настройки (clipPath-группы прокрутки
+journal/library — контейнеры с масками), R4.5 drag/события/геймпад-клик.
+
+### R4 (план исходный). UI нативно (тексты, полосы, иконки, миникарта, drag)
 - Полосы ХП/опыта/босса (clipPath-маски) → прямой redraw Graphics; journal/library/
   settings/tip/миникарта/minimapFx → makeText/makeGraphics; drop-shadow декора →
   нативный фильтр (теневые копии-сиблинги удаляются как класс).

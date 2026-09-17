@@ -752,3 +752,18 @@ dataGeneric); window.__BACKEND получил spritePos/moveSprite/rectPos (те
 синх 1:1; FPS 143 (= baseline); warns=0/loopErr=null во всех прогонах.
 Отложено на R4: mapRender (панель карты), экраны/панели screenPic (лобби/comix/
 endGame/HUD), растущий rect полосы юза.
+
+## ДЕВЯТАЯ ВОЛНА — ЭТАПЫ R4.1–R4.3 (2026-09-17, коммиты 6dd0c23/4fbeb4e/2316c99)
+Юзер подтвердил фикс шкафчика, начат R4. **R4.1 карта**: панель карты нативно —
+все прямоугольники одним PIXI.Graphics (createNativeGraphics/nativeGraphics), объекты
+и герой — worldImage, свечение иконки через style (glow-запекалка duck-typing).
+**R4.2 полосы**: createWorldBar (спрайт+маска Graphics+setBarProgress) — ХП/опыт/
+босс/загрузка; changeHP больше не пересоздаёт clipPath в defs на каждый удар; опыт
+заполняется справа (anchor right). **R4.3 floatText**: NativeText (PIXI.Text, DOM-
+поднабор с базлайн-математикой applyTextStyle) + nativeText фасад; пул с revive()
+(remove уничтожает узел — реюз перезапускает хэндл). УРОК: bash-heredoc в этом
+окне обрезается на ~8KB — длинные правки только через Write-файл + python.
+Проверено headless: карта открывается/закрывается; урон в бою сжимает заливку ХП
+(19/25) и двигает текст; волны чисел с реюзом пула; 0 ошибок. Осталось R4.4
+(журнал/библиотека/настройки/тултипы — клипы прокрутки → контейнеры с масками) и
+R4.5 (drag/события/геймпад), затем R5 (снос шима).
