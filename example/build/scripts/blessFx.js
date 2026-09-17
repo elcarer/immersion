@@ -1,6 +1,6 @@
 import { status } from "../scripts/start.js"
 import { T } from "../scripts/localization.js"
-import { svgArr,image,worldImage,text,rect,textHtml } from "../scripts/svg.js"
+import { svgArr,image,worldImage,picById,text,rect,textHtml } from "../scripts/svg.js"
 import { screenPic } from "../scripts/del.js"
 //V69: доп. кучка эха не должна застревать в стенах — тот же placeDrop, что у основного дропа
 import { placeDrop } from "../scripts/dropSafe.js"

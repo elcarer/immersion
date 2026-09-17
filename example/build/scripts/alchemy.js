@@ -1,6 +1,6 @@
 import { status } from "../scripts/start.js"
 import { T } from "../scripts/localization.js"
-import { svgArr,image,text,rect } from "../scripts/svg.js"
+import { svgArr,image,picById,text,rect } from "../scripts/svg.js"
 import { tip,tipDel,rarityColor,itemFrameOn,itemGlowOn } from "../scripts/tip.js"
 import { cellPickArr } from "../scripts/doll.js"
 //V54: объединение трёх предметов одного качества — снятие с куклы только через unEquip
