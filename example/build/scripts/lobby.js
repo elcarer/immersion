@@ -1,5 +1,6 @@
 import { screenPic,del } from "../scripts/del.js"
-import { svgArr,image, text, rect } from "../scripts/svg.js"
+import { svgArr,image, text, rect, nativeHtml } from "../scripts/svg.js"
+import { data } from "../scripts/data.js"
 import { tip,tipDel,rarityColor,itemFrameOn,itemGlowOn } from "../scripts/tip.js"
 import { status } from "../scripts/start.js"
 import { comix } from "../scripts/comix.js"
@@ -38,6 +39,9 @@ let lobbySelect = []     // iMeta отмеченных вещей (в поряд
 let lobbySelFrames = {}  // iMeta -> элемент жёлтой рамки
 function lobby(lose,next,pageChest=0) {
     del()
+    //E-17: карточка героя при наведении может висеть со старой перерисовки — гасим
+    //вместе со слоем (remove() по отцеплённым узлам безвреден, нужен ради массива)
+    heroTipDel()
     //V66b: таверна — ни забег (1), ни экран очков (2). Раньше после возврата из вылазки
     //start оставался 2, и тик в лобби продолжал крутить ветку экрана результатов
     //(animPlay/rollNumbers каждые 3 тика) — нормализуем состояние при любом входе
@@ -71,8 +75,10 @@ function lobby(lose,next,pageChest=0) {
     heroName = screenPic[screenPic.length-1]
     //V74: все герои открыты сразу — силуэты UI/doll/0-3.png и проверка openHeroes удалены,
     //клик по любому герою выбирает его (спрайты UI/doll/T0-T3.png)
+    //E-17: наведение на куклу открывает карточку героя (heroTip, как карточка врага в
+    //enemyHover.js). hoverOpa здесь НЕ ставим: backend перезаписывает им funcShow/funcShowOut
     for (let i = 0; i < heroesArr.length; i++) {
-        screenPic.push(image(svgArr[2],heroesArr[i].x,heroesArr[i].y,heroesArr[i].w,heroesArr[i].h,"./images/UI/doll/T"+i+".png",{"func":e=>{svgArr[2].append(e.target);chengeHero(i)}, "hoverOpa":"0.01","opacity":"0.01"}))
+        screenPic.push(image(svgArr[2],heroesArr[i].x,heroesArr[i].y,heroesArr[i].w,heroesArr[i].h,"./images/UI/doll/T"+i+".png",{"func":e=>{svgArr[2].append(e.target);chengeHero(i)},"funcShow":e=>heroTip(i,e),"funcShowOut":heroTipDel,"opacity":"0.01"}))
     }
     //V59: спрайт кнопки — пустой emptyButton.png (341×96) вместо next.png с запечённым текстом
     screenPic.push(image(svgArr[2],1920/2-341/2,960,341,96,"./images/UI/panels/buttons/button.png",{"glow":1,"func":()=>{status.rectShadow = 1;playback(strike[14].vol,0,0,3*status.settings.soundVolume);status.nextFunction = () => {takeSelected();comix()}}}))
@@ -96,6 +102,50 @@ function lobby(lose,next,pageChest=0) {
 function chengeHero(hero=0) {
     status.hero.class = hero
     heroName.textContent = T(heroesArr[hero].name)
+}
+
+//----- E-17: карточка героя при наведении на куклу -----
+//Оформление повторяет карточку врага при наведении (enemyHover.js, та же вёрстка, что в
+//Библиотеке): рамка и фон те же, имя сверху, портрет data.heroes[i].img (192×288) вписан
+//в коробку слева, начальные характеристики (5 статов из data.js, до очков прокачки)
+//справа колонкой, описание геймплея (hero.N.desc) внизу во всю ширину с переносом строк.
+//Окно ставится справа от куклы (клампы по краям viewBox 1920×1080), целиком pointer-events:
+//none — клик по кукле и чужие подсказки сквозь него работают как раньше.
+const HT_W = 392, HT_H = 420
+const HT_NAME_SIZE = 32, HT_NAME_Y = 40
+const HT_IMG_MAX_W = 134, HT_IMG_MAX_H = 202, HT_IMG_X = 24, HT_IMG_Y = 64
+const HT_STAT_SIZE = 26, HT_STAT_X = 176, HT_STAT_Y = 88, HT_STAT_STEP = 34
+const HT_DESC_SIZE = 22, HT_DESC_Y = 288, HT_DESC_H = 116
+const HT_COL = "rgb(204, 153, 102)"
+let heroTipNodes = []
+function heroTip(i,e) {
+    heroTipDel()
+    //позиция: справа от куклы, клампы краёв (у правого края переворот влево не нужен —
+    //куклы лежат левее центра, но кламп оставляем на случай будущих перестановок)
+    const kx = e.target.x.animVal.value, ky = e.target.y.animVal.value
+    let x = kx + heroesArr[i].w + 18
+    x + HT_W > 1912 && (x = kx - HT_W - 18)
+    x < 8 && (x = 8)
+    let y = ky - 24
+    y + HT_H > 1072 && (y = 1072 - HT_H)
+    y < 8 && (y = 8)
+    const h = data.heroes[i]
+    heroTipNodes.push(rect(svgArr[2],x,y,HT_W,HT_H,HT_COL,"1px","rgba(16,12,10,0.92)",{"rx":"6px"}))
+    heroTipNodes.push(text(svgArr[2],x+HT_W/2,y+HT_NAME_Y,"0pt","50pt","black","2px",HT_COL,T(h.className),{"size":HT_NAME_SIZE,"font":"baseFont4","anchor":"middle"}))
+    //портрет героя вписан в коробку ≤134×202 (пропорция 2:3 сохраняется)
+    const fit = Math.min(HT_IMG_MAX_W/192, HT_IMG_MAX_H/288)
+    heroTipNodes.push(image(svgArr[2],x+HT_IMG_X,y+HT_IMG_Y,Math.round(192*fit),Math.round(288*fit),h.img))
+    //начальные характеристики: 5 статов из data.js (Сила/Ловкость/Здоровье/Скорость/Мудрость)
+    for (let j = 0; j < h.stats.length; j++) {
+        heroTipNodes.push(text(svgArr[2],x+HT_STAT_X,y+HT_STAT_Y+j*HT_STAT_STEP,"0pt","50pt","black","2px",HT_COL,T(h.stats[j].name)+": "+h.stats[j].value,{"size":HT_STAT_SIZE,"font":"baseFont4"}))
+    }
+    //описание геймплея — нативный html-блок с переносом по словам (как desc врага);
+    //id — тестовая ручка: dumpUI нативные тексты не обходит (children слоя их не регистрируют)
+    heroTipNodes.push(nativeHtml(svgArr[2],x+HT_IMG_X,y+HT_DESC_Y,HT_W-HT_IMG_X*2,HT_DESC_H,"black","2px",HT_COL,T("hero."+i+".desc"),{"size":HT_DESC_SIZE,"font":"baseFont4","id":"heroTipDesc"}))
+}
+function heroTipDel() {
+    for (let i = 0; i < heroTipNodes.length; i++) heroTipNodes[i].remove()
+    heroTipNodes = []
 }
 function viewMetaInv(pageChest) {
     let lengthEmpty = status.meta.metaInvLen
