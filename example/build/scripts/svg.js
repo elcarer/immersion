@@ -76,6 +76,11 @@ function nativeGraphics(place) {
 function worldBar(place,x,y,w,h,src,obj={}) {
     return backend.createWorldBar(place,x,y,w,h,src,obj)
 }
+// R4: нативный текст (PIXI.Text + текстовый DOM-поднабор) — floatText-пул и
+// последующие панели; базлайн-семантика SVG сохранена (y = базлайн)
+function nativeText(place,x,y,w,h,stroke,strokeWidth,fill,textContent,obj={}) {
+    return backend.createNativeText(place,x,y,w,h,stroke,strokeWidth,fill,textContent,obj)
+}
 function path(place,obj,fill='rgba(0, 0, 0, 0.65)') {
     return backend.createPath(place,obj,fill)
 }
@@ -92,4 +97,4 @@ function gamepadDragMove (x,y) { backend.dragState().move(x,y) }
 function gamepadDragEnd () { backend.dragState().end() }
 function isDragging () { return backend.dragState().isDragging() }
 
-export {svg,svgArr,circle,rect,text,image,textHtml,path,worldImage,worldBar,picById,nativeGraphics,gamepadDragStart,gamepadDragMove,gamepadDragEnd,isDragging,spritePos,moveSprite,releaseSprite,rectPos,getCTM}
+export {svg,svgArr,circle,rect,text,image,textHtml,path,worldImage,worldBar,nativeText,picById,nativeGraphics,gamepadDragStart,gamepadDragMove,gamepadDragEnd,isDragging,spritePos,moveSprite,releaseSprite,rectPos,getCTM}

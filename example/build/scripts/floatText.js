@@ -1,7 +1,10 @@
-import { svgArr,text } from "../scripts/svg.js"
+import { svgArr,nativeText } from "../scripts/svg.js"
 
 let floattext = []
-//V10: пул текстовых узлов — не создаём/удаляем SVG-текст на каждое число урона
+//R4: пул нативных текстовых хэндлов — не создаём/удаляем текст на каждое число урона.
+//remove() уничтожает PIXI.Text, поэтому реюз перезапускает хэндл: сброс _dead,
+//замена PIXI.Text у уничтоженного и полный рестайл (textContent-сеттер гонит
+//applyTextStyle по свежим атрибутам)
 let pool = []
 const MAX_FLOATS = 50
 
@@ -10,6 +13,7 @@ function floatText(x,y,textValue,color="white",size="24px",stroke="none") {//,te
     if (floattext.length >= MAX_FLOATS) return
     let el = pool.pop()
     if (el) {
+        el.revive()
         el.setAttribute("x", x)
         el.setAttribute("y", y)
         el.setAttribute("stroke", stroke)
@@ -18,7 +22,7 @@ function floatText(x,y,textValue,color="white",size="24px",stroke="none") {//,te
         el.textContent = textValue
         svgArr[1].append(el)
     } else {
-        el = text(svgArr[1],x,y,"50pt","50pt",stroke,"3px",color,textValue,{"id":"floatText","size":size,"font":"baseFont","anchor":"middle", })//"blur":"filter: drop-shadow(0 0 20px rgba(255, 0, 0, 0.8))"
+        el = nativeText(svgArr[1],x,y,"50pt","50pt",stroke,"3px",color,textValue,{"id":"floatText","size":size,"font":"baseFont","anchor":"middle",})//"blur":"filter: drop-shadow(0 0 20px rgba(255, 0, 0, 0.8))"
     }
     floattext.push({"time":30,"obj":el})
 }

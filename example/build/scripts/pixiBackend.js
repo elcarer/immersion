@@ -1426,6 +1426,58 @@ function appendWorld(layer, ws, toBottom) {
     ws.parent = layer
     ws._layer = layer
 }
+// R4: NativeText — нативный PIXI.Text с текстовым поднабором DOM-API, который
+// читает/пишет игра (floatText-пул и позднее тултипы/панели): setAttribute
+// x|y|fill|stroke|stroke-width|font-size|text-anchor|font-family|opacity|id,
+// textContent, remove(). Базлайн-математика — та же, что в applyTextStyle шима
+// (SVG y = базлайн, text-anchor:middle → anchor.x=0.5). remove() уничтожает узел;
+// пулы (floatText) перезапускают хэндл сбросом _dead + заменой PIXI.Text
+class NativeText extends WorldSprite {
+    constructor(node, layer, opts) {
+        super(node, layer)
+        this.kind = "text"
+        this._textOpts = opts || {}
+    }
+    setAttribute(name, value) {
+        if (this._dead) return
+        this.attrs[name] = value
+        if (name === "text") { this.node.text = String(value); syncShadowCopies(this); return }
+        if (name === "x" || name === "y" || name === "fill" || name === "stroke" ||
+            name === "stroke-width" || name === "font-size" || name === "text-anchor" ||
+            name === "font-family") {
+            applyTextStyle(this)
+            return
+        }
+        super.setAttribute(name, value)
+    }
+    get textContent() { return this.node.text }
+    set textContent(v) {
+        this.node.text = domText(v)
+        applyTextStyle(this)
+    }
+    // реюз из пула (floatText): снять «мёртвость», пересоздать уничтоженный узел —
+    // атрибуты перезадаёт пул, полный рестайл делает textContent-сеттер
+    revive() {
+        this._dead = 0
+        if (this.node.destroyed) this.node = new PIXI.Text({ text: "" })
+    }
+}
+// фабрика нативного текста (svg.js-фасад: nativeText) — сигнатура createTextEl
+function createNativeText(place, x, y, w, h, stroke, strokeWidth, fill, textContent, obj = {}) {
+    const node = new PIXI.Text({ text: domText(textContent) })
+    const t = new NativeText(node, place, obj)
+    t.attrs.x = num(x); t.attrs.y = num(y)
+    t.attrs.stroke = stroke; t.attrs["stroke-width"] = strokeWidth; t.attrs.fill = fill
+    t.attrs["font-size"] = obj.size; t.attrs["font-family"] = obj.font
+    t.attrs["text-anchor"] = obj.anchor
+    if (obj.id !== undefined && obj.id !== "") {
+        t.attrs.id = String(obj.id) + "I"
+        shimById.set(t.attrs.id, t)
+    }
+    applyTextStyle(t)
+    place.node.addChild(node)
+    return t
+}
 // R4: нативная полоса (ХП/опыт/босс/загрузка) — спрайт заливки + маска-Graphics.
 // Рост/убыль заливки = ОКНО маски (картинка не сжимается, как в SVG-клипе):
 // anchor "left" — заполнение слева (ХП/босс/загрузка), "right" — справа (опыт).
@@ -2174,7 +2226,7 @@ export {
     setupBackend, createLayers, windowSize, layers,
     createImage, createAnimImage, acquirePooled, releaseSprite,
     createRect, createCircle, createTextEl, createTextHtml, createPath, createGroup,
-    createWorldImage, createWorldBar, createNativeGraphics, worldById,
+    createWorldImage, createWorldBar, createNativeGraphics, createNativeText, worldById,
     spritePos, moveSprite, rectPos, getCTMExport, applyPixelated, cameraView,
     preloadGameTextures, backendHooks, dragState,
     installGameTicks, gameTickSystem, applyStillTexture,
