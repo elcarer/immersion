@@ -828,3 +828,21 @@ data.js = w/times==fw, h==fh (проверено скриптом) — в мир
 14×14 (клетка floor/32) — сажать врага на ловушку с offset (-6,-30); враги спавнятся
 только при входе героя в комнату (телепорт + walk); SHEETS-ключи без кавычек
 (fw: 32) — regex парсинга манифеста; поля анимаций data.js: times/w/h ПЕРЕД img.
+
+## ТРИНАДЦАТАЯ ВОЛНА — R5, СНОС ШИМА, МИГРАЦИЯ ЗАВЕРШЕНА (2026-09-17, коммиты f617e39/d4aa9e1)
+El-класс = паритет-замена ShimEl с DOM-поднабором ровно по факту вызовов. СВЕЖИЙ
+АУДИТ ИСПРАВИЛ ПЛАН: circle()/path()/text() ЖИВЫ (vampFx/howlFx/minimapFx; настройки-
+чекбоксы + rectShadow-тени; blessFx/alchemy) — исходный аудит пометил их мёртвыми
+ошибочно, фабрики остались. Срезано: геттеры cx/cy/r, публичные on*-аксессоры
+(кроме onclick — journal/library track.onclick), style.cursor/opacity/zIndex,
+clipPath-машинерия целиком, createElementNS-патч+фабрика, kind'ы clip/cliprect/
+defs/poly/group/html (El = layer|image|anim|rect|circle|text|path|vrect),
+createTextHtml/stripHtml/фасад textHtml, querySelector слоёв, SVG_NS
+(−271 строка за волну). ДОБАВЛЕНО: getComputedTextLength (=node.width) — fitText
+журнала/библиотеки/хитбокса врага прежде МОЛЧА отключался (try/catch), длинные
+строки не сжимали шрифт. Патчи getElementById/elementFromPoint ЖИВЫ. Протокол:
+полный цикл, журнал/библиотека/настройки (НОВЫЙ verify_settings.mjs: sliderDrag,
+клик по полосе, «Звук выкл.» baseVal-запись, path-галочка), drag/dblclick/геймпад,
+ХП z-order, FPS 145. ГРАБЛИ: фоновый батч из двух node-прогонов на ОДНОЙ CDP-
+странице зависает (второй соединяется и молчит) — гонять по одному; `| tail`
+буферизует вывод падающего теста до конца — лог в файл.

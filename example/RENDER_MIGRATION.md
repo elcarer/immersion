@@ -202,25 +202,39 @@ dropSafe, spiderBossFight) получили нативный путь без е�
   переезжает в публичный API); elementFromPoint → hitTestUI; drag.js → нативный pointer-drag.
 - Критерий: панели, тултипы, drag предметов, геймпад-клик, минимапа.
 
-### R5. Снос шима — СЛЕДУЮЩАЯ СЕССИЯ (аудит готов, 2026-09-17)
-Реальных вызовов createElementNS/textHtml/clipPath в игровых файлах БОЛЬШЕ НЕТ
-(после R4.4 остались только комментарии) — monkey-patch и клип-машинерия удаляемы.
-Остальной DOM-поднабор, который игра реально зовёт (аудит по scripts/ вне
-pixiBackend/svg.js; движок engine.js исключён):
-  animVal 313 (x/y/width/height/href) · setAttribute 135 · getAttribute 92 ·
-  remove() 84 · пулы releaseSprite/_slot 72 · getElementById 64 · id-геттер 52 ·
-  style. 32 (filter/outline/display) · addEventListener 25 (document-mousemove
-  ползунков, wheel) · textContent 23 · parentNode/isConnected 21 · append 15 ·
-  removeEventListener 10 · firstChild 6 (del.js) · insertBefore 5 (тени) ·
-  getScreenCTM 3 · getComputedTextLength 3 (fitText) · onclick= 2 · removeChild 3.
-ЭТО и есть ТЗ «тонкого элемента» R5: переписать ShimEl → El с ровно этим
-поднабором над нативными узлами (animVal — геттеры над attrs; style — мини-прокси
-filter/outline/display; пулы и glow-запекалка ПОКА оставить как утилиты), затем
-удалять: applyAttr-ветки умерших атрибутов, clipPath-машинерию, createElementNS
-monkey-patch, svg.js-обёртки мёртвых фабрик (circle/path/textHtml уже не зовутся).
-Этапы: (1) El-класс паритет-замена (игра не меняется), (2) удаление мёртвых
-веток/патчей, (3) финальный grep-аудит + доки ENGINE/GAME. Каждый этап — коммит
-с полным протоколом (синтакс → headless полный цикл → скриншоты панелей → пуш).
+### R5. Снос шима — ВЫПОЛНЕН ПОЛНОСТЬЮ (2026-09-17, коммиты f617e39 / d4aa9e1)
+Шим переписан в «тонкий элемент» **El** с DOM-поднабором ровно по факту вызовов
+(свежий греп-аудит игровых файлов уточнил план ниже: **circle() ЖИВ** — vampFx/
+howlFx/minimapFx, **path() ЖИВ** — чекбоксы настроек + rectShadow (ядро теней),
+**text() жив** — blessFx/alchemy/... — в исходном аудите они были помечены
+мёртвыми ошибочно, фабрики остались).
+- **R5.1 (f617e39)**: класс El — срезаны геттеры cx/cy/r (игра только setAttribute'ит —
+  redrawCircle читает attrs), публичные аксессоры onmouseover/onmouseout/onmousedown/
+  onmouseup/onmousemove (0 внешних; транспорт читает поля _over/_out/_down/_up/_move,
+  куда пишут фабрики obj.func/funcShow/hoverOpa и drag-машина), style.cursor/opacity/
+  zIndex. ДОБАВЛЕН getComputedTextLength (= node.width) — раньше метода не было и
+  fitText (journal/library/enemyHover) молча отключался своим try/catch: длинные
+  строки не сжимали шрифт (закрытая дыра эмуляции).
+- **R5.2 (d4aa9e1, −271 строка)**: снесены clipPath-машинерия целиком (makeClipMask/
+  updateClipMask/applyClipPath, ветка clip-path applyAttr, клип-окно createPath,
+  clip-ветки El.remove/destroyShimNode/attachShim/hitTestUI), createElementNS-патч
+  и фабрика, kind'ы clip/cliprect/defs/poly/group/html (El теперь 8 видов:
+  layer|image|anim|rect|circle|text|path|vrect), createTextHtml+stripHtml+фасад
+  textHtml (0 вызовов после R4.4; ушёл и firstChild html-div контракт),
+  querySelector слоёв, SVG_NS. Остались патчи getElementById (шим-реестр) и
+  elementFromPoint (hitTestUI) — оба живые.
+- **R5.3**: финальный аудит — поверхность El = animVal 192 · setAttribute 134 ·
+  getAttribute 77 · releaseSprite 50 · getElementById 35 · clipRect 25 ·
+  addEventListener 25 · textContent 23 · isConnected 17 · append 14 · href 12 ·
+  removeEventListener 10 · firstChild 6 · parentNode 5 · insertBefore 5 ·
+  prepend/lastElementChild/contains 4 · removeChild 3 · getComputedTextLength 3 ·
+  onclick 2 · getScreenCTM 2 · baseVal 2 · ownerSVGElement/getBBox/dispatchEvent/
+  appendChild 1. GAME.md обновлён (образец больше не «SVG-движок»); ENGINE.md не
+  менялся — он описывает zero_engine и шим immersion не касался.
+- Проверка: полный цикл (бой/убийство/дроп, 0 warns), журнал скролл 1096↔136,
+  библиотека 3 режима, drag/dblclick/геймпад, ХП-полосы z-order, настройки
+  (sliderDrag/клик по полосе/«Звук выкл.» baseVal-запись/чекбокс), FPS 145
+  (= baseline), скриншоты панелей без отличий. Миграция ЗАВЕРШЕНА.
 
 ## 4. Протокол проверки каждого этапа (единый)
 1. `node --input-type=module --check` каждого правленого модуля (node --check молчит на CJS!).
