@@ -31,9 +31,6 @@ function rect(place,x,y,width,height,stroke,strokeWidth,fill,obj={}) {
 function text(place,x,y,width,height,stroke,strokeWidth,fill,textContent,obj={"size":24,"font":"baseFont2"}) {
     return backend.createTextEl(place,x,y,width,height,stroke,strokeWidth,fill,textContent,obj)
 }
-function textHtml(place,x,y,width,height,stroke,strokeWidth,fill,textContent,obj={"size":24,"font":"baseFont2"}) {
-    return backend.createTextHtml(place,x,y,width,height,stroke,strokeWidth,fill,textContent,obj)
-}
 function image(place,x,y,w,h,src,obj={}) {
     if (obj.times) {
         // Анимированный спрайт — пул узлов; позиционирование АБСОЛЮТНОЕ:
@@ -115,4 +112,4 @@ function gamepadDragMove (x,y) { backend.dragState().move(x,y) }
 function gamepadDragEnd () { backend.dragState().end() }
 function isDragging () { return backend.dragState().isDragging() }
 
-export {svg,svgArr,circle,rect,text,image,textHtml,path,worldImage,worldBar,nativeText,nativeGroup,nativeHtml,nativeSector,nativePoly,picById,nativeGraphics,gamepadDragStart,gamepadDragMove,gamepadDragEnd,isDragging,spritePos,moveSprite,releaseSprite,rectPos,getCTM}
+export {svg,svgArr,circle,rect,text,image,path,worldImage,worldBar,nativeText,nativeGroup,nativeHtml,nativeSector,nativePoly,picById,nativeGraphics,gamepadDragStart,gamepadDragMove,gamepadDragEnd,isDragging,spritePos,moveSprite,releaseSprite,rectPos,getCTM}

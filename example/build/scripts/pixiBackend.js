@@ -24,8 +24,6 @@
 // spider/spiderRed wait|damage) читают старые файлы как раньше.
 import { SHEETS } from "./sheetsMap.js"
 
-const SVG_NS = "http://www.w3.org/2000/svg"
-
 let app = null
 let worldContainer = null
 let layerNodes = []        // [floorContainer, objContainer, uiContainer] (Pixi)
@@ -47,7 +45,7 @@ function cleanupGraveyardOne() {
     while (graveyard.length) {
         const e = graveyard.shift()
         const shim = e.shim
-        if (e.gen === (shim._gen || 0) && !shim.parent && shim.kind !== "text" && shim.kind !== "html") {
+        if (e.gen === (shim._gen || 0) && !shim.parent && shim.kind !== "text") {
             destroyShimNode(shim); return
         }
     }
@@ -366,7 +364,7 @@ function makeShadowCopy(shim, sp) {
         copy = new PIXI.Sprite(baked)
         // паддинг запечки: r*2+2, где r = round(clamp(sp.blur/k, 1..64)) — см. getGlowTexture
         copy._glowPad = Math.round(Math.max(1, Math.min(64, sp.blur / k))) * 2 + 2
-    } else if (shim.kind === "text" || shim.kind === "html") {
+    } else if (shim.kind === "text") {
         // белый клон стиля: tint красит силуэт чистым цветом (как CSS drop-shadow)
         const st = Object.assign({}, shim.node.style, { fill: 0xffffff, stroke: undefined })
         copy = new PIXI.Text({ text: shim.node.text, style: st })
@@ -461,7 +459,7 @@ function applyDropShadow(shim, styleStr) {
 // поля _over/_out/... напрямую), style.cursor/opacity/zIndex.
 class El {
     constructor(kind, node) {
-        this.kind = kind          // layer|image|anim|rect|circle|text|html|path|poly|group|clip|vrect|defs
+        this.kind = kind          // layer|image|anim|rect|circle|text|path|vrect
         this.node = node          // Pixi-узел (может быть null у vrect/clip)
         this.attrs = {}           // хранилище атрибутов (как у DOM)
         this._style = {}          // разобранный style
@@ -485,32 +483,7 @@ class El {
         while (p) { if (p.kind === "layer") return true; p = p.parent }
         return false
     }
-    get firstChild() {
-        // foreignObject-контракт: textHtml держит <div> ребёнком, игра задаёт ширину
-        // переноса через fo.firstChild.style.width (blessFx/library/enemyHover)
-        if (this.kind === "html" && this.children.length === 0) {
-            if (!this._htmlDiv) {
-                const shim = this
-                this._htmlDiv = {
-                    get style() {
-                        return {
-                            set width(v) {
-                                shim.attrs.width = num(v)
-                                if (shim.node) {
-                                    shim.node.style.wordWrapWidth = Math.max(10, num(v))
-                                    shim.node.style.wordWrap = true
-                                    shim.node.style.breakWords = true
-                                }
-                            },
-                            get width() { return shim.attrs.width || 0 },
-                        }
-                    },
-                }
-            }
-            return this._htmlDiv
-        }
-        return this.children[0] || null
-    }
+    get firstChild() { return this.children[0] || null }
     get lastElementChild() { return this.children[this.children.length - 1] || null }
     appendChild(shim) { return attachShim(this, shim, this.children.length) }
     append(...shims) {
@@ -550,10 +523,6 @@ class El {
     }
     remove() {
         if (this.parent) this.parent.removeChild(this)
-        // маски клипов снимаются с дерева сразу (иначе «белый прямоугольник»-призрак)
-        if (this.kind === "clip" && this._maskG && this._maskG.parent) {
-            this._maskG.parent.removeChild(this._maskG)
-        }
         // ВАЖНО: только ОТКРЕПЛЯЕМ (семантика SVG remove): пулы (floatText и др.)
         // переиспользуют узел ПОСЛЕ remove — уничтожение здесь ломало бы рендер
         // («renderPipeId of null» на переподключении уничтоженного узла).
@@ -600,7 +569,6 @@ class El {
     set textContent(v) {
         this.attrs["#text"] = domText(v)
         if (this.kind === "text") this.node.text = domText(v)
-        else if (this.kind === "html") this.node.text = stripHtml(domText(v))
         syncShadowCopies(this)
     }
     getBBox() {
@@ -779,10 +747,6 @@ function applyAttr(shim, name, value) {
             if (shim.node) shim.node.visible = value !== "hidden"
             return
         }
-        case "clip-path": {
-            applyClipPath(shim, value)
-            return
-        }
         case "style": {
             // полная запись style-строки (svg.js text hover меняет style целиком)
             applyStyleString(shim, value)
@@ -801,10 +765,6 @@ function applyAttr(shim, name, value) {
             if (shim.kind === "path") redrawPath(shim)
             return
         }
-        case "points": {
-            if (shim.kind === "poly") redrawPoly(shim)
-            return
-        }
         case "cx": case "cy": case "r": {
             if (shim.kind === "circle") redrawCircle(shim)
             return
@@ -812,20 +772,19 @@ function applyAttr(shim, name, value) {
         case "rx": case "stroke-width": case "fill-opacity": case "fill": case "stroke": {
             if (shim.kind === "rect") redrawRect(shim)
             else if (shim.kind === "circle") redrawCircle(shim)
-            // poly/path: игра ставит stroke/fill ПОСЛЕ points/d (minimapFx-кнопка,
-            // секторы кулдаунов) — без перерисовки фигура оставалась пустой (0×0)
-            else if (shim.kind === "poly") redrawPoly(shim)
+            // path: игра ставит stroke/fill ПОСЛЕ d (чекбоксы настроек) — без
+            // перерисовки фигура оставалась пустой (0×0)
             else if (shim.kind === "path") redrawPath(shim)
-            else if (shim.kind === "text" || shim.kind === "html") applyTextStyle(shim)
+            else if (shim.kind === "text") applyTextStyle(shim)
             shim._syncInteractive()
             return
         }
         case "font-size": case "text-anchor": case "font-family": {
-            if (shim.kind === "text" || shim.kind === "html") applyTextStyle(shim)
+            if (shim.kind === "text") applyTextStyle(shim)
             return
         }
         case "text": {
-            if (shim.kind === "text" || shim.kind === "html") { shim.node.text = String(value); syncShadowCopies(shim) }
+            if (shim.kind === "text") { shim.node.text = String(value); syncShadowCopies(shim) }
             return
         }
         case "transform": {
@@ -857,7 +816,7 @@ function applyAttr(shim, name, value) {
             shim._syncInteractive()
             return
         }
-        case "preserveAspectRatio": case "clipPathUnits":
+        case "preserveAspectRatio":
         case "stroke-linejoin": case "stroke-linecap":
             return // семантика покрыта eventMode/деревом
         default:
@@ -924,21 +883,15 @@ function applyPosition(shim) {
         syncEcsPos(shim)
         return
     }
-    if (shim.kind === "cliprect") {
-        shim._rx = num(shim.attrs.x)
-        shim._ry = num(shim.attrs.y)
-        if (shim.parent && shim.parent.kind === "clip") updateClipMask(shim.parent)
-        return
-    }
     // rect/circle: координаты живут ВНУТРИ геометрии Graphics (redrawRect/redrawCircle),
     // position узла — нулевой; повторная запись x/y двигает ТОЛЬКО геометрию (в SVG
     // атрибут x у rect сдвигает фигуру — двойной сдвиг «позиция+геометрия» ломал полосы
     // прогресса и рамки, которые игра двигает через setAttribute("x"/"y"))
     if (shim.kind === "rect") { redrawRect(shim); return }
     if (shim.kind === "circle") { redrawCircle(shim); return }
-    // path/poly: x/y — хранилище (на d/points не влияют, как в SVG)
-    if (shim.kind === "path" || shim.kind === "poly") return
-    if (shim.kind === "text" || shim.kind === "html") {
+    // path: x/y — хранилище (на d не влияют, как в SVG)
+    if (shim.kind === "path") return
+    if (shim.kind === "text") {
         // повторная запись x/y у текста обязана сохранить базлайн-вычет и якорь
         // (та же формула, что в applyTextStyle, иначе текст съезжает вниз/влево)
         applyTextStyle(shim)
@@ -954,10 +907,6 @@ function applyPosition(shim) {
 
 function applySize(shim) {
     const w = num(shim.attrs.width), h = num(shim.attrs.height)
-    if (shim.kind === "cliprect") {
-        if (shim.parent && shim.parent.kind === "clip") updateClipMask(shim.parent)
-        return
-    }
     if (shim.kind === "anim") {
         // SVG-контракт: width/height на img — размер ЛИСТА (его читают animPlay/enemyHover
         // через img.width.animVal для culling и hit-тестов). Окно кадра (clipRect) НЕ
@@ -978,7 +927,7 @@ function applySize(shim) {
     // (полоса использования начинается с width 0) scale = w/0 → Infinity, и первый
     // же рост ширины «выстреливает» прямоугольник за экран («прилетает справа»).
     // SVG-семантика: атрибут width ПЕРЕОПРЕДЕЛЯЕТ геометрию — перерисовываем
-    if (shim.kind === "rect" || shim.kind === "circle" || shim.kind === "path" || shim.kind === "poly") {
+    if (shim.kind === "rect" || shim.kind === "circle" || shim.kind === "path") {
         if (shim.kind === "rect") redrawRect(shim)
         else if (shim.kind === "circle") redrawCircle(shim)
         syncShadowCopies(shim)
@@ -1040,52 +989,6 @@ function syncEcsPos(shim) {
 // ----------------------------------------------------------------------------
 
 // ----------------------------------------------------------------------------
-// clipPath (полосы ХП/опыта/босса/журнала/библиотеки): шим держит Graphics-маску
-// ----------------------------------------------------------------------------
-function makeClipMask(clipShim) {
-    const g = new PIXI.Graphics()
-    g.rect(0, 0, 0, 0).fill({ color: 0xffffff })
-    clipShim._maskG = g
-    clipShim._maskUsers = []
-}
-function updateClipMask(clipShim) {
-    const rectShim = clipShim.children.find(c => c.kind === "cliprect")
-    if (!rectShim || !clipShim._maskG) return
-    const x = num(rectShim.attrs.x), y = num(rectShim.attrs.y)
-    const w = num(rectShim.attrs.width), h = num(rectShim.attrs.height)
-    // маска в КООРДИНАТАХ РОДИТЕЛЯ пользователя: у UI-слоя всё в общих viewBox-координатах,
-    // у игровых слоёв — тоже (общий worldContainer) — Grafika-маску добавляем пользователю
-    const g = clipShim._maskG
-    g.clear()
-    if (w > 0 && h > 0) g.rect(x, y, w, h).fill({ color: 0xffffff })
-}
-function applyClipPath(shim, value) {
-    // открепить старую
-    if (shim._clipSrc) {
-        const users = shim._clipSrc._maskUsers
-        const i = users ? users.indexOf(shim) : -1
-        if (i !== -1) users.splice(i, 1)
-        if (shim.node) shim.node.mask = null
-        shim._clipSrc = null
-    }
-    const m = /url\(#([^)]+)\)/.exec(String(value || ""))
-    if (!m) return
-    const clip = shimById.get(m[1])
-    if (!clip || clip.kind !== "clip") { warnOnce("clip" + m[1], "clip-path на несуществующий id " + m[1]); return }
-    shim._clipSrc = clip
-    clip._maskUsers.push(shim)
-    if (clip._maskG && shim.node) {
-        // маска живёт в координатах слоя пользователя: добавляем Graphics в тот же слой
-        if (!clip._maskG.parent) {
-            const layer = shim._layer || layers[2]
-            layer.node.addChild(clip._maskG)
-        }
-        shim.node.mask = clip._maskG
-        updateClipMask(clip)
-    }
-}
-
-// ----------------------------------------------------------------------------
 // Отрисовка примитивов (Graphics)
 // ----------------------------------------------------------------------------
 function redrawRect(shim) {
@@ -1113,20 +1016,6 @@ function redrawCircle(shim) {
     g.clear()
     if (r > 0) {
         const p = g.circle(cx, cy, r)
-        if (fill && fill !== "none") p.fill({ color: fill })
-        if (stroke && stroke !== "none" && sw > 0) p.stroke({ width: sw, color: stroke })
-    }
-}
-function redrawPoly(shim) {
-    const g = shim.node
-    const pts = String(shim.attrs.points || "").trim().split(/[\s,]+/).map(Number)
-    const flat = []
-    for (let i = 0; i + 1 < pts.length; i += 2) flat.push(pts[i], pts[i + 1])
-    const fill = shim.attrs.fill, stroke = shim.attrs.stroke
-    const sw = num(shim.attrs["stroke-width"])
-    g.clear()
-    if (flat.length >= 6) {
-        const p = g.poly(flat)
         if (fill && fill !== "none") p.fill({ color: fill })
         if (stroke && stroke !== "none" && sw > 0) p.stroke({ width: sw, color: stroke })
     }
@@ -1231,7 +1120,7 @@ function applyTextStyle(shim) {
     // textHtml (foreignObject) — блок от ЛЕВОГО ВЕРХНЕГО угла (x,y), text-anchor
     // на foreignObject НЕ действовал: если рисовать html от центра/базлайна,
     // текст «вылезает» влево-вверх из своих фреймов (helpWord/ addToSkill/library)
-    const isHtml = shim.kind === "html" || shim._htmlBlock === true
+    const isHtml = shim._htmlBlock === true
     const anchorX = !isHtml && shim.attrs["text-anchor"] === "middle" ? 0.5 : 0
     const st = {
         fontFamily: family,
@@ -1260,7 +1149,7 @@ function attachShim(parent, shim, index) {
     // layer.removeChild, но старые пулы могли запомнить шим из прежней сцены) —
     // пересоздаём PIXI.Text по сохранённым атрибутам, иначе рендер падает на destroyed
     if (shim.node && shim.node.destroyed) {
-        if (shim.kind === "text" || shim.kind === "html") {
+        if (shim.kind === "text") {
             shim.node = new PIXI.Text({ text: shim.attrs["#text"] || "" })
             shim._wired = 0
             shim._interactive = 0
@@ -1314,11 +1203,6 @@ function attachShim(parent, shim, index) {
             }
         }
         parent.node.addChildAt(shim.node, Math.min(rawIdx, parent.node.children.length))
-        // маски-Graphics клипов переезжают вместе с пользователем (applyClipPath перевесит)
-        if (shim._clipSrc && shim._clipSrc._maskG && shim._clipSrc._maskG.parent !== shim._layer.node) {
-            const layer = shim._layer || layers[2]
-            layer.node.addChild(shim._clipSrc._maskG)
-        }
     }
     // копии свечения/теней переезжают вместе с узлом (drag перебрасывает иконку в слой)
     mountShadowCopies(shim)
@@ -1332,22 +1216,6 @@ function detachShim(shim) {
 function destroyShimNode(shim) {
     if (shim._dead) return
     shim._dead = 1
-    if (shim.kind === "clip" && shim._maskG) {
-        // пользователи теряют маску (пересоздаются на новом этаже — как в SVG)
-        for (const u of shim._maskUsers || []) if (u.node) u.node.mask = null
-        if (shim._maskG.parent) shim._maskG.parent.removeChild(shim._maskG)
-        shim._maskG.destroy()
-    }
-    // пользователь клипа умирает: если клип без пользователей — маска уходит с дерева
-    if (shim._clipSrc) {
-        const users = shim._clipSrc._maskUsers
-        const i = users ? users.indexOf(shim) : -1
-        if (i !== -1) users.splice(i, 1)
-        if (users && users.length === 0 && shim._clipSrc._maskG && shim._clipSrc._maskG.parent) {
-            shim._clipSrc._maskG.parent.removeChild(shim._clipSrc._maskG)
-        }
-        shim._clipSrc = null
-    }
     removeShadowCopies(shim)
     if (shim.node) shim.node.destroy({ children: true })
 }
@@ -1961,36 +1829,6 @@ function createTextEl(place, x, y, w, h, stroke, strokeWidth, fill, textContent,
     return shim
 }
 
-function stripHtml(html) {
-    return String(html)
-        .replace(/<br\s*\/?>/gi, "\n")
-        .replace(/<[^>]*>/g, "")
-        .replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">")
-        .replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&nbsp;/g, " ")
-}
-function createTextHtml(place, x, y, w, h, stroke, strokeWidth, fill, textContent, obj = {}) {
-    const t = new PIXI.Text({ text: stripHtml(domText(textContent)) })
-    const shim = new El("html", t)
-    shim._textOpts = obj
-    shim.attrs.x = num(x); shim.attrs.y = num(y); shim.attrs.width = num(w); shim.attrs.height = num(h)
-    shim.attrs.stroke = stroke; shim.attrs["stroke-width"] = strokeWidth; shim.attrs.fill = fill
-    shim.attrs["font-size"] = obj.size || 24
-    shim.attrs["font-family"] = obj.font || "baseFont2"
-    shim.attrs["text-anchor"] = obj.anchor || "start"
-    shim.attrs["#text"] = stripHtml(domText(textContent))
-    if (obj.id !== undefined) { shim.attrs.id = obj.id; if (obj.id !== "") shimById.set(String(obj.id), shim) }
-    applyTextStyle(shim)
-    if (obj.func) shim._onclick = obj.func
-    if (obj.hover) {
-        shim._over = () => { if (shim.node) shim.node.alpha = 0.85 }
-        shim._out = () => { if (shim.node) shim.node.alpha = 1 }
-    }
-    if (obj.blur) applyDropShadow(shim, String(obj.blur).replace(/^filter:\s*/, ""))
-    shim._syncInteractive()
-    place.appendChild(shim)
-    return shim
-}
-
 function createPath(place, obj, fill) {
     const g = new PIXI.Graphics()
     const shim = new El("path", g)
@@ -2003,68 +1841,7 @@ function createPath(place, obj, fill) {
     // eventMode решает _syncInteractive: залитый path перехватывает клики (visiblePainted)
     shim._syncInteractive()
     place.appendChild(shim)
-    if (obj.clipPath) {
-        // окно-клип [w,h] вокруг (x,y) — как svg.js createPath
-        const clip = new El("clip", null)
-        makeClipMask(clip)
-        clip.attrs.id = obj.id + "PV"
-        shimById.set(obj.id + "PV", clip)
-        const cr = new El("cliprect", null)
-        cr.attrs.x = obj.x - obj.clipPath[0] / 2
-        cr.attrs.y = obj.y - obj.clipPath[1] / 2
-        cr.attrs.width = obj.clipPath[0]
-        cr.attrs.height = obj.clipPath[1]
-        cr.parent = clip
-        clip.children.push(cr)
-        updateClipMask(clip)
-        shim.setAttribute("clip-path", "url(#" + obj.id + "PV)")
-    }
     return shim
-}
-
-function createGroup(place) {
-    const c = new PIXI.Container()
-    const shim = new El("group", c)
-    c.eventMode = "static" // дети сами решают (интерактивные узлы внутри групп)
-    place.appendChild(shim)
-    return shim
-}
-
-function createElementNS(tag, place) {
-    // перехват document.createElementNS(SVG_NS, tag) — 6 игровых файлов создают
-    // clipPath/rect/defs/g/polygon напрямую (start/takeDamage/hpBar/journal/library/minimapFx)
-    switch (tag) {
-        case "clipPath": {
-            const shim = new El("clip", null)
-            makeClipMask(shim)
-            return shim
-        }
-        case "rect": {
-            // rect внутри clipPath — клип-окно: чистые атрибуты без Pixi-узла
-            // (createElementNS("…rect") в игре используется ТОЛЬКО внутри clipPath:
-            // start/takeDamage/hpBar/journal/library)
-            const shim = new El("cliprect", null)
-            return shim
-        }
-        case "defs": {
-            const shim = new El("defs", null) // виртуальный контейнер (без Pixi-узла)
-            return shim
-        }
-        case "g": return createGroup(layers[2])
-        case "polygon": {
-            const g = new PIXI.Graphics()
-            const shim = new El("poly", g)
-            g.eventMode = "static"
-            return shim
-        }
-        case "svg": {
-            return layers[2] || null
-        }
-        default: {
-            warnOnce("ns" + tag, "createElementNS: тег " + tag + " не поддержан — заглушка group")
-            return createGroup(layers[2])
-        }
-    }
 }
 
 // ----------------------------------------------------------------------------
@@ -2145,7 +1922,6 @@ function hitTestUI(cx, cy) {
         for (let i = ch.length - 1; i >= 0; i--) {
             const c = ch[i]
             if (!c.node || !c.node.visible || c.node.alpha === 0) continue
-            if (c.kind === "defs" || c.kind === "clip") continue
             const deep = walk(c)
             if (deep) return deep
             if (c._interactive) {
@@ -2170,7 +1946,7 @@ function makeLayerShim(index, node) {
     const shim = new El("layer", c)
     // removeChild на СЛОЕ — путь очистки сцены (del.js: while firstChild removeChild):
     // шим отсоединяется и его Pixi-узел уничтожается (иначе утечка GPU между этажами).
-    // ВАЖНО: text/html НЕ уничтожаются — игровые пулы (floatText и др.) переиспользуют
+    // ВАЖНО: text НЕ уничтожается — игровые пулы (floatText и др.) переиспользуют
     // свои шимы ПОСЛЕ del(): уничтоженный PIXI.Text, вставленный пулом обратно в дерево,
     // валил рендер каждый кадр («null._x» в updateLocalTransform) — чёрный экран
     shim.removeChild = child => {
@@ -2178,7 +1954,7 @@ function makeLayerShim(index, node) {
         if (i !== -1) {
             shim.children.splice(i, 1)
             detachShim(child)
-            if (child.kind !== "text" && child.kind !== "html") destroyShimNode(child)
+            if (child.kind !== "text") destroyShimNode(child)
         }
         return child
     }
@@ -2202,17 +1978,6 @@ function makeLayerShim(index, node) {
         x: 0, y: 0,
         matrixTransform(m) { return { x: this.x * m.a + this.y * m.c + m.e, y: this.x * m.b + this.y * m.d + m.f } },
     })
-    shim.querySelector = sel => {
-        if (sel === "defs") {
-            let defs = shim.children.find(ch => ch.kind === "defs")
-            if (!defs) {
-                defs = new El("defs", null)
-                shim.appendChild(defs)
-            }
-            return defs
-        }
-        return shim.children.find(ch => ch.attrs.id === sel.replace("#", "")) || null
-    }
     return shim
 }
 
@@ -2281,21 +2046,11 @@ function setupBackend(engineApi) {
     applyCamera()
     installDragListeners()
     window.addEventListener("resize", onWindowResize)
-    // перехват DOM: createElementNS (SVG NS), getElementById (шим-реестр), elementFromPoint
-    const nativeCreateElementNS = document.createElementNS.bind(document)
+    // перехват DOM: getElementById (шим-реестр), elementFromPoint (hit-test UI).
+    // createElementNS-патч снесён (R5): после R4.4 ни один игровой файл не создаёт
+    // узлы через NS — clipPath/defs/g/polygon-машинария удалена вместе с ним
     const nativeGetElementById = document.getElementById.bind(document)
     const nativeElementFromPoint = document.elementFromPoint.bind(document)
-    document.createElementNS = (ns, tag) => {
-        if (ns === SVG_NS) {
-            if (tag === "rect") {
-                // rect в игре создаётся через NS ТОЛЬКО внутри clipPath — клип-окно:
-                // чистые атрибуты без Pixi-узла, маску двигает updateClipMask
-                return new El("cliprect", null)
-            }
-            return createElementNS(tag)
-        }
-        return nativeCreateElementNS(ns, tag)
-    }
     document.getElementById = id => nativeGetElementById(id) || shimById.get(id) || null
     document.elementFromPoint = (x, y) => hitTestUI(x, y) || nativeElementFromPoint(x, y)
 }
@@ -2434,7 +2189,7 @@ function releaseSprite(img) {
 export {
     setupBackend, createLayers, windowSize, layers,
     createImage, createAnimImage, acquirePooled, releaseSprite,
-    createRect, createCircle, createTextEl, createTextHtml, createPath, createGroup,
+    createRect, createCircle, createTextEl, createPath,
     createWorldImage, createWorldBar, createNativeGraphics, createNativeText, worldById,
     createNativeGroup, createNativeHtml, createNativeSector, createNativePoly,
     spritePos, moveSprite, rectPos, getCTMExport, applyPixelated, cameraView,
