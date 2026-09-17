@@ -1,5 +1,5 @@
 import { status } from "../scripts/start.js"
-import { rect } from "../scripts/svg.js"
+import { rect,uiRightEdge,uiBottomEdge } from "../scripts/svg.js"
 import { mapRender } from "../scripts/mapRender.js"
 import { musicDuck } from "../scripts/sound.js"
 
@@ -9,7 +9,10 @@ function map(data,num,layer) {
     status.move = 0
     status.pause = 1
     musicDuck(1)
-    mapTemp.push(rect(layer,0,0,1920,1080,"black","1px","black"))
+    //E-13 (репорт юзера): подложка — на ВЕСЬ экран, а не дизайн 1920×1080: при окне
+    //шире 16:9 миникарта (прибита к правому краю экрана) частично торчала из-под
+    //чёрного квадрата и «резалась» им
+    mapTemp.push(rect(layer,0,0,uiRightEdge(),uiBottomEdge(),"black","1px","black"))
     let tileX = 1920/data.scenes[num].w
     let tileY = 1080/data.scenes[num].h
     //V62: содержимое карты (комнаты и коридоры прямоугольниками, объекты и герой

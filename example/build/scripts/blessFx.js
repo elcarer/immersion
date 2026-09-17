@@ -1,6 +1,6 @@
 import { status } from "../scripts/start.js"
 import { T } from "../scripts/localization.js"
-import { svgArr,image,worldImage,picById,text,rect,nativeHtml } from "../scripts/svg.js"
+import { svgArr,image,worldImage,picById,text,rect,nativeHtml,uiRightEdge,uiBottomEdge } from "../scripts/svg.js"
 import { screenPic } from "../scripts/del.js"
 //V69: доп. кучка эха не должна застревать в стенах — тот же placeDrop, что у основного дропа
 import { placeDrop } from "../scripts/dropSafe.js"
@@ -62,7 +62,7 @@ function openAncient(obj) {
     //строится под display:none, и у части движков такой текст потом не переносится (одна
     //строка; тултип иконок, построенный при видимом слое, переносится нормально). Скрытие
     //бессмысленно и для мигания: сборка синхронная, кадр красится одним куском после выхода
-    ancientTemp.push(rect(svgArr[2],0,0,1920,1080,"black","1px","black"))
+    ancientTemp.push(rect(svgArr[2],0,0,uiRightEdge(),uiBottomEdge(),"black","1px","black"))
     ancientTemp.push(image(svgArr[2],520,50,919,73,"./images/UI/panels/endTop.png"))
     ancientTemp.push(text(svgArr[2],960,106,"0pt","50pt","black","2px",COL,T("obj.20.name"),{"id":"ancientTitle","size":56,"font":"baseFont4","anchor":"middle"}))
     ancientTemp.push(text(svgArr[2],960,152,"0pt","50pt","black","2px",COL,T("ancient.pick"),{"id":"ancientPick","size":30,"font":"baseFont4","anchor":"middle"}))

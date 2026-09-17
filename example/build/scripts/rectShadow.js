@@ -1,4 +1,4 @@
-import { svgArr,path,rect } from "../scripts/svg.js"
+import { svgArr,path,rect,uiRightEdge,uiBottomEdge } from "../scripts/svg.js"
 import { status } from "../scripts/start.js"
 
 let rectShadowArr = []
@@ -28,7 +28,7 @@ function rectShadow() {
     if(time >= 20400) {
         status.rectShadow = 0
         time = M_TYME_INIT
-        rectShadowArr.push(rect(svgArr[2],0,0,1920,1080,"none",0,"black"))
+        rectShadowArr.push(rect(svgArr[2],0,0,uiRightEdge(),uiBottomEdge(),"none",0,"black"))
         clearTimeout(shadowTimeout)
         shadowTimeout = setTimeout(next,200)
     } else {

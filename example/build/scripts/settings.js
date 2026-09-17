@@ -1,5 +1,5 @@
 import { status,drawStartScreen } from "../scripts/start.js"
-import { svgArr,image, text, rect, path } from "../scripts/svg.js"
+import { svgArr,image, text, rect, path, uiRightEdge, uiBottomEdge } from "../scripts/svg.js"
 import { tipDel } from "../scripts/tip.js"
 import { playback,strike,musicDuck,setMusicVolume } from "../scripts/sound.js"
 import { lobby } from "../scripts/lobby.js"
@@ -164,7 +164,7 @@ function exitConfirm() {
     const add = (el) => {settingsTemp.push(el); confirmTemp.push(el)}
     //подложка: перекрывает панель настроек и гасит клики мимо кнопок (pointer-events
     //включается наличием func); клик по ней сам по себе ничего не закрывает
-    add(rect(svgArr[2],0,0,1920,1080,"none","0px","black",{"fillOpacity":"0.6","func":()=>{}}))
+    add(rect(svgArr[2],0,0,uiRightEdge(),uiBottomEdge(),"none","0px","black",{"fillOpacity":"0.6","func":()=>{}}))
     add(rect(svgArr[2],650,420,620,240,`rgb(204, 153, 102)`,"4px","black",{"rx":"6px"}))
     //V73: фреймы ДА/НЕТ удвоены по высоте (73→146) и подняты на те же 73px (нижняя кромка
     //на месте) — надписи вылезали за фрейм. Фреймы рисуются ДО текстов вопроса, чтобы

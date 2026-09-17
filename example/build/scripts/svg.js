@@ -13,7 +13,8 @@ import * as backend from "./pixiBackend.js"
 // windowSize переехал в pixiBackend (миграция): раньше импортировался из index.js —
 // убран цикл index→svg→index, обязательный для top-level await в точке входа
 // E-12: uiRightEdge/onUiResize — право-прибитые панели (миникарта/полоса босса)
-import { uiRightEdge, onUiResize } from "./pixiBackend.js"
+// E-13: uiBottomEdge — фуллскрин-подложки (карта/алхимия/bless/настройки/инвентарь)
+import { uiRightEdge, uiBottomEdge, onUiResize } from "./pixiBackend.js"
 export { windowSize } from "./pixiBackend.js"
 
 let svgArr = []
@@ -117,3 +118,5 @@ function isDragging () { return backend.dragState().isDragging() }
 export {svg,svgArr,circle,rect,text,image,path,worldImage,worldBar,nativeText,nativeGroup,nativeHtml,nativeSector,nativePoly,picById,nativeGraphics,gamepadDragStart,gamepadDragMove,gamepadDragEnd,isDragging,spritePos,moveSprite,releaseSprite,rectPos,getCTM}
 // E-12: право-прибитые панели (миникарта/полоса босса) — край экрана + подписка на ресайз
 export {uiRightEdge,onUiResize}
+// E-13: нижний край экрана — фуллскрин-подложки
+export {uiBottomEdge}

@@ -1,6 +1,6 @@
 import { status } from "../scripts/start.js"
 import { T } from "../scripts/localization.js"
-import { svgArr,image,picById,text,rect } from "../scripts/svg.js"
+import { svgArr,image,picById,text,rect,uiRightEdge,uiBottomEdge } from "../scripts/svg.js"
 import { tip,tipDel,rarityColor,itemFrameOn,itemGlowOn } from "../scripts/tip.js"
 import { cellPickArr } from "../scripts/doll.js"
 //V54: объединение трёх предметов одного качества — снятие с куклы только через unEquip
@@ -34,7 +34,7 @@ function openAlchemy(obj) {
     musicDuck(1)
     svgArr[2].style.display = 'none'
     //чёрная подложка — скрывает игровое поле (как у Карты, map.js)
-    alchemyTemp.push(rect(svgArr[2],0,0,1920,1080,"black","1px","black"))
+    alchemyTemp.push(rect(svgArr[2],0,0,uiRightEdge(),uiBottomEdge(),"black","1px","black"))
     alchemyTemp.push(image(svgArr[2],520,50,919,73,"./images/UI/panels/endTop.png"))
     alchemyTemp.push(text(svgArr[2],1920/2,106,"0pt","50pt","black","2px",`rgb(204, 153, 102)`,T("alchemy.title"),{"id":"alchemyTitle","size":56,"font":"baseFont4","anchor":"middle"}))
     //кукла — только ячейки с предметами

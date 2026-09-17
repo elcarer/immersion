@@ -1,4 +1,4 @@
-﻿import { svgArr,image,worldBar,text,rect } from "../scripts/svg.js"
+﻿import { svgArr,image,worldBar,text,rect,uiRightEdge,uiBottomEdge } from "../scripts/svg.js"
 import cacheResources from "../scripts/cacheResources.js"
 import { screenPic,del } from "../scripts/del.js"
 import { gameLoop } from "../scripts/gameLoop.js"
@@ -167,7 +167,7 @@ function newGameYes() {
 function newGameConfirm() {
     if (newGameConfirmTemp.length > 0) return
     const add = (el) => newGameConfirmTemp.push(el)
-    add(rect(svgArr[2],0,0,1920,1080,"none","0px","black",{"fillOpacity":"0.6","func":()=>{}}))
+    add(rect(svgArr[2],0,0,uiRightEdge(),uiBottomEdge(),"none","0px","black",{"fillOpacity":"0.6","func":()=>{}}))
     add(rect(svgArr[2],610,410,700,260,`rgb(204, 153, 102)`,"4px","black",{"rx":"6px"}))
     //V73: фреймы ДА/НЕТ удвоены по высоте (73→146) и подняты на те же 73px (нижняя кромка
     //на месте) — надписи вылезали за фрейм. Фреймы теперь рисуются ДО текстов вопроса:

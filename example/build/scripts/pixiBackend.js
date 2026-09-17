@@ -254,6 +254,12 @@ function uiRightEdge() {
     return window.innerWidth / sUi
 }
 
+// нижний край экрана в дизайн-координатах UI — пара к uiRightEdge для фуллскрин-подложек
+function uiBottomEdge() {
+    const sUi = windowSize.wt / uiVB.width
+    return window.innerHeight / sUi
+}
+
 // подписка игры на ресайз окна (после пересчёта windowSize/камеры): право-прибитые
 // панели доезжают до края экрана
 const uiResizeCbs = []
@@ -2228,7 +2234,7 @@ export {
     spritePos, moveSprite, rectPos, getCTMExport, applyPixelated, cameraView,
     preloadGameTextures, backendHooks, dragState,
     installGameTicks, gameTickSystem, applyStillTexture,
-    uiRightEdge, onUiResize,
+    uiRightEdge, uiBottomEdge, onUiResize,
 }
 function getCTMExport() {
     return layers[2] ? layers[2].getScreenCTM() : null
