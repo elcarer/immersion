@@ -10,6 +10,8 @@ import { useObject,stopUseObject } from "../scripts/useObject.js"
 //карты переехала в mapRender.js
 import { checkCollision } from "../scripts/damage.js"
 import { dashPress,updateRazgon,wingsActive,dashInvulnActive } from "../scripts/valkyrie.js"
+//R2.6: единый писатель камеры (плавное следование в scroll) — см. комментарий в scroll
+import { setWorldViewBox } from "../scripts/zoomFx.js"
 //V49 баф скорости (статуя): перемещение героя ×1.5
 import { buffActive } from "../scripts/buffFx.js"
 //V43: попытка призыва босса 3 этажа при открытии новой комнаты (все столбы могли
@@ -278,24 +280,23 @@ function heroMove () {
         y < vbCam.y + camMY && scroll(2)
         y > vbCam.y + vbCam.height - camMY && scroll(3)
     function scroll(orient) {
-        let lengthSvg = svgArr.length
-        //V31: размер окна камеры берём из viewBox (зависит от зума, zoomFx.js), не литерал
-        const camW = svgArr[0].viewBox.animVal.width
-        const camH = svgArr[0].viewBox.animVal.height
-        for(let i = 0; i < lengthSvg; i++) {
-            if (i !== lengthSvg-1) {
-                //V16: не пишем тот же viewBox повторно каждый тик у края экрана —
-                //сравниваем с текущим значением (раньше setAttribute шёл каждый тик)
-                let nx = svgArr[i].viewBox.animVal.x
-                let ny = svgArr[i].viewBox.animVal.y
-                orient === 2&&(ny -= moveSpeed)
-                orient === 1&&(nx += moveSpeed)
-                orient === 3&&(ny += moveSpeed)
-                orient === 0&&(nx -= moveSpeed)
-                if (nx !== svgArr[i].viewBox.animVal.x || ny !== svgArr[i].viewBox.animVal.y) {
-                    svgArr[i].setAttribute("viewBox", nx+" "+ny+" "+camW+" "+camH)
-                }
-            }   
+        //V16: не пишем тот же viewBox повторно каждый тик у края экрана —
+        //сравниваем с текущим значением (раньше setAttribute шёл каждый тик)
+        let nx = svgArr[0].viewBox.animVal.x
+        let ny = svgArr[0].viewBox.animVal.y
+        orient === 2&&(ny -= moveSpeed)
+        orient === 1&&(nx += moveSpeed)
+        orient === 3&&(ny += moveSpeed)
+        orient === 0&&(nx -= moveSpeed)
+        if (nx !== svgArr[0].viewBox.animVal.x || ny !== svgArr[0].viewBox.animVal.y) {
+            //R2.6: единый писатель камеры. Прежний цикл по слоям 0 и 1 читал
+            //animVal.x ВТОРОГО слоя уже ПОСЛЕ записи первого: в шиме оба игровых слоя
+            //делят один живой объект cameraVB (makeLayerShim: _vb = cameraVB), поэтому
+            //второй слой прибавлял moveSpeed к уже сдвинутому значению — камера ехала
+            //в 2 раза быстрее героя, мёртвая зона мигала через тик, и весь мир
+            //«подпрыгивал» на ±moveSpeed×масштаб каждый тик (рябь только при скролле).
+            //В старом SVG у слоёв были независимые строки viewBox — потому там не прыгало.
+            setWorldViewBox(nx, ny)
         }
     }
     //детект обьекта
