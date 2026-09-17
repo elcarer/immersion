@@ -13,7 +13,7 @@
 //Сами питомцы еду НЕ едят — guard в checkRat; урон по pet не проходит (damage() читает
 //только type "enemy"), поэтому питомцы бессмертны и живут до конца забега.
 import { status } from "../scripts/start.js"
-import { svgArr, image, rectPos } from "../scripts/svg.js"
+import { svgArr, image, worldImage, rectPos } from "../scripts/svg.js"
 import { objectValues, screenPic } from "../scripts/del.js"
 import { dropArr } from "../scripts/useObject.js"
 import { buildChasePath } from "../scripts/enemyAI.js"
@@ -117,7 +117,7 @@ function spawnLuckyFood(pet) {
     const p = rectPos(pet.rect)
     const spot = [Math.trunc((p[0] + 16) / 32), Math.trunc((p[1] + 25) / 32)]
     const drop = {"w":32,"h":36,"img":"./images/dungeon/drop/food.png"}
-    screenPic.push(image(svgArr[1],spot[0]*32,spot[1]*32 - 2,drop.w,drop.h,drop.img,{"id":screenPic.length-1}))
+    screenPic.push(worldImage(svgArr[1],spot[0]*32,spot[1]*32 - 2,drop.w,drop.h,drop.img,{"id":screenPic.length-1}))
     dropArr.push(screenPic[screenPic.length - 1])
     blessEcho(drop,spot[0]*32,spot[1]*32 - 2)
 }

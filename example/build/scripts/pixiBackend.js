@@ -491,11 +491,30 @@ class ShimEl {
     }
     get lastElementChild() { return this.children[this.children.length - 1] || null }
     appendChild(shim) { return attachShim(this, shim, this.children.length) }
-    append(...shims) { for (const s of shims) attachShim(this, s, this.children.length) }
-    prepend(shim) { return attachShim(this, shim, 0) }
+    append(...shims) {
+        for (const s of shims) {
+            // R3: нативный спрайт мира (checkZOrder гоняет стены-накладки через append)
+            if (s instanceof WorldSprite) { appendWorld(this, s, false); continue }
+            attachShim(this, s, this.children.length)
+        }
+    }
+    prepend(shim) {
+        if (shim instanceof WorldSprite) return appendWorld(this, shim, true)
+        return attachShim(this, shim, 0)
+    }
     insertBefore(shim, before) {
         const i = this.children.indexOf(before)
-        return attachShim(this, shim, i === -1 ? this.children.length : i)
+        if (i !== -1) return attachShim(this, shim, i)
+        // R3: хозяин — нативный спрайт мира (тень объекта в groundShadow) —
+        // шим встаёт в raw-дерево ровно ПОД узел хозяина
+        if (before instanceof WorldSprite && before.parent === this && !before._dead) {
+            const s = attachShim(this, shim, this.children.length)
+            if (s.node && before.node && before.node.parent === this.node) {
+                this.node.addChildAt(s.node, this.node.getChildIndex(before.node))
+            }
+            return s
+        }
+        return attachShim(this, shim, this.children.length)
     }
     removeChild(shim) {
         const i = this.children.indexOf(shim)
@@ -1233,6 +1252,12 @@ function attachShim(parent, shim, index) {
             // prepend (SVG: в начало = на самый нижний слой) — checkZOrder героя
             // опускает стены/накладки под себя именно prepend'ом
             rawIdx = 0
+        } else if (index >= parent.children.length) {
+            // R3: чистый append (в т.ч. пере-append существующего шима в checkZOrder):
+            // в SVG appendChild ставит элемент ПОСЛЕДНИМ ребёнком слоя — выше и шимов,
+            // и нативных WorldSprite'ов, и копий свечения. Прежний поиск соседа-шима
+            // сажал новый узел ПОД мировые спрайты, добавленные в raw-дерево позже
+            rawIdx = parent.node.children.length
         } else {
             rawIdx = parent.node.children.length
             for (let k = index - 1; k >= 0; k--) {
@@ -1280,6 +1305,123 @@ function destroyShimNode(shim) {
     }
     removeShadowCopies(shim)
     if (shim.node) shim.node.destroy({ children: true })
+}
+
+// ============================================================================
+// R3: WorldSprite — нативный спрайт мира (тайлы/стены/объекты/дроп) МИМО ShimEl.
+// PIXI.Sprite + лёгкий хэндл с DOM-поднабором, который игра реально читает у
+// мировых узлов: getAttribute/setAttribute (href|x|y|opacity|style|id), animVal-
+// геттеры x/y/width/height, href, id, remove, parentNode/ownerSVGElement/isConnected.
+// Никаких пулов/graveyard/событий/style-прокси: позиция ставится при создании и
+// не переписывается. spritePos/moveSprite/rectPos/applySize/applyTextureRetro/
+// playEffect/destroyObjects работают как есть (kind="image", attrs, _lx/_ly).
+// Z-сортировка (checkZOrder: svgArr[1].append/prepend) и тени объектов
+// (groundShadow: parentNode.insertBefore) заведены через duck-typing в ShimEl.
+// ============================================================================
+class WorldSprite {
+    constructor(node, layer) {
+        this.kind = "image"
+        this.node = node
+        this.attrs = {}
+        this.parent = layer      // слой-шим (contains/checkZOrder ходят по .parent)
+        this._layer = layer
+        this._lx = null
+        this._ly = null
+        this._dead = 0
+    }
+    get parentNode() { return this.parent }
+    get ownerSVGElement() { return this._layer }
+    get isConnected() {
+        let p = this.parent
+        while (p) { if (p.kind === "layer") return true; p = p.parent }
+        return false
+    }
+    get id() { const v = this.attrs.id; return v === undefined || v === null ? "" : String(v) }
+    get x() { return numAttr(this, "x") }
+    get y() { return numAttr(this, "y") }
+    get width() { return numAttr(this, "width") }
+    get height() { return numAttr(this, "height") }
+    get href() { return { animVal: this.attrs.href || "" } }
+    getAttribute(name) {
+        const v = this.attrs[name]
+        return v === undefined ? null : v
+    }
+    setAttribute(name, value) {
+        if (this._dead) return
+        this.attrs[name] = value
+        switch (name) {
+            case "href": {
+                this.node.texture = getTexture(String(value))
+                this.node.width = +this.attrs.width || this.node.texture.width
+                this.node.height = +this.attrs.height || this.node.texture.height
+                syncShadowCopies(this)
+                break
+            }
+            case "x": case "y":
+                this.node.position.set(+this.attrs.x || 0, +this.attrs.y || 0)
+                syncShadowCopies(this)
+                break
+            case "opacity":
+                this.node.alpha = value === undefined || value === "" ? 1 : +value
+                syncShadowCopies(this)
+                break
+            case "display":
+                this.node.visible = value !== "none"
+                break
+            case "style":
+                applyStyleString(this, value)
+                break
+            case "id":
+                if (value !== undefined && value !== null && value !== "") shimById.set(String(value), this)
+                break
+        }
+    }
+    remove() {
+        if (this._dead) return
+        this._dead = 1
+        // слой-шим хранит только ShimEl-детей — WorldSprite живёт в raw-дереве,
+        // так что отсоединение = вынуть из raw-контейнера и уничтожить
+        removeShadowCopies(this)
+        if (this.node.parent) this.node.parent.removeChild(this.node)
+        this.node.destroy()
+        if (this.attrs.id !== undefined && this.attrs.id !== null) {
+            for (const [k, v] of shimById) if (v === this) { shimById.delete(k); break }
+        }
+        this.parent = null
+    }
+}
+// фабрика мирового спрайта (svg.js-фасад: worldImage)
+function createWorldImage(place, x, y, w, h, src, obj = {}) {
+    const sprite = new PIXI.Sprite(getTexture(String(src)))
+    const wN = num(w), hN = num(h)
+    const ws = new WorldSprite(sprite, place)
+    ws.attrs.x = num(x); ws.attrs.y = num(y); ws.attrs.width = wN; ws.attrs.height = hN
+    ws.attrs.href = String(src)
+    sprite.position.set(num(x), num(y))
+    // texture ДО width/height — width-сеттер делит на ширину текстуры (см. createImage)
+    sprite.width = wN; sprite.height = hN
+    if (obj.opacity !== undefined) { ws.attrs.opacity = obj.opacity; sprite.alpha = +obj.opacity }
+    // контракт svg.js: id хранится с суффиксом «I» и попадает в shimById —
+    // им же пользуется picById (поиск «…OI»/«…RI» без сканов screenPic)
+    if (obj.id !== undefined && obj.id !== "") {
+        ws.attrs.id = String(obj.id) + "I"
+        shimById.set(ws.attrs.id, ws)
+    }
+    if (sprite.texture === PIXI.Texture.EMPTY) registerPending(String(src), ws)
+    place.node.addChild(sprite)
+    applyPixelated()
+    return ws
+}
+// Z-операции слоя над нативным спрайтом (checkZOrder: стены-накладки под/над героем)
+function appendWorld(layer, ws, toBottom) {
+    if (ws._dead || !layer.node) return
+    layer.node.addChildAt(ws.node, toBottom ? 0 : layer.node.children.length)
+    ws.parent = layer
+    ws._layer = layer
+}
+// поиск мирового узла по id-ключу («15OI», «3RI») — O(1) вместо сканов screenPic
+function worldById(key) {
+    return shimById.get(String(key)) || null
 }
 
 // ----------------------------------------------------------------------------
@@ -1791,6 +1933,7 @@ function setupBackend(engineApi) {
         get cameraVB() { return cameraVB },
         worldContainer, texCache, frameCache,
         shimById, spritePool, SHEETS,
+        spritePos, moveSprite, rectPos,
         windowSize: () => windowSize,
         framesInfo() {
             const out = []
@@ -1995,6 +2138,7 @@ export {
     setupBackend, createLayers, windowSize, layers,
     createImage, createAnimImage, acquirePooled, releaseSprite,
     createRect, createCircle, createTextEl, createTextHtml, createPath, createGroup,
+    createWorldImage, worldById,
     spritePos, moveSprite, rectPos, getCTMExport, applyPixelated, cameraView,
     preloadGameTextures, backendHooks, dragState,
     installGameTicks, gameTickSystem, applyStillTexture,

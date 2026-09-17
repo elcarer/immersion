@@ -2,7 +2,7 @@ import * as basicData from "../scripts/data.js"
 import { status } from "../scripts/start.js"
 import { dataGeneric,createRoom,floorTexture } from "../scripts/sceneGenerate.js"
 import { collision } from "../scripts/collision.js"
-import { svgArr,image, moveSprite, rectPos } from "../scripts/svg.js"
+import { svgArr,image,worldImage, moveSprite, rectPos } from "../scripts/svg.js"
 import { screenPic,objectValues,wallsOverlay,acidArr,doorPics } from "../scripts/del.js"
 import { openRoom } from "../scripts/openRoom.js"
 import { useObject,stopUseObject } from "../scripts/useObject.js"
@@ -404,6 +404,35 @@ function createCorridor (cell,tileX,tileY,level) {
     let conteiner = screenPic
     let layer0 = svgArr[0]
     let layer1 = svgArr[1]
+    //R3: стены индексируются по клетке-началу и по клетке-владению ([5]) — раньше на
+    //каждую клетку коридора заново сканировались все стены этажа. Тайлы/стены —
+    //нативные спрайты мира (worldImage)
+    const wallsByCell = new Map()
+    const wallsByOwner = new Map()
+    for (let i3 = 0; i3 < level.walls.length; i3++) {
+        const w = level.walls[i3]
+        const ckey = w[0] + "," + w[1]
+        let arr = wallsByCell.get(ckey)
+        if (!arr) { arr = []; wallsByCell.set(ckey, arr) }
+        arr.push(w)
+        if (w[5] !== undefined) {
+            let arr2 = wallsByOwner.get(w[5])
+            if (!arr2) { arr2 = []; wallsByOwner.set(w[5], arr2) }
+            arr2.push(w)
+        }
+    }
+    const drawWall = (w) => {
+        conteiner.push(worldImage(layer1,
+                    w[0]*tileX,
+                    w[1]*tileY,
+                    w[3]*tileX,
+                    w[4]*tileY,"./images/dungeon/walls/"+(w[2]+status.levelFloor*30)+".png"))
+        //V4: стены-накладки (27/28) — в кэш Z-сортировки («;» обязательна:
+        //строка начинается с «(» — без неё ASI склеивает с push выше)
+        ;(w[2]===27||w[2]===28)&&wallsOverlay.push(conteiner[conteiner.length-1])
+        //V16: двери — в кэш openDoor
+        ;(w[2]===9||w[2]===12||w[2]===23||w[2]===24)&&doorPics.push(conteiner[conteiner.length-1])
+    }
     let lengthFloor = level.floor.length
     for (let i = 0; i < lengthFloor; i++) {
         //пол коридора рисуем ТОЛЬКО для клеток коридора ([2]===1): у комнат [5]/[6] — это
@@ -413,39 +442,15 @@ function createCorridor (cell,tileX,tileY,level) {
             level.floor[i][6]===cell[6]) {
                 //пол коридора НЕ рисуем там, где уже есть пол комнаты (createRoom +
                 //его ряд [3]+1 + коридор под комнатой — двойной тайл, полоса по нижнему краю)
-                !corridorOnRoomFloor(level,level.floor[i][0],level.floor[i][1])&&conteiner.push(image(layer0,
+                !corridorOnRoomFloor(level,level.floor[i][0],level.floor[i][1])&&conteiner.push(worldImage(layer0,
                     level.floor[i][0]*tileX,
                     level.floor[i][1]*tileY,
                     tileX,tileY,floorTexture(status.levelFloor,level.floor[i][4],1),{"opacity":"0.7"}))
             level.floor[i][7] = 1
-            let lengthWalls = level.walls.length
-            for (let i3 = 0; i3 < lengthWalls; i3++) {
-                if (level.walls[i3][0]===level.floor[i][0]&&
-                    level.walls[i3][1]===level.floor[i][1]) {
-                        conteiner.push(image(layer1,
-                    level.walls[i3][0]*tileX,
-                    level.walls[i3][1]*tileY,
-                    level.walls[i3][3]*tileX,
-                    level.walls[i3][4]*tileY,"./images/dungeon/walls/"+(level.walls[i3][2]+status.levelFloor*30)+".png"))
-                    //V4: стены-накладки (27/28) — в кэш Z-сортировки («;» обязательна:
-                    //строка начинается с «(» — без неё ASI склеивает с push выше)
-                    ;(level.walls[i3][2]===27||level.walls[i3][2]===28)&&wallsOverlay.push(conteiner[conteiner.length-1])
-                    //V16: двери — в кэш openDoor
-                    ;(level.walls[i3][2]===9||level.walls[i3][2]===12||level.walls[i3][2]===23||level.walls[i3][2]===24)&&doorPics.push(conteiner[conteiner.length-1])
-                }
-            }
-            let lengthWalls2 = level.walls.length
-            for (let i4 = 0; i4 < lengthWalls2; i4++) {
-                if (level.walls[i4][5] !== undefined && level.walls[i4][5] === i) {
-                    conteiner.push(image(layer1,
-                        level.walls[i4][0]*tileX,
-                        level.walls[i4][1]*tileY,
-                        level.walls[i4][3]*tileX,
-                        level.walls[i4][4]*tileY,"./images/dungeon/walls/"+(level.walls[i4][2]+status.levelFloor*30)+".png"))
-                    ;(level.walls[i4][2]===27||level.walls[i4][2]===28)&&wallsOverlay.push(conteiner[conteiner.length-1])
-                    ;(level.walls[i4][2]===9||level.walls[i4][2]===12||level.walls[i4][2]===23||level.walls[i4][2]===24)&&doorPics.push(conteiner[conteiner.length-1])
-                }
-            }
+            const cw = wallsByCell.get(level.floor[i][0] + "," + level.floor[i][1])
+            if (cw) for (let k = 0; k < cw.length; k++) drawWall(cw[k])
+            const ow = wallsByOwner.get(i)
+            if (ow) for (let k = 0; k < ow.length; k++) drawWall(ow[k])
         }
     }
 }

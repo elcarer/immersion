@@ -18,8 +18,8 @@
 import { status } from "../scripts/start.js"
 import { T } from "../scripts/localization.js"
 import { data } from "../scripts/data.js"
-import { rectPos } from "../scripts/svg.js"
-import { screenPic, objectValues } from "../scripts/del.js"
+import { rectPos, picById } from "../scripts/svg.js"
+import { objectValues } from "../scripts/del.js"
 import { dataGeneric } from "../scripts/sceneGenerate.js"
 import { floatText } from "../scripts/floatText.js"
 import { changeHP, checkFood } from "../scripts/takeDamage.js"
@@ -71,7 +71,7 @@ function tickState(obj) {
     if(obj[12] > 0) return
     obj[12] = STATE_TICKS
     obj[13] = obj[13] === 1 ? 0 : 1
-    let img = screenPic.find(f => f && f.id === obj[6]+"OI")
+    let img = picById(obj[6]+"OI")
     img && img.setAttribute("href", trapSpriteSrc(obj))
     obj[10] === 1 && obj[13] === 1 && fireBurst(obj)
 }
@@ -197,7 +197,7 @@ function releaseCloud(obj) {
     obj[16] = 0  //журнальная строка — одна на облако
     //центр листа 384×96 над клеткой: спрайт 96×96 с offset −32,−32 от клетки ловушки
     //(координаты эффекта считаются от ЦЕНТРА rect: effect.x=0/effect.y=0 дают нужный сдвиг)
-    let img = screenPic.find(f => f && f.id === obj[6]+"OI")
+    let img = picById(obj[6]+"OI")
     img && playEffect({"rect": img}, ACID_CLOUD)
 }
 

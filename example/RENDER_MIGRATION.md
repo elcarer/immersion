@@ -124,14 +124,44 @@ dropSafe, spiderBossFight) получили нативный путь без е�
   пул буллетов — пул entity id.
 - Критерий: grep — в перечисленных файлах 0 setAttribute/moveSprite; поведение 1:1.
 
-### R3. Мир нативно (тайлы, двери, объекты)
-- sceneGenerate/mapRender/openRoom/useObject/openDoor — статичные тайлы и объекты
-  через батч-фабрику (общий батчер Pixi; при профиле — particleContainer), позиция
-  ставится при создании и не переписывается.
-- screenPic становится логическим реестром записей {sheetId, x, y, id-ключ}; поиск
-  по `f.id === obj[6]+"OI"` (useObject/blessFx/alchemy/finPillars/trapsFx) → Map по ключу.
-- del() — пакетное уничтожение слоя (существующий cleanup слоёв), graveyard сокращается.
-- Критерий: старт этажа попиксельно, доставка/использование объектов, смена этажа.
+### R3. Мир нативно (тайлы, двери, объекты) — ✅ ВЫПОЛНЕН (2026-09-17)
+Фактически сделано:
+- **WorldSprite** (pixiBackend): нативный PIXI.Sprite + лёгкий хэндл с DOM-поднабором,
+  который игра реально читает у мировых узлов (getAttribute/setAttribute
+  href|x|y|opacity|style|id, animVal-геттеры, href, id, remove, parentNode/
+  isConnected). Никаких пулов/graveyard/событий/style-прокси; позиция ставится при
+  создании и не переписывается. spritePos/moveSprite/rectPos/applySize/
+  applyTextureRetro/playEffect/destroyObjects работают с ним как есть
+  (kind="image", attrs, _lx/_ly). Фабрика createWorldImage + worldById (поиск по
+  id-ключу через shimById за O(1)). Фасад svg.js: worldImage(), picById().
+- **duck-typing в ShimEl**: append/prepend принимают WorldSprite (checkZOrder гоняет
+  стены-накладки 27/28 через svgArr[1].append/prepend → raw addChildAt); insertBefore
+  с WorldSprite-хозяином сажает шим ровно под его узел (тени объектов groundShadow);
+  чистый append шима идёт в конец raw-дерева (раньше сосед-шим сажал новый узел ПОД
+  мировые спрайты, добавленные позже).
+- **createRoom/createCorridor**: стены и объекты индексируются по клетке-началу (Map)
+  вместо полного скана на каждый тайл (квадратичный перебор → O(1) на клетку); тайлы
+  пола, стены, объекты — нативные спрайты. Стены-владения комнаты ([5]) рисуются РОВНО
+  ОДИН РАЗ: прежний цикл рисовал их заново на каждый тайл комнаты — замер показал 124
+  спрайта-дубликата из 137 на слое объектов (копии шести стен); после дедупа слой
+  объектов на стартовой комнате: 26 узлов вместо 137 (−81%), screenPic 200→97.
+- **screenPic.find → picById**: поиск «…OI»/«…RI» за O(1) в useObject (×3 + RI),
+  trapsFx (×2), finPillars, blessFx, alchemy; сканы тысяч плиток убраны.
+- **Нативные спрайты вместо шимов** в точках спавна: дроп (useObject/damage ×3/
+  enemyAI/blessFx/pets/voidBoss), кислота (moveBullet/damageHero/spiderBossFight),
+  боссы-спрайты (spiderBossFight), Сгустки/выход/дроп voidBoss, метеор activeSkills,
+  запасной портал/рычаг portalFx, фон полосы использования (растущий rect остаётся
+  шимом до R4).
+- screenPic остаётся списком очистки del() (шимы + нативные записи с remove()).
+- Проверка: парити стен открытых комнат 19/19 (матч позиция+размер+текстура через
+  texCache, 0 лишних/0 пропавших); дверь открывается на нативном спрайте (href
+  9→27, wallsOverlay пополняется); комната с 12 врагами + массовый del() + смерть →
+  результаты → новый забег; юз бочки: подсветка (glow-копии на WorldSprite), полоса
+  («RI» найден), d-версия спрайта (4d.png), obj[7]=1; труп врага; дроп item3.png на
+  полу и подбор (takeDrop → dropArr 1→0, предмет в инвентаре); verify_r1 синх 1:1;
+  FPS 143 (= baseline); warns=0, loopErr=null во всех прогонах.
+- Отложено на R4: mapRender (панель карты — UI-слой), экраны/панели в screenPic
+  (лобби/comix/endGame/HUD), растущий rect полосы юза.
 
 ### R4. UI нативно (тексты, полосы, иконки, миникарта, drag)
 - Полосы ХП/опыта/босса (clipPath-маски) → прямой redraw Graphics; journal/library/

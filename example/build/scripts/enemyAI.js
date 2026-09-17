@@ -26,7 +26,7 @@ import { data } from "../scripts/data.js"
 import { dataGeneric } from "../scripts/sceneGenerate.js"
 import { checkCollision, playEffect, dropKey, checkExp, reanimateCheck } from "../scripts/damage.js"
 import { aStar } from "../scripts/astar.js"
-import { svgArr, image, spritePos, moveSprite, rectPos, releaseSprite } from "../scripts/svg.js"
+import { svgArr, image, worldImage, spritePos, moveSprite, rectPos, releaseSprite } from "../scripts/svg.js"
 import { checkZOrder } from "../scripts/heroMove.js"
 import { enemyOnTrail } from "../scripts/valkyrie.js"
 import { checkRat } from "../scripts/encounters.js"
@@ -841,7 +841,7 @@ function tickShadow (enemy) {
 //(dropKey в damage.js): спрайт на слое объектов + очередь подбора dropArr
 function spawnGoldPile(x, y) {
     let drop = {"w":28,"h":32,"img":"./images/dungeon/drop/gold.png"}
-    screenPic.push(image(svgArr[1],x + 16,y + 55,drop.w,drop.h,drop.img,{"id":screenPic.length-1}))
+    screenPic.push(worldImage(svgArr[1],x + 16,y + 55,drop.w,drop.h,drop.img,{"id":screenPic.length-1}))
     dropArr.push(screenPic[screenPic.length - 1])
     //V69: золото упало в стену/пустоту — переносим на свободную клетку рядом
     placeDrop(screenPic[screenPic.length - 1],x + 16,y + 55,drop.w,drop.h)

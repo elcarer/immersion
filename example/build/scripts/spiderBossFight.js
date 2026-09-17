@@ -1,5 +1,5 @@
 import { status } from "../scripts/start.js"
-import { svgArr,image,path, moveSprite } from "../scripts/svg.js"
+import { svgArr,image,worldImage,path, moveSprite } from "../scripts/svg.js"
 import { screenPic,objectValues,acidArr } from "../scripts/del.js"
 import { data } from "../scripts/data.js"
 import { createCells } from "../scripts/encounters.js"
@@ -59,7 +59,7 @@ function descentBoss() {
     if(!boss) {
         let x = status.hero.x - 256
         let y = status.hero.y - 948
-        screenPic.push(image(svgArr[1],x,y,575,448,"./images/enemy/boss.png"))
+        screenPic.push(worldImage(svgArr[1],x,y,575,448,"./images/enemy/boss.png"))
         boss = screenPic[screenPic.length - 1]
     }
     boss.setAttribute("y", boss.y.animVal.value + moveSpeed * direction)
@@ -74,7 +74,7 @@ function descentBoss() {
         status.bossDown = 1
     }
     if(status.time % 2 === 0) {
-        screenPic.push(image(svgArr[0],status.hero.x - 384 + Math.trunc(Math.random() * 768),status.hero.y - 1256 + Math.trunc(Math.random() * 384),32,47,"./images/enemy/bossAttack.png"))
+        screenPic.push(worldImage(svgArr[0],status.hero.x - 384 + Math.trunc(Math.random() * 768),status.hero.y - 1256 + Math.trunc(Math.random() * 384),32,47,"./images/enemy/bossAttack.png"))
         bossAttack.push({"path":0,"speed":Math.trunc(Math.random() * 3) + 1.5,"img":screenPic[screenPic.length - 1]})
     }
 }
@@ -118,7 +118,7 @@ function descentBossAttack() {
             bossAttack[i].img.setAttribute("y", bossAttack[i].img.y.animVal.value + moveSpeed*bossAttack[i].speed)
             bossAttack[i].path += moveSpeed*bossAttack[i].speed
         } else {
-            screenPic.push(image(svgArr[0],bossAttack[i].img.x.animVal.value,bossAttack[i].img.y.animVal.value + 40,32,15,"./images/effects/acid.png",{"id":screenPic.length-1}))
+            screenPic.push(worldImage(svgArr[0],bossAttack[i].img.x.animVal.value,bossAttack[i].img.y.animVal.value + 40,32,15,"./images/effects/acid.png",{"id":screenPic.length-1}))
             acidArr.push(screenPic[screenPic.length - 1])
             bossAttack[i].img.remove()
             bossAttack.splice(i,1)
@@ -128,7 +128,7 @@ function descentBossAttack() {
     }
 }
 function createEgg(x,y) {
-    screenPic.push(image(svgArr[0],x,y,32,25,"./images/enemy/bossEgg.png",{"id":screenPic.length-1}))
+    screenPic.push(worldImage(svgArr[0],x,y,32,25,"./images/enemy/bossEgg.png",{"id":screenPic.length-1}))
     eggsArr.push({"birthTime":400,"img":screenPic[screenPic.length - 1]})
 }
 function delEgg() {

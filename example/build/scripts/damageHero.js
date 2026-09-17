@@ -5,7 +5,7 @@ import { screenPic,objectValues,acidArr } from "../scripts/del.js"
 import { takeDamage } from "../scripts/takeDamage.js"
 import { data } from "../scripts/data.js"
 import { playback,strike } from "../scripts/sound.js"
-import { svgArr,image, releaseSprite, rectPos } from "../scripts/svg.js"
+import { svgArr,image,worldImage, releaseSprite, rectPos } from "../scripts/svg.js"
 import { floatText } from "../scripts/floatText.js"
 import { wingsActive } from "../scripts/valkyrie.js"
 import { applyFlame } from "../scripts/flameFx.js"
@@ -99,7 +99,7 @@ function dropPool(x,y) {
     //контактный яд каждые 20 тиков стояния в луже
     let dx = [0,-32,32,0,0], dy = [0,0,0,-15,15]
     for (let k = 0; k < 5; k++) {
-        screenPic.push(image(svgArr[0],x+dx[k],y+dy[k],32,15,"./images/effects/acid.png",{"id":screenPic.length-1}))
+        screenPic.push(worldImage(svgArr[0],x+dx[k],y+dy[k],32,15,"./images/effects/acid.png",{"id":screenPic.length-1}))
         acidArr.push(screenPic[screenPic.length - 1])
     }
 }

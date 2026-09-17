@@ -1,7 +1,7 @@
 import { dataGeneric } from "../scripts/sceneGenerate.js"
 import { status } from "../scripts/start.js"
 import { T } from "../scripts/localization.js"
-import { svgArr,image,rect } from "../scripts/svg.js"
+import { svgArr,image,worldImage,rect,picById } from "../scripts/svg.js"
 import { screenPic } from "../scripts/del.js"
 import { encounters } from "../scripts/encounters.js"
 import { changeHP } from "../scripts/takeDamage.js"
@@ -36,14 +36,14 @@ function useObject(obj,i0) {
     status.use = 1
     //подсветка только если картинка объекта отрисована (защита от find===undefined: объект вне
     //отрисованных клеток комнаты не имеет спрайта, но геометрически находится checkObject'ом).
-    //V55: f && — в screenPic бывают «надгробия» (null) вместо удалённых спрайтов
-    let hl = screenPic.find(f => f && f.id === obj[6]+"OI")
+    //R3: поиск по id-ключу за O(1) (shimById), «надгробия» (null) в Map не попадают
+    let hl = picById(obj[6]+"OI")
     hl && hl.setAttribute("style", 'filter: drop-shadow(0 0 6px rgba(255, 255, 204, 0.8))')
     screenPic.push(rect(svgArr[1],obj[0]*32+2+obj[3]*16-32,obj[1]*32-21,0,10,"none","0px","#cc9966"))
     //V53: сет «Великий вор» (4 надетых): -10% ко времени использования — полоска 60 → 54 тика
     //(V67: «Вечный берилл» удваивает численные бонусы сета — 48 тиков)
     bars.push({"type":"use","fin":setUseTicks(),"speed":1,"obj":screenPic[screenPic.length - 1],"func":() => finishUsedObject(obj)})
-    screenPic.push(image(svgArr[1],obj[0]*32+obj[3]*16-32,obj[1]*32-24,64,14,"./images/UI/panels/bar1mini.png",{"id":i0+"R"}))
+    screenPic.push(worldImage(svgArr[1],obj[0]*32+obj[3]*16-32,obj[1]*32-24,64,14,"./images/UI/panels/bar1mini.png",{"id":i0+"R"}))
     obj[5] = i0
 }
 function stopUseObject() {
@@ -59,9 +59,10 @@ function stopUseObject() {
                 break
                 }
             }
-            screenPic.forEach(f => f && f.id === level.objects[i0][5]+"RI"&&f.remove())
+            let barBg = picById(level.objects[i0][5]+"RI")
+            barBg && barBg.remove()
             level.objects[i0][5] = undefined
-            let obj = screenPic.find(f => f && f.id === level.objects[i0][6]+"OI")
+            let obj = picById(level.objects[i0][6]+"OI")
             obj && obj.setAttribute("style", 'filter: none')
             status.use = 0
         }
@@ -165,8 +166,8 @@ function actionsObject(obj) {
         case 20: obj[11] = 1;openAncient(obj)
         break
     }
-    //V55: f && — «надгробия» (null) в screenPic вместо удалённых спрайтов
-    let img = screenPic.find(f => f && f.id === obj[6]+"OI")
+    //R3: поиск по id-ключу за O(1)
+    let img = picById(obj[6]+"OI")
     //для ловушек это traps/1d|3d|4d.png (обезвреженный спрайт); V63: у шипов/огня текущий
     //спрайт может быть «выключенного» состояния (3e/1e.png) — e-суффикс снимается перед d,
     //иначе наивная склейка давала несуществующий 3ed.png.
@@ -187,15 +188,15 @@ function drop(obj,lvl=0) {
     drop === false && obj[2] !== 11 && encounters(obj)
     drop === false && status.info.searshFood && Math.random() < status.info.searshFood && (drop = lootTable[4])
     if (drop) {
-        //V55: f && — «надгробия» (null) в screenPic вместо удалённых спрайтов
-        let img = screenPic.find(f => f && f.id === obj[6]+"OI")
+        //R3: поиск по id-ключу за O(1)
+        let img = picById(obj[6]+"OI")
         //если спрайта объекта нет (объект вне отрисованных клеток комнаты), дропаем от его
         //собственной клетки — img обязателен был только ради координат
         let bx = img ? img.x.animVal.value : obj[0]*32
         let by = img ? img.y.animVal.value : obj[1]*32
         let x = bx + Math.trunc(Math.random() * obj[3]*16)
         let y = by + obj[4]*32 + Math.trunc(Math.random() * 16) - 16
-        screenPic.push(image(svgArr[1],x,y,drop.w,drop.h,drop.img,{"id":screenPic.length-1}))
+        screenPic.push(worldImage(svgArr[1],x,y,drop.w,drop.h,drop.img,{"id":screenPic.length-1}))
         dropArr.push(screenPic[screenPic.length - 1])
         //V69: дроп упал в стену/пустоту — переносим на свободную клетку рядом
         placeDrop(screenPic[screenPic.length - 1],x,y,drop.w,drop.h)

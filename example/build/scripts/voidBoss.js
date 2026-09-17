@@ -29,7 +29,7 @@ import { status } from "../scripts/start.js"
 import { data } from "../scripts/data.js"
 import { dataGeneric } from "../scripts/sceneGenerate.js"
 //V85: releaseSprite — спрайт делившейся Медузы возвращается в пул (труп не оставляем)
-import { svgArr, image, rectPos, spritePos, releaseSprite } from "../scripts/svg.js"
+import { svgArr, image, worldImage, rectPos, spritePos, releaseSprite } from "../scripts/svg.js"
 import { objectValues, screenPic } from "../scripts/del.js"
 import { hpBar } from "../scripts/hpBar.js"
 import { checkCollision } from "../scripts/damage.js"
@@ -278,7 +278,7 @@ function spawnBlob(ang, dir) {
     let cy = p[1] + bossRef.rect._h / 2
     //пределы комнаты босса в px (+ размер Сгустка запаса, чтобы исчезал ЗА стеной, а не на ней)
     let rf = dataGeneric.scenes[status.levelFloor].floor[bossRef.room[0]]
-    screenPic.push(image(svgArr[1],
+    screenPic.push(worldImage(svgArr[1],
         cx - BLOB_SIZE/2,
         cy - BLOB_SIZE/2,
         BLOB_SIZE,
@@ -357,7 +357,7 @@ function bossDrop(target) {
         {"w":32,"h":36,"img":"./images/dungeon/drop/item5.png"}
     //падает в точке смерти (центр rect погибшей сущности)
     let p = rectPos(target.rect)
-    screenPic.push(image(svgArr[1],
+    screenPic.push(worldImage(svgArr[1],
         p[0] + target.rect._w/2 - drop.w/2,
         p[1] + target.rect._h/2 - drop.h/2,
         drop.w, drop.h, drop.img, {"id":screenPic.length-1}))
@@ -381,7 +381,7 @@ function spawnVoidExit() {
     level.objects.push([x, y, 13, 2, 2, undefined])
     let obj = level.objects[level.objects.length - 1]
     obj[9] = room
-    screenPic.push(image(svgArr[1],
+    screenPic.push(worldImage(svgArr[1],
         x*32 + 32 - 48,
         y*32 + 64 - 128,
         96, 128, EXIT_SPRITE, {"id":screenPic.length+"O"}))

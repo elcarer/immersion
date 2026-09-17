@@ -1,7 +1,6 @@
 import { status } from "../scripts/start.js"
 import { T } from "../scripts/localization.js"
 import { svgArr,image,text,rect } from "../scripts/svg.js"
-import { screenPic } from "../scripts/del.js"
 import { tip,tipDel,rarityColor,itemFrameOn,itemGlowOn } from "../scripts/tip.js"
 import { cellPickArr } from "../scripts/doll.js"
 //V54: объединение трёх предметов одного качества — снятие с куклы только через unEquip
@@ -197,12 +196,7 @@ function mergeSelected() {
         //объект использован: флаг + спрайт «d»-версии (15d/35d/55d), как у прочих объектов.
         //Поиск защитный: без animVal-чтений и с guard от не-элементов в screenPic
         alchemyObj[7] = 1
-        let img = null
-        let lengthPic = screenPic.length
-        for (let i = 0; i < lengthPic; i++) {
-            let f = screenPic[i]
-            f && f.id === alchemyObj[6]+"OI" && (img = f)
-        }
+        let img = picById(alchemyObj[6]+"OI")
         if (img) {
             let href = img.getAttribute("href") || ""
             img.setAttribute("href", href.slice(0,-4)+"d"+href.slice(-4))

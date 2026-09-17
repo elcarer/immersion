@@ -1,5 +1,5 @@
 import { status } from "../scripts/start.js"
-import { svgArr,image,path, spritePos } from "../scripts/svg.js"
+import { svgArr,image,worldImage,path, spritePos } from "../scripts/svg.js"
 import { delPins } from "../scripts/checkBuffs.js"
 import { checkCollision,playEffect,createSplash } from "../scripts/damage.js"
 import { data } from "../scripts/data.js"
@@ -263,7 +263,7 @@ function useSkill(skill) {
         skill.cooldown = skill.skill.cooldown
         status.info.grimore === 1 && (skill.cooldown -= 60)
         status.info.meteorHole = playEffect(status.hero.obj,data.effects[11])
-        screenPic.push(image(svgArr[0],status.hero.obj.rect.x.animVal.value - 16,status.hero.obj.rect.y.animVal.value - 600,64,66,"./images/effects/12.png"))
+        screenPic.push(worldImage(svgArr[0],status.hero.obj.rect.x.animVal.value - 16,status.hero.obj.rect.y.animVal.value - 600,64,66,"./images/effects/12.png"))
         status.info.meteor = screenPic[screenPic.length-1]
     }
     if(skill.skill.title === "skill.1.9.title") {

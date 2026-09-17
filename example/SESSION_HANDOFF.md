@@ -715,3 +715,40 @@ moveSpeed к уже сдвинутому значению (двойная зап
 zoomFx.setWorldViewBox (безопасен — пишет заранее вычисленную строку).
 УРОК: в шиме viewBox.animVal слоёв 0/1 — ЖИВОЙ общий объект; любой код, читающий
 animVal.x ПОСЛЕ записи первого слоя в том же тике, видит уже новое значение.
+
+## ВОСЬМАЯ ВОЛНА — ЭТАП R3: МИР НАТИВНО (2026-09-17, продолжение RENDER_MIGRATION)
+Юзер подтвердил: рябь при скролле починена (48c60b3) — продолжаем отказ от шима.
+**WorldSprite** (pixiBackend.js): нативный PIXI.Sprite + лёгкий хэндл с DOM-поднабором
+мировых узлов (getAttribute/setAttribute href|x|y|opacity|style|id, animVal-геттеры,
+href/id/remove/parentNode/isConnected). Без пулов/graveyard/событий/style-прокси.
+spritePos/moveSprite/rectPos/applySize/applyTextureRetro/playEffect/destroyObjects
+работают с ним без правок (kind="image", attrs, _lx/_ly). Фабрика createWorldImage,
+поиск worldById по id-ключу через shimById (O(1)); фасад svg.js: worldImage(), picById().
+**duck-typing в ShimEl**: append/prepend принимают WorldSprite (checkZOrder водит
+стены-накладки 27/28 → raw addChildAt); insertBefore с WorldSprite-хозяином ставит
+шим ровно под его узел (тени объектов groundShadow); ЧИСТЫЙ append шима теперь идёт
+в КОНЕЦ raw-дерева (раньше поиск соседа-шима сажал узел ПОД мировые спрайты, которые
+в raw-дереве стоят позже — латентный баг порядка отрисовки).
+**createRoom/createCorridor** (sceneGenerate.js/heroMove.js): стены/объекты
+индексируются по клетке-началу (Map) вместо полного скана на каждый тайл (был
+квадратичный перебор); тайлы/стены/объекты — нативные спрайты; СТЕНЫ-ВЛАДЕНИЯ
+комнаты ([5]) рисуются один раз — раньше цикл по тайлам рисовал их заново на каждый
+тайл (124 дубля из 137 спрайтов слоя объектов!). layer1 стартовой комнаты: 26 узлов
+вместо 137 (−81%), screenPic 200→97.
+**screenPic.find → picById** за O(1): useObject ×3 (+RI-бар), trapsFx ×2, finPillars,
+blessFx, alchemy. **image→worldImage** в точках спавна: дроп (useObject/damage ×3/
+enemyAI/blessFx/pets/voidBoss), кислота (moveBullet/damageHero/spiderBossFight),
+спрайты боссов, Сгустки/выход voidBoss, метеор, запасной портал portalFx, фон полосы
+юза (растущий rect полосы остаётся шимом до R4).
+Отладка: window.__ST расширен (screenPic/wallsOverlay/dropArr + getters svgArr/
+dataGeneric); window.__BACKEND получил spritePos/moveSprite/rectPos (телепорт героя
+в тестах). Инструменты: measure_world/measure_dup/probe_*/verify_r3*.
+Проверка: парити стен открытых комнат 19/19 (позиция+размер+текстура через texCache,
+0 лишних/0 пропавших — первая версия парити врала из-за пустого _filename у части
+текстур, не верить матчам по _filename); дверь на нативном спрайте открывается
+(href 9→27 + wallsOverlay); комната 12 врагов + массовый del() + смерть → результаты
+→ новый забег; юз бочки: подсветка-glow + полоса «RI» + d-версия (4d.png) + obj[7];
+труп врага; дроп на полу и подбор (dropArr 1→0, предмет в инвентаре); verify_r1
+синх 1:1; FPS 143 (= baseline); warns=0/loopErr=null во всех прогонах.
+Отложено на R4: mapRender (панель карты), экраны/панели screenPic (лобби/comix/
+endGame/HUD), растущий rect полосы юза.

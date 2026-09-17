@@ -44,7 +44,7 @@
 import { status } from "../scripts/start.js"
 import { data } from "../scripts/data.js"
 import { dataGeneric, createMatrix } from "../scripts/sceneGenerate.js"
-import { svgArr, image, spritePos } from "../scripts/svg.js"
+import { svgArr, image, worldImage, spritePos } from "../scripts/svg.js"
 import { screenPic } from "../scripts/del.js"
 //V31: единый писатель камеры + фактический размер окна (зависит от зума)
 import { setWorldViewBox, worldViewW, worldViewH } from "../scripts/zoomFx.js"
@@ -485,7 +485,7 @@ function grantForeignSkill() {
 //спрайт объекта 1×1 (рычаг) «вне createRoom»: комната уже отрисована — рисуем сразу тем же
 //конвейером (id «NO», svg.image дописывает «I», obj[6] = индекс в screenPic)
 function drawObjectSprite(obj) {
-    screenPic.push(image(svgArr[1], obj[0] * 32, obj[1] * 32, 32, 32, portalSpriteSrc(obj), {"id": screenPic.length + "O"}))
+    screenPic.push(worldImage(svgArr[1], obj[0] * 32, obj[1] * 32, 32, 32, portalSpriteSrc(obj), {"id": screenPic.length + "O"}))
     obj[6] = screenPic.length - 1
 }
 

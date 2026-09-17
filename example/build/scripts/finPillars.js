@@ -18,8 +18,8 @@
 import { status } from "../scripts/start.js"
 import { data } from "../scripts/data.js"
 import { dataGeneric } from "../scripts/sceneGenerate.js"
-import { svgArr, image, rectPos } from "../scripts/svg.js"
-import { screenPic, objectValues } from "../scripts/del.js"
+import { svgArr, image, rectPos, picById } from "../scripts/svg.js"
+import { objectValues } from "../scripts/del.js"
 import { hpBar } from "../scripts/hpBar.js"
 import { playback, strike } from "../scripts/sound.js"
 import { playEffect } from "../scripts/damage.js"
@@ -79,8 +79,8 @@ function finCellBusy(level, x, y) {
 //----- переключение столба (вызывается из useObject.finishUsedObject) -----
 function finPillarToggle(obj) {
     obj[10] = obj[10] === 2 ? 1 : 2
-    //V55: f && — «надгробия» (null) в screenPic вместо удалённых спрайтов
-    let img = screenPic.find(f => f && f.id === obj[6] + "OI")
+    //R3: поиск по id-ключу за O(1)
+    let img = picById(obj[6] + "OI")
     img && img.setAttribute("href", "./images/dungeon/objects/fin" + obj[10] + ".png")
     return obj[10]
 }

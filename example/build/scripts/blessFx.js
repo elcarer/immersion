@@ -1,6 +1,6 @@
 import { status } from "../scripts/start.js"
 import { T } from "../scripts/localization.js"
-import { svgArr,image,text,rect,textHtml } from "../scripts/svg.js"
+import { svgArr,image,worldImage,text,rect,textHtml } from "../scripts/svg.js"
 import { screenPic } from "../scripts/del.js"
 //V69: доп. кучка эха не должна застревать в стенах — тот же placeDrop, что у основного дропа
 import { placeDrop } from "../scripts/dropSafe.js"
@@ -118,12 +118,7 @@ function grantBless(id,obj) {
     playback(strike[13].vol,0,0,2*status.settings.soundVolume)
     //объект использован: флаг + спрайт «d»-версии — защитный поиск по screenPic, как в alchemy
     obj[7] = 1
-    let img = null
-    let lengthPic = screenPic.length
-    for (let i = 0; i < lengthPic; i++) {
-        let f = screenPic[i]
-        f && f.id === obj[6]+"OI" && (img = f)
-    }
+    let img = picById(obj[6]+"OI")
     if (img) {
         let href = img.getAttribute("href") || ""
         img.setAttribute("href", href.slice(0,-4)+"d"+href.slice(-4))
@@ -231,7 +226,7 @@ function blessEcho(drop,x,y) {
     let side = Math.trunc(Math.random() * 4)
     let dx = side === 0 ? -32 : side === 1 ? 32 : 0
     let dy = side === 2 ? -32 : side === 3 ? 32 : 0
-    screenPic.push(image(svgArr[1],x + dx,y + dy,drop.w,drop.h,drop.img,{"id":screenPic.length-1}))
+    screenPic.push(worldImage(svgArr[1],x + dx,y + dy,drop.w,drop.h,drop.img,{"id":screenPic.length-1}))
     dropArr.push(screenPic[screenPic.length - 1])
     //доп. кучка упала в стену/пустоту — переносим на свободную клетку рядом, как основной дроп
     placeDrop(screenPic[screenPic.length - 1],x + dx,y + dy,drop.w,drop.h)

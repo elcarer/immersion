@@ -54,6 +54,17 @@ function image(place,x,y,w,h,src,obj={}) {
     }
     return backend.createImage(place,x,y,w,h,src,obj)
 }
+// R3: нативный спрайт мира (тайлы/стены/объекты/дроп) — PIXI.Sprite без шима.
+// Контракт чтения тот же (x/y/width/height.animVal, href, getAttribute), запись —
+// href/x/y/opacity/style/id; позиция ставится при создании и не переписывается
+function worldImage(place,x,y,w,h,src,obj={}) {
+    return backend.createWorldImage(place,x,y,w,h,src,obj)
+}
+// R3: поиск мирового узла по id-ключу («15OI»/«3RI») за O(1) — замена сканов
+// screenPic.find(f => f && f.id === ...) в useObject/trapsFx/finPillars/blessFx/alchemy
+function picById(key) {
+    return backend.worldById(key)
+}
 function path(place,obj,fill='rgba(0, 0, 0, 0.65)') {
     return backend.createPath(place,obj,fill)
 }
@@ -70,4 +81,4 @@ function gamepadDragMove (x,y) { backend.dragState().move(x,y) }
 function gamepadDragEnd () { backend.dragState().end() }
 function isDragging () { return backend.dragState().isDragging() }
 
-export {svg,svgArr,circle,rect,text,image,textHtml,path,gamepadDragStart,gamepadDragMove,gamepadDragEnd,isDragging,spritePos,moveSprite,releaseSprite,rectPos,getCTM}
+export {svg,svgArr,circle,rect,text,image,textHtml,path,worldImage,picById,gamepadDragStart,gamepadDragMove,gamepadDragEnd,isDragging,spritePos,moveSprite,releaseSprite,rectPos,getCTM}

@@ -7,7 +7,7 @@ import { portalSpriteSrc } from "../scripts/portalSprite.js"
 //V75: шкафчик с древностями — ряд иконок-подсказок активных благословений пересобирается на этаже
 import { renderBlessHints } from "../scripts/blessFx.js"
 import { T } from "../scripts/localization.js"
-import { svgArr,image } from "../scripts/svg.js"
+import { svgArr,image,worldImage } from "../scripts/svg.js"
 //V62: импорт map.js удалён вместе с map-веткой createRoom — отрисовка карты
 //переехала в mapRender.js (комнаты/коридоры прямоугольниками)
 import * as basicData from "../scripts/data.js"
@@ -187,108 +187,130 @@ function floorTexture(levelFloor,base,plus=0) {
 }
 //V62: параметр map и map-ветка удалены — createRoom рисует ТОЛЬКО основное поле
 //(svgArr[0]/[1], screenPic). Карту строит mapRender.js.
+//R3: тайлы/стены/объекты — нативные спрайты мира (worldImage, без шима); стены и
+//объекты индексируются по клетке-началу (Map) — раньше на КАЖДЫЙ тайл пола заново
+//сканировались все стены и все объекты этажа (квадратичный перебор). Порядок записей
+//внутри клетки сохраняется исходный — порядок отрисовки 1:1.
 function createRoom (level,i0,tileX,tileY) {
     let layer0 = svgArr[0]
     let layer1 = svgArr[1]
-    //пол комнаты
-
-    for (let i = 0; i < level.floor[level.roomsArr[i0][0]][2]; i++) {
-        for (let i2 = 0; i2 < level.floor[level.roomsArr[i0][0]][3] + 1; i2++) {
-            screenPic.push(image(layer0,
-                (level.floor[level.roomsArr[i0][0]][0]+i)*tileX,
-                (level.floor[level.roomsArr[i0][0]][1]+i2)*tileY,
-                tileX,tileY,floorTexture(status.levelFloor,level.floor[level.roomsArr[i0][0]][4]),{"opacity":"0.7"}))
-
-            let length = level.walls.length
-            for (let i3 = 0; i3 < length; i3++) {
-                if (level.walls[i3][0]===level.floor[level.roomsArr[i0][0]][0]+i&&level.walls[i3][1]===level.floor[level.roomsArr[i0][0]][1]+i2) {
-                    screenPic.push(image(layer1,
-                    level.walls[i3][0]*tileX,
-                    level.walls[i3][1]*tileY,
-                    level.walls[i3][3]*tileX,
-                    level.walls[i3][4]*tileY,"./images/dungeon/walls/"+(level.walls[i3][2]+status.levelFloor*30)+".png",{"id":screenPic.length+"W"}))
-                level.walls[i3][6] = screenPic.length-1
-                //V4: стены-накладки (27/28) — в кэш Z-сортировки («;» обязательна: строка
-                //начинается с «(» — без неё ASI склеивает с присваиванием выше)
-                ;(level.walls[i3][2]===27||level.walls[i3][2]===28)&&wallsOverlay.push(screenPic[screenPic.length-1])
-                //V16: двери (9/12/23/24) — в кэш openDoor (не сканировать весь screenPic каждый тик)
-                ;(level.walls[i3][2]===9||level.walls[i3][2]===12||level.walls[i3][2]===23||level.walls[i3][2]===24)&&doorPics.push(screenPic[screenPic.length-1])
-                }
-            }
-            let lengthWalls3 = level.walls.length
-            for (let i3 = 0; i3 < lengthWalls3; i3++) {
-                if (level.walls[i3][5]!==undefined&&level.walls[i3][5]===level.roomsArr[i0][0]) {
-                    screenPic.push(image(layer1,
-                        level.walls[i3][0]*tileX,
-                        level.walls[i3][1]*tileY,
-                        level.walls[i3][3]*tileX,
-                        level.walls[i3][4]*tileY,"./images/dungeon/walls/"+(level.walls[i3][2]+status.levelFloor*30)+".png",{"id":screenPic.length+"W"}))
-                    level.walls[i3][6] = screenPic.length-1
-                    ;(level.walls[i3][2]===27||level.walls[i3][2]===28)&&wallsOverlay.push(screenPic[screenPic.length-1])
-                    ;(level.walls[i3][2]===9||level.walls[i3][2]===12||level.walls[i3][2]===23||level.walls[i3][2]===24)&&doorPics.push(screenPic[screenPic.length-1])
-                }
-            }
-            let length2 = level.objects.length
-            for (let i3 = 0; i3 < length2; i3++) {
-                if (level.objects[i3][0]===level.floor[level.roomsArr[i0][0]][0]+i&&level.objects[i3][1]===level.floor[level.roomsArr[i0][0]][1]+i2) {
-                    //ловушка (тип 14) рендерится из папки traps — спрайт по ФАЗЕ ловушки
-                    //(trapSprite.js: 3e/1e в «выключенном» состоянии, 3/4/1 в активном)
-                    //столб призыва (тип 15, V43) — спец-спрайт fin1/fin2 по состоянию objects[i3][10]
-                    //статуя героя (тип 16, V49) — спрайты по этажам objects/14|34|54.png (формула 14+этаж*20)
-                    //алхимический стол (тип 17, V54) — спрайты по этажам objects/15|35|55.png (формула 15+этаж*20)
-                    //V64: портал (18) и рычаг (19) — спрайты по фазе objects[i3][10] (portalSprite.js)
-                    //V67: выход с 4 этажа (тип 13 на этаже «Пустота») — спрайт 4exit.png
-                    //V75: шкафчик с древностями (тип 20) — спрайт 101|101d.png по использованию
-                    //V83: портал вида 2 (obj[12]=2, 100a.png) и кнопка загадки (21, push0/push1) —
-                    //там же, в portalSprite.js
-                    let objSrc = level.objects[i3][2] === 13 && status.levelFloor === 3 ?
-                        "./images/dungeon/objects/4exit.png" :
-                        level.objects[i3][2] === 14 ?
-                        trapSpriteSrc(level.objects[i3]) :
-                        level.objects[i3][2] === 18 || level.objects[i3][2] === 19 || level.objects[i3][2] === 21 ?
-                            portalSpriteSrc(level.objects[i3]) :
-                        level.objects[i3][2] === 15 ?
-                            "./images/dungeon/objects/fin"+(level.objects[i3][10]||1)+".png" :
-                            level.objects[i3][2] === 16 ?
-                                "./images/dungeon/objects/"+(14+status.levelFloor*20)+".png" :
-                                level.objects[i3][2] === 17 ?
-                                    "./images/dungeon/objects/"+(15+status.levelFloor*20)+".png" :
-                                    level.objects[i3][2] === 20 ?
-                                        "./images/dungeon/objects/"+(level.objects[i3][7] ? "101d" : "101")+".png" :
-                                        "./images/dungeon/objects/"+(level.objects[i3][2]+status.levelFloor*20)+".png"
-                    //столб 32×81 рисуется 1:1 с якорем низа в клетку объекта (логика — клетка 1×1)
-                    let isPillar = level.objects[i3][2] === 15
-                    //статуя (сетка 1×2) рисуется 1:1 натуральной высоты (65/69/48) с якорем низа
-                    //в 2 клетки — спрайт 48px третьего этажа нельзя растягивать до 64
-                    let isStatue = level.objects[i3][2] === 16
-                    let statueH = isStatue ? [65,69,48][status.levelFloor] : 0
-                    //V64: портал 64×84 рисуется 1:1 с якорем низа и центром по клетке
-                    //(логика — клетка 1×1); рычаг 32×32 идёт по обычной ветке 1×1
-                    let isPortalObj = level.objects[i3][2] === 18
-                    //V67: выход с 4 этажа 96×128 рисуется 1:1 с якорем низа и центром по
-                    //логической клетке 2×2 (та же геометрия, что у спавна в voidBoss.js)
-                    let isExit4 = level.objects[i3][2] === 13 && status.levelFloor === 3
-                    //V75: шкафчик 64×42 рисуется 1:1 с якорем низа и центром по клетке
-                    //(логика — клетка 1×1, как у портала)
-                    let isAncient = level.objects[i3][2] === 20
-                    screenPic.push(image(layer1,
-                        isExit4 ? level.objects[i3][0]*tileX + tileX - 48 :
-                        isAncient ? level.objects[i3][0]*tileX + tileX/2 - 32 :
-                        isPortalObj ? level.objects[i3][0]*tileX + tileX/2 - 64/2 : level.objects[i3][0]*tileX,
-                        isPillar ? level.objects[i3][1]*tileY + tileY - 81 :
-                            isPortalObj ? level.objects[i3][1]*tileY + tileY - 84 :
-                            isAncient ? level.objects[i3][1]*tileY + tileY - 42 :
-                            isStatue ? level.objects[i3][1]*tileY + 2*tileY - statueH :
-                            isExit4 ? level.objects[i3][1]*tileY + 2*tileY - 128 : level.objects[i3][1]*tileY,
-                        isPillar ? 32 : isPortalObj ? 64 : isStatue ? 32 : isExit4 ? 96 : isAncient ? 64 : level.objects[i3][3]*tileX,
-                        isPillar ? 81 : isPortalObj ? 84 : isStatue ? statueH : isExit4 ? 128 : isAncient ? 42 : level.objects[i3][4]*tileY,objSrc,{"id":screenPic.length+"O"}))
-                    level.objects[i3][6] = screenPic.length-1
-                    //V80: наземная тень под объектом (тип 14 — ловушка-плитка: лежит на полу,
-                    //тень не нужна); при выключенных тенях хост запоминается groundShadow.js
-                    level.objects[i3][2] !== 14 && objectShadow(screenPic[screenPic.length-1])
-                }
-            }
+    const roomRec = level.floor[level.roomsArr[i0][0]]
+    //индекс стен по клетке-началу (в исходном порядке) + список стен-владений комнаты
+    const wallsByCell = new Map()
+    const wallsOwned = []
+    for (let i3 = 0; i3 < level.walls.length; i3++) {
+        const w = level.walls[i3]
+        if (w[5] !== undefined && w[5] === level.roomsArr[i0][0]) wallsOwned.push(w)
+        const key = w[0] + "," + w[1]
+        let arr = wallsByCell.get(key)
+        if (!arr) { arr = []; wallsByCell.set(key, arr) }
+        arr.push(w)
+    }
+    //индекс объектов по клетке-началу
+    const objectsByCell = new Map()
+    for (let i3 = 0; i3 < level.objects.length; i3++) {
+        const o = level.objects[i3]
+        const key = o[0] + "," + o[1]
+        let arr = objectsByCell.get(key)
+        if (!arr) { arr = []; objectsByCell.set(key, arr) }
+        arr.push(o)
+    }
+    //стена: спрайт + индекс в screenPic (walls[j][6]) + кэши Z-сортировки/дверей
+    const drawWall = (w) => {
+        screenPic.push(worldImage(layer1,
+            w[0]*tileX,
+            w[1]*tileY,
+            w[3]*tileX,
+            w[4]*tileY,"./images/dungeon/walls/"+(w[2]+status.levelFloor*30)+".png",{"id":screenPic.length+"W"}))
+        w[6] = screenPic.length-1
+        //V4: стены-накладки (27/28) — в кэш Z-сортировки («;» обязательна: строка
+        //начинается с «(» — без неё ASI склеивает с присваиванием выше)
+        ;(w[2]===27||w[2]===28)&&wallsOverlay.push(screenPic[screenPic.length-1])
+        //V16: двери (9/12/23/24) — в кэш openDoor (не сканировать весь screenPic каждый тик)
+        ;(w[2]===9||w[2]===12||w[2]===23||w[2]===24)&&doorPics.push(screenPic[screenPic.length-1])
+    }
+    const drawObject = (o) => {
+        //ловушка (тип 14) рендерится из папки traps — спрайт по ФАЗЕ ловушки
+        //(trapSprite.js: 3e/1e в «выключенном» состоянии, 3/4/1 в активном)
+        //столб призыва (тип 15, V43) — спец-спрайт fin1/fin2 по состоянию objects[i3][10]
+        //статуя героя (тип 16, V49) — спрайты по этажам objects/14|34|54.png (формула 14+этаж*20)
+        //алхимический стол (тип 17, V54) — спрайты по этажам objects/15|35|55.png (формула 15+этаж*20)
+        //V64: портал (18) и рычаг (19) — спрайты по фазе objects[i3][10] (portalSprite.js)
+        //V67: выход с 4 этажа (тип 13 на этаже «Пустота») — спрайт 4exit.png
+        //V75: шкафчик с древностями (тип 20) — спрайт 101|101d.png по использованию
+        //V83: портал вида 2 (obj[12]=2, 100a.png) и кнопка загадки (21, push0/push1) —
+        //там же, в portalSprite.js
+        let objSrc = o[2] === 13 && status.levelFloor === 3 ?
+            "./images/dungeon/objects/4exit.png" :
+            o[2] === 14 ?
+            trapSpriteSrc(o) :
+            o[2] === 18 || o[2] === 19 || o[2] === 21 ?
+                portalSpriteSrc(o) :
+            o[2] === 15 ?
+                "./images/dungeon/objects/fin"+(o[10]||1)+".png" :
+                o[2] === 16 ?
+                    "./images/dungeon/objects/"+(14+status.levelFloor*20)+".png" :
+                    o[2] === 17 ?
+                        "./images/dungeon/objects/"+(15+status.levelFloor*20)+".png" :
+                        o[2] === 20 ?
+                            "./images/dungeon/objects/"+(o[7] ? "101d" : "101")+".png" :
+                            "./images/dungeon/objects/"+(o[2]+status.levelFloor*20)+".png"
+        //столб 32×81 рисуется 1:1 с якорем низа в клетку объекта (логика — клетка 1×1)
+        let isPillar = o[2] === 15
+        //статуя (сетка 1×2) рисуется 1:1 натуральной высоты (65/69/48) с якорем низа
+        //в 2 клетки — спрайт 48px третьего этажа нельзя растягивать до 64
+        let isStatue = o[2] === 16
+        let statueH = isStatue ? [65,69,48][status.levelFloor] : 0
+        //V64: портал 64×84 рисуется 1:1 с якорем низа и центром по клетке
+        //(логика — клетка 1×1); рычаг 32×32 идёт по обычной ветке 1×1
+        let isPortalObj = o[2] === 18
+        //V67: выход с 4 этажа 96×128 рисуется 1:1 с якорем низа и центром по
+        //логической клетке 2×2 (та же геометрия, что у спавна в voidBoss.js)
+        let isExit4 = o[2] === 13 && status.levelFloor === 3
+        //V75: шкафчик 64×42 рисуется 1:1 с якорем низа и центром по клетке
+        //(логика — клетка 1×1, как у портала)
+        let isAncient = o[2] === 20
+        screenPic.push(worldImage(layer1,
+            isExit4 ? o[0]*tileX + tileX - 48 :
+            isAncient ? o[0]*tileX + tileX/2 - 32 :
+            isPortalObj ? o[0]*tileX + tileX/2 - 64/2 : o[0]*tileX,
+            isPillar ? o[1]*tileY + tileY - 81 :
+                isPortalObj ? o[1]*tileY + tileY - 84 :
+                isAncient ? o[1]*tileY + tileY - 42 :
+                isStatue ? o[1]*tileY + 2*tileY - statueH :
+                isExit4 ? o[1]*tileY + 2*tileY - 128 : o[1]*tileY,
+            isPillar ? 32 : isPortalObj ? 64 : isStatue ? 32 : isExit4 ? 96 : isAncient ? 64 : o[3]*tileX,
+            isPillar ? 81 : isPortalObj ? 84 : isStatue ? statueH : isExit4 ? 128 : isAncient ? 42 : o[4]*tileY,objSrc,{"id":screenPic.length+"O"}))
+        o[6] = screenPic.length-1
+        //V80: наземная тень под объектом (тип 14 — ловушка-плитка: лежит на полу,
+        //тень не нужна); при выключенных тенях хост запоминается groundShadow.js
+        o[2] !== 14 && objectShadow(screenPic[screenPic.length-1])
+    }
+    //пол комнаты + стены/объекты в клетках
+    for (let i = 0; i < roomRec[2]; i++) {
+        for (let i2 = 0; i2 < roomRec[3] + 1; i2++) {
+            const cx = roomRec[0] + i
+            const cy = roomRec[1] + i2
+            screenPic.push(worldImage(layer0,
+                cx*tileX,
+                cy*tileY,
+                tileX,tileY,floorTexture(status.levelFloor,roomRec[4]),{"opacity":"0.7"}))
+            const cellWalls = wallsByCell.get(cx + "," + cy)
+            if (cellWalls) for (let k = 0; k < cellWalls.length; k++) drawWall(cellWalls[k])
+            const cellObjs = objectsByCell.get(cx + "," + cy)
+            if (cellObjs) for (let k = 0; k < cellObjs.length; k++) drawObject(cellObjs[k])
         }
+    }
+    //R3: стены-владения комнаты ([5]===floorIdx), начало которых ВНЕ диапазона тайлов
+    //(ряд над верхом комнаты и т.п.) — РОВНО ОДИН РАЗ каждая. Раньше этот цикл был
+    //внутри тайлового и рисовал их заново на каждый тайл: сотни невидимых копий одного
+    //спрайта (замер 2026-09-17: 124 спрайта слоя объектов из 137 — копии шести стен).
+    //Стены с началом внутри диапазона уже нарисованы циклом клеток (прежний цикл A).
+    for (let k = 0; k < wallsOwned.length; k++) {
+        const w = wallsOwned[k]
+        if (w[0] >= roomRec[0] && w[0] < roomRec[0] + roomRec[2] &&
+            w[1] >= roomRec[1] && w[1] <= roomRec[1] + roomRec[3]) continue
+        drawWall(w)
     }
 }
 export {sceneGenerate,createRoom,dataGeneric,buttonInit,floorTexture,createMatrix}

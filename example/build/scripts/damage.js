@@ -4,7 +4,7 @@ import { status } from "../scripts/start.js"
 import { T } from "../scripts/localization.js"
 import { changeHP,changeLvl } from "../scripts/takeDamage.js"
 import { data } from "../scripts/data.js"
-import { svgArr,image, moveSprite, releaseSprite, rectPos } from "../scripts/svg.js"
+import { svgArr,image,worldImage, moveSprite, releaseSprite, rectPos } from "../scripts/svg.js"
 import { dropArr } from "../scripts/useObject.js"
 import { playback,strike } from "../scripts/sound.js"
 import { callAllies, enemyStun, enemyDie, enemyNoticeHero, setEnemyState, setEnemyPose, ENEMY_STATE } from "../scripts/enemyAI.js"
@@ -135,7 +135,7 @@ function damage() {
                 enemyDie(hitEnemy, hitEnemy.stats.exp)
                 if(status.info.beacon === 1 && bullet.stats.name === "attack.16.name" && Math.random() < (status.info.cookChance || 0)) { //V42: 5% → 10%
                     let drop = {"w":32,"h":36,"img":"./images/dungeon/drop/food.png"}
-                    screenPic.push(image(svgArr[1],hitEnemy.rect.x.animVal.value + 16,hitEnemy.rect.y.animVal.value + 55,drop.w,drop.h,drop.img,{"id":screenPic.length-1}))
+                    screenPic.push(worldImage(svgArr[1],hitEnemy.rect.x.animVal.value + 16,hitEnemy.rect.y.animVal.value + 55,drop.w,drop.h,drop.img,{"id":screenPic.length-1}))
                     dropArr.push(screenPic[screenPic.length - 1])
                     //V69: еда упала в стену/пустоту — переносим на свободную клетку рядом
                     placeDrop(screenPic[screenPic.length - 1],hitEnemy.rect.x.animVal.value + 16,hitEnemy.rect.y.animVal.value + 55,drop.w,drop.h)
@@ -237,7 +237,7 @@ function countMagicDamage(minDmg) {
 }
 function dropKey(x,y) {
     let drop = {"w":28,"h":32,"img":"./images/dungeon/drop/key.png"}
-    screenPic.push(image(svgArr[1],x + 16,y + 55,drop.w,drop.h,drop.img,{"id":screenPic.length-1}))
+    screenPic.push(worldImage(svgArr[1],x + 16,y + 55,drop.w,drop.h,drop.img,{"id":screenPic.length-1}))
     dropArr.push(screenPic[screenPic.length - 1])
     //V69: ключ упал в стену/пустоту — переносим на свободную клетку рядом
     placeDrop(screenPic[screenPic.length - 1],x + 16,y + 55,drop.w,drop.h)
@@ -473,7 +473,7 @@ function createSplash(enemy,effect,damage,other=0,range=0,selfTo=0,srcName=undef
             if(o.stats.hp <= 0 && !reanimateCheck(o)) {
                 if(status.info.beacon === 1 && other === 0 && Math.random() < (status.info.cookChance || 0)) { //V42: 5% → 10%
                     let drop = {"w":32,"h":36,"img":"./images/dungeon/drop/food.png"}
-                    screenPic.push(image(svgArr[1],oPos[0] + 16,oPos[1] + 55,drop.w,drop.h,drop.img,{"id":screenPic.length-1}))
+                    screenPic.push(worldImage(svgArr[1],oPos[0] + 16,oPos[1] + 55,drop.w,drop.h,drop.img,{"id":screenPic.length-1}))
                     dropArr.push(screenPic[screenPic.length - 1])
                     //V69: еда упала в стену/пустоту — переносим на свободную клетку рядом
                     placeDrop(screenPic[screenPic.length - 1],oPos[0] + 16,oPos[1] + 55,drop.w,drop.h)

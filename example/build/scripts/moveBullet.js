@@ -3,7 +3,7 @@ import { checkCollision,playEffect } from "../scripts/damage.js"
 import { status } from "../scripts/start.js"
 import { dataGeneric } from "../scripts/sceneGenerate.js"
 import { data } from "../scripts/data.js"
-import { svgArr,image, moveSprite, releaseSprite, rectPos } from "../scripts/svg.js"
+import { svgArr,image,worldImage, moveSprite, releaseSprite, rectPos } from "../scripts/svg.js"
 import { createEgg } from "../scripts/spiderBossFight.js"
 
 // E-3: обе системы крутятся по группе gbullet (маркер isBullet — пули на спавне),
@@ -30,7 +30,7 @@ function moveBullet() {
             if(b.currentAnim.poisonMove === 1 && status.time % 31 === 0) {
                 let x = bPos[0] + Math.trunc(Math.random() * 64)
                 let y = bPos[1] + Math.trunc(Math.random() * 64)
-                screenPic.push(image(svgArr[0],x,y,32,15,"./images/effects/acid.png",{"id":screenPic.length-1}))
+                screenPic.push(worldImage(svgArr[0],x,y,32,15,"./images/effects/acid.png",{"id":screenPic.length-1}))
                 acidArr.push(screenPic[screenPic.length - 1])
 
                 Math.trunc(Math.random() * 15) === 0 && checkCollision(x - 512, status.hero.x, 1056, 32, y - 256, status.hero.y, 563, 25) && createEgg(x,y)
