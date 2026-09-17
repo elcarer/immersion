@@ -51,6 +51,7 @@ let activeTrack = TRACK.none    //какой трек ДОЛЖЕН звучат�
 let ducked = 0                  //панель приглушила активный трек
 let pendingTrack = TRACK.none   //трек заказан раньше, чем декодировался файл
 let trackGains = {}, trackSources = {}
+let trackGen = 0 //счётчик созданий источников — для среза window.__MUSIC
 function trackBuffer(t) {
     return t === TRACK.menu ? strike[18].vol : t === TRACK.dungeon ? strike[10].vol : strike[17].vol
 }
@@ -70,9 +71,37 @@ function ensureTrack(t) {
     src.buffer = trackBuffer(t)
     src.loop = 1
     src.connect(g)
+    //страховка зацикливания (репорт: в лобби музыка доигрывала до конца и не возвращалась).
+    //У циклящегося источника onended по спецификации НЕ срабатывает никогда — его
+    //срабатывание значит, что трек умер НЕштатно (прерывание аудиосессии ОС, смена
+    //устройства вывода, сон системы). Активный трек пересоздаём немедленно с тем же
+    //гейном (applyMusicVolume вернёт слышимость), неактивный просто забываем — следующий
+    //playTrack соберёт его заново; приглушённый (ducked) тоже пересоздаём тихим,
+    //иначе unduck вернул бы громкость гейну без источника
+    src.onended = () => {
+        if (trackSources[t] !== src) return
+        delete trackSources[t]
+        if (activeTrack === t) { ensureTrack(t); applyMusicVolume() }
+    }
     src.start()
     trackGains[t] = g
     trackSources[t] = src
+    trackGen++
+}
+//headless-диагностика (как __ST/__BACKEND): срез музыкальной шины + kill —
+//принудительная остановка источника для проверки самопочинки в тестах
+window.__MUSIC = {
+    snap: () => ({
+        activeTrack, ducked, pendingTrack,
+        ctxState: ctxM ? ctxM.state : null,
+        ctxTime: ctxM ? Math.round(ctxM.currentTime * 100) / 100 : 0,
+        trackGen, vol: status.settings.musicVolume,
+        tracks: Object.keys(trackSources).map(t => {
+            const s = trackSources[t]
+            return { track: +t, loop: !!s.loop, gain: trackGains[t].gain.value, dur: s.buffer ? Math.round(s.buffer.duration) : 0 }
+        })
+    }),
+    kill: (t) => { const s = trackSources[t]; s && s.stop() }
 }
 export function playTrack(track) {
     activeTrack = track
