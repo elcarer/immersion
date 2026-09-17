@@ -44,7 +44,8 @@ import "../scripts/zoomFx.js"
 import { rectShadow } from "../scripts/rectShadow.js"
 //V65: Сгустки пустоты Циклопа (4 этаж) — кулдаун способности и движение по спирали
 //V85: там же живёт Медуза пустоты — medusaSplitTick (порог деления segmentation)
-import { voidBossTick, medusaSplitTick } from "../scripts/voidBoss.js"
+//V91: там же Гриб пустоты — sporeTick (копилка спор и их прорастание)
+import { voidBossTick, medusaSplitTick, sporeTick } from "../scripts/voidBoss.js"
 import { spiderBossFight,descentBossAttack,bossAttack,bossDown,eggsArr,delEgg } from "../scripts/spiderBossFight.js"
 import { valkyrieTick } from "../scripts/valkyrie.js"
 //V80: наземные тени героя/врагов/питомцев — синхронизация после всех шагов движения
@@ -119,6 +120,8 @@ function gameLoop() {
         voidBossTick()
         //V85: Медуза пустоты — проверка порога деления (segmentation) после урона за тик
         medusaSplitTick()
+        //V91: Гриб пустоты — кулдаун разброса спор + полёт/прорастание лежащих
+        sporeTick()
         //V52 достижения: ХП героя против прошлого тика — любая потеря гасит «чистый» этаж
         achTick()
         //V27: ХП-бары врагов после урона / мигание меню при левелапе / авточистка окошка предмета

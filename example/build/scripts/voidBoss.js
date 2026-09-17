@@ -25,6 +25,14 @@
 //в комнате появляется ВЫХОД (интерактивный объект типа 13, как спуск на других этажах,
 //спрайт 4exit.png 96×128); взаимодействие с ним запускает стандартное завершение этажа
 //(nextFloor → комикс концовки: 4-0/4-1 у Циклопа, 4-2/4-3 у Медузы — V87 → экран очков).
+//V91: третий босс — «Гриб пустоты» (id 27, data.enemes[18][2]): выбор в nextFloor стал
+//1 из 3. Поведение — как у Циклопа, без его способностей; своя способность «spore»
+//(секунды в data.js): раз в N секунд разбрасывает 10 спор по параболе в случайные
+//свободные клетки комнаты (спрайт босса в 1/10, отдельный файл spore.png); наступание
+//героя уничтожает спору, через 8с лежания невытоптанная прорастает мини-грибом
+//(spawnSporeMini: клон класса без тега boss, ХП/урон/опыт 1/10 актуальных статов,
+//размер 1/5, скорость полная). При смерти босса споры исчезают (решение пользователя).
+//Заставки 4 этажа у Гриба пока медузинские (comix.js — своего арта нет).
 import { status } from "../scripts/start.js"
 import { data } from "../scripts/data.js"
 import { dataGeneric } from "../scripts/sceneGenerate.js"
@@ -70,6 +78,23 @@ let finaleArmed = false
 //системах (полоса ХП, тик деления, последний осколок)
 const MEDUSA_ID = 26
 
+//----- V91: Гриб пустоты (id 27) — способность «spore» -----
+//Раз в stats.spore секунд босс разбрасывает 10 спор: каждая вылетает из центра босса
+//и по параболе (линейное сближение + дуга-«высота» визуально вверх) летит в случайную
+//свободную клетку комнаты. Лежит 8 секунд: наступание героя уничтожает спору, иначе
+//спора прорастает мини-грибом (spawnSporeMini). При смерти босса споры исчезают.
+const SPORE_COUNT = 10
+const SPORE_SIZE = 13            //128/10 ≈ 13 — спора = спрайт босса в 1/10 (по ТЗ)
+const SPORE_SPRITE = "./images/enemy/mushroom/spore.png"
+const SPORE_LAND_TICKS = Math.round(8000 / 16) //8с жизни на полу до прорастания
+const SPORE_FLY_TICKS = 36       //полёт ~0.6с
+const SPORE_ARC = 56             //высота дуги полёта, px
+const MINI_K = 1 / 5             //мини-гриб = 1/5 босса (по ТЗ)
+
+let sporeBossRef = null
+let sporeCd = 0
+let spores = []   // {img, sx, sy, tx, ty, t, fly, arc, landed, life}
+
 //----- спавн босса (newGame → после sceneGenerate, как configPortal) -----
 function spawnVoidBoss(level) {
     if (!level.roomsArr || !level.roomsArr.length) return
@@ -81,7 +106,7 @@ function spawnVoidBoss(level) {
     //V85: босс случаен — 50/50 Циклоп (id 25) / Медуза пустоты (id 26); V87: выбор сделан
     //заранее в nextFloor (до комикса спуска — заставка зависит от босса), здесь читаем его,
     //страховка — при пустом поле решаем на месте
-    let bossIdx = status.voidBossId === 26 ? 1 : status.voidBossId === 25 ? 0 : (Math.random() < 0.5 ? 0 : 1)
+    let bossIdx = status.voidBossId === 26 ? 1 : status.voidBossId === 27 ? 2 : status.voidBossId === 25 ? 0 : Math.trunc(Math.random() * 3)
     let enemy1 = data.enemes[18][bossIdx]
     let stats = JSON.parse(JSON.stringify(enemy1.stats))
     //множители глав — тот же конвейер, что openRoom/encounters/spawnFinEnemy
@@ -128,8 +153,15 @@ function spawnVoidBoss(level) {
     if (enemy1.stats.voidBlob) {
         bossRef = e
         blobCd = Math.round(enemy1.stats.voidBlob * 1000 / 16) //4с = 250 тиков
+        sporeBossRef = null
+    } else if (enemy1.stats.spore) {
+        //V91: Гриб пустоты — копилка спор, Сгустков нет
+        sporeBossRef = e
+        sporeCd = Math.round(enemy1.stats.spore * 1000 / 16) //10с = 625 тиков
+        bossRef = null
     } else {
         bossRef = null
+        sporeBossRef = null
     }
     finaleArmed = false
 }
@@ -254,6 +286,149 @@ function medusaPieceDied(enemy) {
     return true
 }
 
+//----- V91: Гриб пустоты — тик способности «spore» (gameLoop, вне паузы) -----
+function sporeTick() {
+    if (!sporeBossRef || sporeBossRef.type !== "enemy" || sporeBossRef.stats.hp <= 0) return
+    if (--sporeCd <= 0) {
+        sporeCd = Math.round(sporeBossRef.class.stats.spore * 1000 / 16)
+        scatterSpores()
+    }
+    moveSpores()
+}
+
+//10 случайных свободных клеток комнаты босса — критерии freeSplitCells: пол матрицы,
+//не клетка героя, не клетка живого врага; без дубликатов в партии (40 попыток на спору,
+//не нашли — партия меньше)
+function scatterSpores() {
+    let level = dataGeneric.scenes[status.levelFloor]
+    let rf = level.floor[sporeBossRef.room[0]]
+    let matrix = status.matrixLevel
+    let heroCell = [Math.trunc(status.hero.x / 32), Math.trunc(status.hero.y / 32)]
+    let taken = {}
+    for (let i = 0; i < objectValues.length; i++) {
+        let o = objectValues[i]
+        if (o.type !== "enemy" || !o.rect || o.stats.hp <= 0) continue
+        let c = pieceCellOf(o)
+        taken[c[0] + "," + c[1]] = 1
+    }
+    let p = rectPos(sporeBossRef.rect)
+    let sx = p[0] + sporeBossRef.rect._w / 2
+    let sy = p[1] + sporeBossRef.rect._h / 2
+    for (let n = 0; n < SPORE_COUNT; n++) {
+        let cell = null
+        for (let a = 0; a < 40 && !cell; a++) {
+            let cx = rf[0] + Math.trunc(Math.random() * rf[2])
+            let cy = rf[1] + Math.trunc(Math.random() * rf[3])
+            if (!matrix[cy] || matrix[cy][cx] !== 1) continue
+            if (heroCell[0] === cx && heroCell[1] === cy) continue
+            if (taken[cx + "," + cy]) continue
+            cell = [cx, cy]
+            taken[cx + "," + cy] = 1
+        }
+        if (!cell) break
+        screenPic.push(worldImage(svgArr[1],
+            sx - SPORE_SIZE / 2, sy - SPORE_SIZE / 2, SPORE_SIZE, SPORE_SIZE, SPORE_SPRITE,
+            {"id": screenPic.length - 1}))
+        spores.push({"img": screenPic[screenPic.length - 1],
+            "sx": sx, "sy": sy,
+            "tx": cell[0] * 32 + 16, "ty": cell[1] * 32 + 16,
+            "t": 0, "fly": SPORE_FLY_TICKS,
+            "arc": SPORE_ARC * (0.7 + Math.random() * 0.6),
+            "landed": 0, "life": SPORE_LAND_TICKS})
+    }
+}
+
+function moveSpores() {
+    let heroObj = status.hero.obj
+    for (let i = spores.length - 1; i >= 0; i--) {
+        let s = spores[i]
+        if (!s.landed) {
+            //полёт: сближение по прямой; «высота» = 4·arc·k·(1−k) — визуальный сдвиг вверх
+            s.t++
+            let k = s.t / s.fly
+            let lift = 4 * s.arc * k * (1 - k)
+            spritePos(s.img, s.sx + (s.tx - s.sx) * k - SPORE_SIZE / 2,
+                s.sy + (s.ty - s.sy) * k - SPORE_SIZE / 2 - lift)
+            if (s.t >= s.fly) {
+                s.landed = 1
+                spritePos(s.img, s.tx - SPORE_SIZE / 2, s.ty - SPORE_SIZE / 2)
+            }
+            continue
+        }
+        //лежит: герой наступил — уничтожена; 8с вышли — проросла мини-грибом
+        if (heroObj && heroObj.type === "hero") {
+            let hp = rectPos(heroObj.rect)
+            if (checkCollision(hp[0], s.tx - SPORE_SIZE / 2, heroObj.rect._w, SPORE_SIZE,
+                hp[1], s.ty - SPORE_SIZE / 2, heroObj.rect._h, SPORE_SIZE)) {
+                s.img.remove()
+                spores.splice(i, 1)
+                continue
+            }
+        }
+        if (--s.life <= 0) {
+            spawnSporeMini([Math.trunc(s.tx / 32), Math.trunc(s.ty / 32)])
+            s.img.remove()
+            spores.splice(i, 1)
+        }
+    }
+}
+
+//мини-гриб из проросшей споры: клон базового класса (id 27) БЕЗ тега boss/elite и без
+//«spore»; анимации в 1/5 (как у осколков Медузы — k-масштаб w/h, кадр окна не меняется);
+//статы — 1/10 АКТУАЛЬНЫХ параметров босса (после множителей глав): ХП (от maxHp)/урон/
+//опыт; скорость и зоркость полные, атаки те же (решения пользователя). Структура — как
+//у spawnMedusaPiece
+function spawnSporeMini(cell) {
+    let boss = sporeBossRef
+    let cls = JSON.parse(JSON.stringify(data.enemes[18][2]))
+    delete cls.boss
+    delete cls.elite
+    for (let gI = 0; gI < cls.anims.length; gI++) {
+        let grp = cls.anims[gI]
+        for (let key in grp) {
+            let arr = grp[key]
+            for (let iA = 0; iA < arr.length; iA++) {
+                arr[iA].w = Math.round(arr[iA].w * MINI_K)
+                arr[iA].h = Math.round(arr[iA].h * MINI_K)
+            }
+        }
+    }
+    let miniHp = Math.max(1, Math.trunc(boss.stats.maxHp / 10))
+    let stats = {"hp": miniHp, "maxHp": miniHp,
+        "dmg": [Math.max(1, Math.round(boss.stats.dmg[0] / 10)), Math.max(1, Math.round(boss.stats.dmg[1] / 10))],
+        "exp": Math.max(1, Math.trunc(boss.stats.exp / 10)),
+        "speed": boss.stats.speed, "range": boss.stats.range,
+        "attacksCd": [], "noStunTime": boss.stats.noStunTime, "desc": cls.stats.desc}
+    let wait = cls.anims[2].others[2]
+    let frameW = wait.w / (wait.times || 4)
+    let e = {"id":status.oVcount,"type":"enemy","class":cls,"stats":stats,"animCounters":60/wait.speed,"currentAnim":wait,"currentStill":0,"room":boss.room,"cells":[cell],"state":0,"stop":0,"xCell":cell[0],"yCell":cell[1],"noStunTime":0,
+    "img":image(svgArr[1],
+        cell[0]*32 + 16 - frameW/2,
+        cell[1]*32 - Math.round(19*MINI_K),
+        wait.w,
+        wait.h,
+        wait.img,
+        {"times":wait.times,"id":status.oVcount,"frame":1})}
+    objectValues.push(e)
+    status.oVcount++
+    e.rect = e.img.clipRect
+    let lengthAttacks = cls.attacks.length
+    for (let iA = 0; iA < lengthAttacks; iA++) {
+        e.stats.attacksCd[iA] = Math.trunc((data.attacks[cls.attacks[iA]].cooldown*1000)/16)
+    }
+    return e
+}
+
+//ручка автотестов: состояние копилки спор без экспорта внутреннего массива
+//(по прецеденту minimapDebug/bossBarNodes)
+function sporeDebug() {
+    return {"count": spores.length,
+        "bossAlive": !!(sporeBossRef && sporeBossRef.type === "enemy" && sporeBossRef.stats.hp > 0),
+        "cd": sporeCd,
+        "spores": spores.map(s => ({"x": Math.round(s.tx), "y": Math.round(s.ty),
+            "landed": !!s.landed, "life": s.life}))}
+}
+
 //----- тик из gameLoop (вызывается только вне паузы, как остальные системы) -----
 function voidBossTick() {
     if (!bossRef || bossRef.type !== "enemy" || bossRef.stats.hp <= 0) return
@@ -330,6 +505,11 @@ function moveBlobs() {
 function voidBossFinale(source) {
     if (finaleArmed) return
     finaleArmed = true
+    //V91: споры Гриба при смерти босса исчезают (решение пользователя) — и лежащие,
+    //и летящие; уже проросшие мини-грибы остаются
+    for (let i = spores.length - 1; i >= 0; i--) spores[i].img.remove()
+    spores.length = 0
+    sporeBossRef = null
     //V67: этаж больше не заканчивается сразу — зависшие в воздухе Сгустки (их двигал тик,
     //который после смерти босса не идёт) убираем сразу, иначе провисут до выхода с этажа
     for (let i = blobs.length - 1; i >= 0; i--) blobs[i].img.remove()
@@ -396,6 +576,10 @@ function resetVoidBoss() {
     blobCd = 0
     blobs.length = 0
     finaleArmed = false
+    //V91: споры — как Сгустки: узлы убирает разбор сцены в del.js, здесь только ссылки
+    sporeBossRef = null
+    sporeCd = 0
+    spores.length = 0
 }
 
-export {spawnVoidBoss, voidBossTick, voidBossFinale, resetVoidBoss, medusaSplitTick, medusaPieceDied}
+export {spawnVoidBoss, voidBossTick, voidBossFinale, resetVoidBoss, medusaSplitTick, medusaPieceDied, sporeTick, sporeDebug}

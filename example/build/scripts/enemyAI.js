@@ -1007,6 +1007,9 @@ export function enemyDie(enemy, exp) {
     //V85: Медуза пустоты (id 26) — дроп и выход только с гибелью ПОСЛЕДНЕГО осколка;
     //сами деления смертью не считаются (осколки спавнит medusaSplitTick до ХП ≤ 0)
     enemy.class.id === 26 && medusaPieceDied(enemy) && voidBossFinale(enemy)
+    //V91: Гриб пустоты (id 27) — финал по смерти БОССА; мини-грибы из спор — клоны
+    //без тега boss, этаж не завершают (споры гасятся внутри voidBossFinale)
+    enemy.class.id === 27 && enemy.class.boss === 1 && voidBossFinale(enemy)
 }
 
 // ---------- воскрешение Mummy (reanimate) ----------

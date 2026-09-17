@@ -17,9 +17,10 @@ function nextFloor() {
     //контент по главам: гл.1 — этаж 1; гл.2 — этажи 1+2; гл.3 — этажи 1+2+3; гл.4 — этажи 1+2+3+4 (V65).
     //гл.2: этаж 1 → комикс → этаж 2 → концовка. гл.3: этаж 1 → этаж 2 → комикс → этаж 3 → концовка.
     //V65 гл.4: этаж 1 → этаж 2 → этаж 3 → комикс спуска → этаж 4 («Пустота») → концовка.
-    //V87: диптихи 4 этажа зависят от босса, поэтому выбор (Циклоп 25 / Медуза пустоты 26,
-    //50/50) делается ЗДЕСЬ — при завершении этажа 3, ДО comix(2); spawnVoidBoss читает готовый
-    status.meta.page === 4 && status.levelFloor === 2 && (status.voidBossId = Math.random() < 0.5 ? 25 : 26)
+    //V87: диптихи 4 этажа зависят от босса, поэтому выбор (Циклоп 25 / Медуза пустоты 26 /
+    //Гриб пустоты 27 — V91, поровну) делается ЗДЕСЬ — при завершении этажа 3, ДО comix(2);
+    //spawnVoidBoss читает готовый
+    status.meta.page === 4 && status.levelFloor === 2 && (status.voidBossId = [25, 26, 27][Math.trunc(Math.random() * 3)])
     status.levelFloor === 0 && status.meta.page === 2 ? comix(2) :
     status.levelFloor === 1 && status.meta.page === 3 ? comix(2) :
     status.levelFloor === 2 && status.meta.page === 4 ? comix(2) :
