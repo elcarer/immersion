@@ -83,6 +83,10 @@ function generateGame() {
         createWalls(newDataVoid)
         return newDataVoid
     }
+    if (status.levelFloor < (status.meta.page - 1)) {
+        w -= 20
+        h -= 20
+    }
     let newData = {"scenes":[
         {"w":w,"h":h,"floor":[],"objects":[],"walls":[],"hero":[0,0]},
         {"w":w,"h":h,"floor":[],"objects":[],"walls":[],"hero":[0,0]},
