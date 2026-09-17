@@ -164,7 +164,7 @@ dropSafe, spiderBossFight) получили нативный путь без е�
   (лобби/comix/endGame/HUD), растущий rect полосы юза.
 
 ### R4. UI нативно (тексты, полосы, иконки, миникарта, drag) — ЧАСТИЧНО ВЫПОЛНЕН (2026-09-17)
-Сделано (коммиты 6dd0c23 / 4fbeb4e / 2316c99):
+Сделано (коммиты 6dd0c23 / 4fbeb4e / 2316c99 / 29148d5):
 - **R4.1 карта**: панель «Карта» нативно — все прямоугольники (комнаты/коридоры/стены/
   двери) ОДНИМ PIXI.Graphics (createNativeGraphics + фасад nativeGraphics), объекты
   и иконка героя — нативные спрайты worldImage, свечение через style drop-shadow
@@ -176,8 +176,19 @@ dropSafe, spiderBossFight) получили нативный путь без е�
 - **R4.3 floatText**: NativeText (PIXI.Text + текстовый DOM-поднабор с базлайн-
   математикой applyTextStyle) + фасад nativeText; пул с revive() (remove уничтожает
   узел, реюз перезапускает хэндл). Лимит 50, реюз после смерти волны — без ошибок.
-Осталось: R4.4 тексты/тултипы/журнал/библиотека/настройки (clipPath-группы прокрутки
-journal/library — контейнеры с масками), R4.5 drag/события/геймпад-клик.
+- **R4.4 панели**: journal/library — NativeGroup (контейнер-хост шим-детей + setClip-
+  маска прокрутки) вместо createElementNS("g")/clipPath; tip/enemyHover/blessFx/
+  library — nativeHtml (PIXI.Text-блок от левого верхнего угла с wordWrap — контракт
+  foreignObject) вместо textHtml; activeSkills — nativeSector (тот же d-string через
+  pathPoints, окно-маска 96x96, setSector(angle,clockwise)) вместо path()+clipPath;
+  minimapFx — nativePoly (Graphics + federated-события pointerover/out/tap на узле)
+  вместо createElementNS("polygon"). Попутно закрыта дыра эмуляции: visibility="hidden"
+  шимом не реализовывался (в SVG работал) — строки журнала накладывались при скролле.
+  Игровые файлы больше НЕ содержат createElementNS/textHtml/clipPath (только бэкенд-
+  эмуляции и комментарии) — R5 сносит их вместе с шимом.
+Осталось: R4.5 drag предметов/события onclick-hover (кроме мигрированных точечно)/
+elementFromPoint → hitTestUI/геймпад-клик; settings/skillTree/topMenu/inventory/doll/
+belt тяжёлых конструкций не содержат (тонкие фабрики переживут R5 как есть).
 
 ### R4 (план исходный). UI нативно (тексты, полосы, иконки, миникарта, drag)
 - Полосы ХП/опыта/босса (clipPath-маски) → прямой redraw Graphics; journal/library/
