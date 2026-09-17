@@ -889,7 +889,8 @@ const PAIRS = [
     //V66d: Дворф отразил магию героя (всплывающий текст над дворфом)
     ["float.reflect", "Магия отражена!", "Magic reflected!"],
     //V67: реликвии — пятая (максимальная, красная) редкость; дроп с босса 4 этажа «Пустота».
-    //Тип слота в тултипе и карточки реликвий: имя + описание способности (V68: их шесть)
+    //Тип слота в тултипе и карточки реликвий: имя + описание способности (V68: уникальны;
+    //сейчас их семь — E-16 добавил «Вечный алмаз»; E-16: дроп босса 4 этажа — 100% реликвия)
     ["slot.relic", "Реликвия", "Relic"],
     ["rel.0.name", "Вечный изумруд", "Eternal Emerald"],
     ["rel.0.desc", "Герой больше не наносит критических ударов. Весь шанс крита и вся мощь крита прибавляются к максимальному запасу ХП.", "The hero can no longer land critical hits. All crit chance and crit power are added to maximum HP instead."],
@@ -904,6 +905,9 @@ const PAIRS = [
     ["rel.4.desc", "Герой получает на 25% меньше урона, а враг, нанёсший этот урон, получает эти 25% себе.", "The hero takes 25% less damage, and the enemy that dealt that damage takes that 25% instead."],
     ["rel.5.name", "Вечный рубин", "Eternal Ruby"],
     ["rel.5.desc", "Урон героя тем выше, чем меньше у него осталось ХП: при 1% жизни урон возрастает на 99%.", "The less HP the hero has left, the higher his damage: at 1% HP, damage is increased by 99%."],
+    //E-16: седьмая реликвия
+    ["rel.6.name", "Вечный алмаз", "Eternal Diamond"],
+    ["rel.6.desc", "Даёт +10% ко всем основным параметрам героя от их текущих значений (с округлением в большую сторону).", "Grants +10% to all of the hero's primary stats, based on their current values (rounded up)."],
     ["journ.reflect", "{0} получил {1} урона — его отразил «Вечный жемчуг».", "{0} took {1} damage, reflected by the Eternal Pearl."],
     ["lobby.sell", "Продать", "Sell"],
     //V73: подпись кнопки-карты в полосе меню (icon2) — у остальных кнопок ключи уже были

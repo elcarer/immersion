@@ -1,8 +1,16 @@
 import { status } from "../scripts/start.js"
 //V67: «Вечный изумруд» (крит → макс. ХП) и «Вечный сапфир» (копия параметров 1-й ячейки)
-import { hasRelic, sapphireDamage, sapphireStat, sapphireDop } from "../scripts/relics.js"
+import { hasRelic, sapphireDamage, sapphireStat, sapphireDop, diamondStatBonus } from "../scripts/relics.js"
 //V75: «Кровавый пакт» (шкафчик) — максимум ХП ×0.8
 import { blessMaxHpMult } from "../scripts/blessFx.js"
+
+//итоговая база стата (группа i, строка j): очки героя + «Сапфир» + доп-статы предметов;
+//«Вечный алмаз» (relic 6, E-16) прибавляет сверху +10% от этой базы (округление вверх) —
+//все производные value2 и геймплейные формулы читают value1, так что бонус входит всюду
+function statValue1(i,j) {
+    let base = status.info.stats[i].value + sapphireStat(i) + addDopStatItems(i,j)
+    return base + diamondStatBonus(base)
+}
 
 function countDopStats() {
     let damageMin = 0
@@ -17,56 +25,56 @@ function countDopStats() {
         let lengthDopStats = status.info.stats[i].dops.length
         for (let j = 0; j < lengthDopStats; j++) {
             i===0&&j===0&&
-            (status.info.stats[i].dops[j].value1 = status.info.stats[i].value + sapphireStat(i) + addDopStatItems(i,j))&&
+            (status.info.stats[i].dops[j].value1 = statValue1(i,j))&&
             (status.info.stats[i].dops[j].value2 = damageMin+"-"+status.info.stats[i].dops[j].value1)
             i===0&&j===1&&
-            (status.info.stats[i].dops[j].value1 = status.info.stats[i].value + sapphireStat(i) + addDopStatItems(i,j))&&
+            (status.info.stats[i].dops[j].value1 = statValue1(i,j))&&
             (status.info.stats[i].dops[j].value2 = (countLog(Math.trunc(status.info.stats[i].dops[j].value1/2))+"%"))
             i===0&&j===2&&
-            (status.info.stats[i].dops[j].value1 = status.info.stats[i].value + sapphireStat(i) + addDopStatItems(i,j))&&
+            (status.info.stats[i].dops[j].value1 = statValue1(i,j))&&
             (status.info.stats[i].dops[j].value2 = (countLog(status.info.stats[i].dops[j].value1)+"%"))
 
             i===1&&j===0&&
-            (status.info.stats[i].dops[j].value1 = status.info.stats[i].value + sapphireStat(i) + addDopStatItems(i,j))&&
+            (status.info.stats[i].dops[j].value1 = statValue1(i,j))&&
             (status.info.stats[i].dops[j].value2 = (countLog(status.info.stats[i].dops[j].value1)+"%"))
             i===1&&j===1&&
-            (status.info.stats[i].dops[j].value1 = status.info.stats[i].value + sapphireStat(i) + addDopStatItems(i,j))&&
+            (status.info.stats[i].dops[j].value1 = statValue1(i,j))&&
             (status.info.stats[i].dops[j].value2 = (100+2*countLog(status.info.stats[i].dops[j].value1)+"%"))
             i===1&&j===2&&
-            (status.info.stats[i].dops[j].value1 = status.info.stats[i].value + sapphireStat(i) + addDopStatItems(i,j))&&
+            (status.info.stats[i].dops[j].value1 = statValue1(i,j))&&
             (status.info.stats[i].dops[j].value2 = (countLog(Math.trunc(status.info.stats[i].dops[j].value1/2)))+"%")
 
             i===2&&j===0&&
-            (status.info.stats[i].dops[j].value1 = status.info.stats[i].value + sapphireStat(i) + addDopStatItems(i,j))&&
+            (status.info.stats[i].dops[j].value1 = statValue1(i,j))&&
             //V67 «Вечный изумруд»: криты героя отключены (damage.js), ВЕСЬ шанс крита (N%) и
             //вся мощь крита (включая базу 100%) уходят в макс. ХП — решение пользователя.
             //V75 «Кровавый пакт» (шкафчик): итог умножается на 0.8 — снижается именно МАКСИМУМ
             (status.info.stats[i].dops[j].value2 = (Math.trunc((10+status.meta.dopHP+5*status.info.stats[i].dops[j].value1+emeraldHpBonus())*blessMaxHpMult())+"x"))
             i===2&&j===1&&
-            (status.info.stats[i].dops[j].value1 = status.info.stats[i].value + sapphireStat(i) + addDopStatItems(i,j))&&
+            (status.info.stats[i].dops[j].value1 = statValue1(i,j))&&
             (status.info.stats[i].dops[j].value2 = (countLog(status.info.stats[i].dops[j].value1)+"%"))
             i===2&&j===2&&
-            (status.info.stats[i].dops[j].value1 = status.info.stats[i].value + sapphireStat(i) + addDopStatItems(i,j))&&
+            (status.info.stats[i].dops[j].value1 = statValue1(i,j))&&
             (status.info.stats[i].dops[j].value2 = ((countLog(2*status.info.stats[i].dops[j].value1))+"%"))
 
             i===3&&j===0&&
-            (status.info.stats[i].dops[j].value1 = status.info.stats[i].value + sapphireStat(i) + addDopStatItems(i,j))&&
+            (status.info.stats[i].dops[j].value1 = statValue1(i,j))&&
             (status.info.stats[i].dops[j].value2 = (countLog(status.info.stats[i].dops[j].value1)+"%"))
             i===3&&j===1&&
-            (status.info.stats[i].dops[j].value1 = status.info.stats[i].value + sapphireStat(i) + addDopStatItems(i,j))&&
+            (status.info.stats[i].dops[j].value1 = statValue1(i,j))&&
             (status.info.stats[i].dops[j].value2 = (countLog(status.info.stats[i].dops[j].value1)+"%"))
             i===3&&j===2&&
-            (status.info.stats[i].dops[j].value1 = status.info.stats[i].value + sapphireStat(i) + addDopStatItems(i,j))&&
+            (status.info.stats[i].dops[j].value1 = statValue1(i,j))&&
             (status.info.stats[i].dops[j].value2 = (countLog(Math.trunc(status.info.stats[i].dops[j].value1/2)))+"%")
 
             i===4&&j===0&&
-            (status.info.stats[i].dops[j].value1 = status.info.stats[i].value + sapphireStat(i) + addDopStatItems(i,j))&&
+            (status.info.stats[i].dops[j].value1 = statValue1(i,j))&&
             (status.info.stats[i].dops[j].value2 = "x-"+status.info.stats[i].dops[j].value1)
             i===4&&j===1&&
-            (status.info.stats[i].dops[j].value1 = status.info.stats[i].value + sapphireStat(i) + addDopStatItems(i,j))&&
+            (status.info.stats[i].dops[j].value1 = statValue1(i,j))&&
             (status.info.stats[i].dops[j].value2 = (countLog(Math.trunc(status.info.stats[i].dops[j].value1/3))+"%"))
             i===4&&j===2&&
-            (status.info.stats[i].dops[j].value1 = status.info.stats[i].value + sapphireStat(i) + addDopStatItems(i,j))&&
+            (status.info.stats[i].dops[j].value1 = statValue1(i,j))&&
             (status.info.stats[i].dops[j].value2 = (countLog(status.info.stats[i].dops[j].value1)+"%"))
         }
     }

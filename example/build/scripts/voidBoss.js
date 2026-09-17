@@ -432,6 +432,12 @@ function sporeDebug() {
     return {"count": spores.length,
         "bossAlive": !!(sporeBossRef && sporeBossRef.type === "enemy" && sporeBossRef.stats.hp > 0),
         "cd": sporeCd,
+        //E-16: диагностика Сгустков Циклопа (жив ли bossRef, кулдаун, число живых Сгустков)
+        "bossRefType": bossRef ? bossRef.type : null,
+        "blobCd": blobCd,
+        "blobs": blobs.length,
+        "blobSpawns": blobSpawnCount,
+        "blobLastHit": blobLastHit,
         "spores": spores.map(s => ({"x": Math.round(s.tx), "y": Math.round(s.ty),
             "landed": !!s.landed, "life": s.life}))}
 }
@@ -453,7 +459,10 @@ function voidBossTick() {
 }
 
 //V79: угол и направление вращения задаёт вызывающий (зеркальная пара в неуязвимости)
+let blobSpawnCount = 0
+let blobLastHit = null   //E-16 (диагностика): ролл урона последнего попавшего Сгустка
 function spawnBlob(ang, dir) {
+    blobSpawnCount++
     let p = rectPos(bossRef.rect)
     //точка вылета — центр rect босса (клетка = центр, как всюду в проекте)
     let cx = p[0] + bossRef.rect._w / 2
@@ -497,8 +506,11 @@ function moveBlobs() {
             if (checkCollision(hp[0], b.x - BLOB_SIZE/2, heroObj.rect._w, BLOB_SIZE,
                 hp[1], b.y - BLOB_SIZE/2, heroObj.rect._h, BLOB_SIZE)) {
                 b.hit = 1
+                //E-16 (диагностика): ролл фиксируется до takeDamage — тесты сверяют,
+                //сколько Сгусток «принёс» и сколько дошло до ХП
+                blobLastHit = BLOB_DMG_MIN + Math.trunc(Math.random() * BLOB_DMG_SPREAD)
                 //V68: источнику (Циклопу) уходит доля «Вечного жемчуга», как от его снаряда
-                takeDamage(BLOB_DMG_MIN + Math.trunc(Math.random() * BLOB_DMG_SPREAD), "enemy.25.name", bossRef)
+                takeDamage(blobLastHit, "enemy.25.name", bossRef)
                 b.img.remove()
                 blobs.splice(i,1)
             }
@@ -531,17 +543,15 @@ function voidBossFinale(source) {
     }, 1200)
 }
 
-//V67: дроп босса 4 этажа — ОДИН предмет, редкость по распределению пользователя.
-//V86 (решение пользователя): 80% сетовый легендарный предмет (item4), 20% реликвия (item5);
-//эпические предметы (item3) с боссов 4 этажа больше не падают. Сет и слот легендарки
-//случайные (itemGenerate(4)); сам предмет генерируется в момент ПОДНЯТИЯ (takeItem 4/5) —
-//иконки кучи стандартные. V68: все 6 реликвий уже собраны (пул уникальных пуст) —
-//«реликвийные» 20% дают вторую легендарку item4
+//V67: дроп босса 4 этажа — ОДИН предмет. Сам предмет генерируется в момент ПОДНЯТИЯ
+//(takeItem 4/5) — иконки кучи стандартные.
+//E-16 (решение пользователя): с босса ВСЕГДА падает реликвия (item5) — прежнее
+//распределение 80/20 (V86) отменено. Исключение — пул уникальных реликвий исчерпан
+//(все уже собраны, V68): тогда падает сетовый легендарный предмет (item4, itemGenerate(4)).
 function bossDrop(target) {
     if (!target) return
-    let roll = Math.trunc(Math.random() * 100)
-    let drop = (roll < 80 || !relicPoolLeft()) ? {"w":32,"h":36,"img":"./images/dungeon/drop/item4.png"} :
-        {"w":32,"h":36,"img":"./images/dungeon/drop/item5.png"}
+    let drop = relicPoolLeft() ? {"w":32,"h":36,"img":"./images/dungeon/drop/item5.png"} :
+        {"w":32,"h":36,"img":"./images/dungeon/drop/item4.png"}
     //падает в точке смерти (центр rect погибшей сущности)
     let p = rectPos(target.rect)
     screenPic.push(worldImage(svgArr[1],

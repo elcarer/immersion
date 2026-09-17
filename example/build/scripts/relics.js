@@ -14,7 +14,7 @@
 //только из невыпадавших; пустой пул bossDrop обходит (10% дают item4), takeItem страхуется.
 import { status } from "../scripts/start.js"
 
-//шесть реликвий (индекс = номер спрайта /items/5/N.png и поле relic у предмета)
+//семь реликвий (индекс = номер спрайта /items/5/N.png и поле relic у предмета)
 export const RELICS = [
     {"title":"rel.0.name","desc":"rel.0.desc","img":"./images/items/5/0.png"}, //Вечный изумруд
     {"title":"rel.1.name","desc":"rel.1.desc","img":"./images/items/5/1.png"}, //Вечный цитрин
@@ -22,6 +22,7 @@ export const RELICS = [
     {"title":"rel.3.name","desc":"rel.3.desc","img":"./images/items/5/3.png"}, //Вечный берилл
     {"title":"rel.4.name","desc":"rel.4.desc","img":"./images/items/5/4.png"}, //Вечный жемчуг (V68)
     {"title":"rel.5.name","desc":"rel.5.desc","img":"./images/items/5/5.png"}, //Вечный рубин (V68)
+    {"title":"rel.6.name","desc":"rel.6.desc","img":"./images/items/5/6.png"}, //Вечный алмаз (E-16)
 ]
 
 function isRelic(item) {
@@ -129,4 +130,13 @@ function abilCopyBonus(counter) {
     return s && s.abil && s.abil.desc === ABIL_COUNTER[counter] ? sapphireMult() : 0
 }
 
-export {isRelic,relicCount,hasRelic,relicGenerate,relicPoolLeft,sapphireSource,sapphireDamage,sapphireStat,sapphireDop,sapphireArmor,sapphireBelt,abilCopyBonus}
+//------ «Вечный алмаз» (relic 6, E-16): +10% ко всем 5 основным статам героя ------
+//Прибавка считается ОТ ТЕКУЩЕГО значения стата (база: очки героя + «Сапфир» +
+//доп-статы предметов) с округлением ВВЕРХ; встроена в формулы value1 в countDopStats —
+//read-time, снятие реликвии откатывает статы. Второго алмаза не бывает (уникальность
+//V68), множитель надетых не нужен.
+function diamondStatBonus(base) {
+    return hasRelic(6) ? Math.ceil(base * 0.1) : 0
+}
+
+export {isRelic,relicCount,hasRelic,relicGenerate,relicPoolLeft,sapphireSource,sapphireDamage,sapphireStat,sapphireDop,sapphireArmor,sapphireBelt,abilCopyBonus,diamondStatBonus}

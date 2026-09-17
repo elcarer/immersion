@@ -192,23 +192,52 @@ const blob = await ev(`(async function(){
   st.voidBossId = 25
   V.spawnVoidBoss(window.__ST.dataGeneric.scenes[st.levelFloor])
   const boss = window.__ST.objectValues.find(o => o.type === "enemy" && o.class.id === 25)
-  // выключаем звезду босса — измеряем ТОЛЬКО урон Сгустка
+  // выключаем звезду босса — измеряем ТОЛЬКО урон Сгустка. Кулдаун Сгустков тоже
+  // сжимаем (class.stats.voidBlob — blobCd при спавне И при каждом залпе перечитывает
+  // его): в холодном headless-прогоне тик ~12/с и «родные» 250 тиков = 20+ секунд.
+  // Урон Сгустка (BLOB_DMG) от voidBlob не зависит.
   boss.stats.attacksCd[0] = 1e9
+  boss.class.stats.voidBlob = 1
   st.info.hp = 999
   const m = await import("./scripts/svg.js")
-  const bx = boss.cells[0][0] * 32 + 16, by = boss.cells[0][1] * 32 + 16
-  m.moveSprite(st.hero.obj.img, bx - st.hero.x, by - st.hero.y)
-  st.hero.x = bx; st.hero.y = by
+  //Тест спавнит босса формулой spawnVoidBoss в комнате 0 ЭТАЖА 1 (7×7), где клетка
+  //[rf[5], rf[1]+8] лежит ЗА полом (формула рассчитана на комнаты 4 этажа 24×24):
+  //центр спрайта босса оказывается за нижней границей «пределов комнаты» Сгустков —
+  //они умирают первым тиком, а герой за полом непрерывно получает урон пустоты.
+  //Решение: сдвигаем СПРАЙТ босса в центр пола, героя — в центр спрайта босса.
+  const rf = window.__ST.dataGeneric.scenes[st.levelFloor].floor[boss.room[0]]
+  const tx = (rf[0] + Math.trunc(rf[2] / 2)) * 32 + 16
+  const ty = (rf[1] + Math.trunc(rf[3] / 2)) * 32 + 16
+  const bp = m.rectPos(boss.rect)
+  const bcx = bp[0] + boss.rect._w / 2, bcy = bp[1] + boss.rect._h / 2
+  m.moveSprite(boss.img, tx - bcx, ty - bcy)
+  m.moveSprite(st.hero.obj.img, tx - st.hero.x, ty - st.hero.y)
+  st.hero.x = tx; st.hero.y = ty
   const z = await import("./scripts/zoomFx.js")
-  z.setWorldViewBox(bx - 960, by - 540)
+  z.setWorldViewBox(tx - 960, ty - 540)
   return JSON.stringify({ hp: st.info.hp })
 })()`, true).then(s => JSON.parse(s))
 console.log("циклоп у центра, ждём Сгусток...", JSON.stringify(blob))
 let loss = 0
-for (let i = 0; i < 90; i++) {
+//Сгусток = ОДИН переход на 16..28; мелкие переходы (посторонние касания) копим отдельно
+let prevHp = 999
+const small = []
+for (let i = 0; i < 400; i++) {
   const hp = await ev(`window.__ST.status.info.hp`)
-  if (hp < 999) { loss = 999 - hp; break }
-  await S(100)
+  if (hp < prevHp) {
+    const d = prevHp - hp
+    if (d >= 10) { loss = d; break }
+    small.push(d)
+  }
+  prevHp = Math.min(prevHp, hp)
+  if (i % 100 === 99) {
+    const dbg = await ev(`JSON.stringify((function(){
+      const d = window.__VB.sporeDebug()
+      return { bossRefType: d.bossRefType, blobCd: d.blobCd, blobs: d.blobs }
+    })())`)
+    console.log("  diag @" + Math.round(i / 40) + "s:", dbg, "мелкие:", small.join(","))
+  }
+  await S(60)
 }
 console.log(`blob: потеря ${loss} (ждём 16..28)`)
 const blobOk = loss >= 16 && loss <= 28
