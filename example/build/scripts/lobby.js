@@ -583,4 +583,4 @@ function viewEnemy() {
 function changeChestPage(i) {
     lobby(status.settings.lose,status.settings.next,i)
 }
-export {lobby}
+export {lobby,heroTipDel}

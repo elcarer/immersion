@@ -16,6 +16,8 @@ import { resetHowlZones } from "../scripts/howlFx.js"
 //V51: шлейфы «вампиризма» не переживают смену сцены
 import { resetVampFx } from "../scripts/vampFx.js"
 import { resetEnemyHover } from "../scripts/enemyHover.js"
+//E-17: карточка героя в лобби (heroTip) не переживает смену сцены
+import { heroTipDel } from "../scripts/lobby.js"
 //V64: связка портал/рычаг/арены не переживает смену сцены
 import { resetPortalFx } from "../scripts/portalFx.js"
 //V65: Циклоп Пустоты и его Сгустки не переживают смену сцены
@@ -86,6 +88,7 @@ function del() {
     resetHowlZones()
     resetVampFx()
     resetEnemyHover() //V47: окно врага не переживает смену сцены
+    heroTipDel() //E-17: карточка героя в лобби гаснет при старте забега/смене сцены
     resetPortalFx() //V64: связка портал/рычаг/арены — только на текущем этаже
     resetVoidBoss() //V65: босс 4 этажа и его Сгустки — только на текущем этаже
     resetGroundShadows() //V80: реестры наземных теней — узлы уже снесены очисткой слоёв

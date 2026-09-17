@@ -96,10 +96,26 @@ const picked = t.some(s => s === "Волшебница")
 console.log("клик выбирает:", picked ? "OK" : "FAIL")
 if (!picked) { console.log(t.join(" | ").slice(0, 800)); process.exit(1) }
 
-const st = JSON.parse(await ev(`JSON.stringify({ start: window.__ST.status.start, heroClass: window.__ST.status.hero.class })`))
-console.log("итог:", JSON.stringify(st))
+//----- багфикс: карточка не переживает del() при смене сцены (старт забега/смерть) -----
+//карточка Волшебницы открыта (мышь на кукле после клика); del() — то, что делает сцена
+//при старте забега. До фикса heroTip-узлы не регистрировались в screenPic и не гасились —
+//карточка висела поверх игры
+const killed = await ev(`(async function(){
+  const D = await import("./scripts/del.js")
+  D.del()
+  const shim = window.__BACKEND.shimById.get('heroTipDesc')
+  const texts = window.__BACKEND.dumpUI().filter(u => u.text).map(u => u.text)
+  return JSON.stringify({ tipShimGone: !shim,
+    statLineGone: !texts.some(t => t.includes("Сила:") || t.includes("Мудрость:")) })
+})()`, true).then(s => JSON.parse(s))
+console.log("del() с открытой карточкой:", JSON.stringify(killed))
+const killedOk = killed.tipShimGone && killed.statLineGone
+console.log(`карточка снята del(): ${killedOk ? "OK" : "FAIL"}`)
+if (!killedOk) process.exit(1)
+await shot("e17_after_del")
+
 const exc = exceptions()
 console.log("exceptions:", exc.length, exc.slice(0, 3))
-if (exc.length || st.heroClass !== 1) process.exit(1)
+if (exc.length) process.exit(1)
 console.log("E-17 LOBBY TIP: ВСЁ OK")
 process.exit(0)

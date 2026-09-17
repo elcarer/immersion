@@ -1,0 +1,30 @@
+cd /d F:\elven_wood\build
+npm install electron electron-packager --save-dev
+npm run build-exe
+
+npm install electron-builder --save-dev
+package.json:
+{
+  "name": "my-web-app",
+  "version": "1.0.0",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder"
+  },
+  "build": {
+    "appId": "com.example.mywebapp",
+    "win": {
+      "target": "nsis" 
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    }
+  },
+  "devDependencies": {
+    "electron": "^30.0.0",
+    "electron-builder": "^24.0.0"
+  }
+}
+npm run dist

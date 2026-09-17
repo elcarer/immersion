@@ -1188,3 +1188,16 @@ place.node.addChild БЕЗ appendChild шима — в шим-дереве сл�
 «Волшебница»; клик по кукле выбирает героя (имя внизу, status.hero.class=1).
 Скриншоты e17_lobby_rogue.png / e17_lobby_mage.png — вёрстка и портреты на месте.
 verify_e16.mjs — регрессия флоу новой игры через лобби, зелёный, 0 исключений.
+
+ДОПОЛНЕНИЕ E-17 (багфикс): «описание героев не исчезает после начала игры» — карточка
+heroTip рисовалась на svgArr[2] в локальном массиве heroTipNodes, но НЕ регистрировалась
+в screenPic: del() (смена сцены/старт забега) её не подбирал, а funcShowOut при уходе
+мыши на кнопку срабатывал не всегда (удаление цели без pointerout). Фикс: heroTipDel()
+вызывается в del() рядом с tipDel()/resetEnemyHover() (экспорт heroTipDel из lobby.js —
+цикл lobby↔del в стиле проекта: del.js уже импортирует enemyHover.js, который импортирует
+del.js). remove() бэкенда полностью снимает pixi-узлы и чистит shimById — карточка гаснет
+целиком (включая нативный desc). verify_e17.mjs дополнен юнит-сценарием: карточка открыта
+→ прямой del() → heroTipDesc отсутствует в реестре, статов нет в dumpUI. ГРАБЛИ: dumpUI не
+обходит нативные тексты (проверка по shimById); ES-импорт требует именованный export —
+function declaration без export в lobby.js ронял загрузку всех модулей (SyntaxError «does
+not provide an export named», __ST undefined).
