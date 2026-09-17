@@ -149,7 +149,7 @@ function trapHeroTick(traps) {
 }
 
 //обычные враги (не боссы): те же правила, что у героя — шипы только в активной фазе,
-//огонь в обеих, кислота бьёт только облаком
+//огонь в обеих, кислотную активируют наступанием (выпуск облака), урон — только облаком
 function trapEnemyTick(traps) {
     let lengthEnemy = objectValues.length
     for (let i = 0; i < lengthEnemy; i++) {
@@ -161,7 +161,16 @@ function trapEnemyTick(traps) {
         let ex = ePos[0]
         let ey = ePos[1]
         let obj = trapUnder(ex+13,ey+37,14,14,traps)
-        if(!obj || obj[10] === 4 || (obj[10] === 3 && obj[13] !== 1)) {
+        if(!obj || (obj[10] === 3 && obj[13] !== 1)) {
+            enemy.trapTime = 0
+            continue
+        }
+        if(obj[10] === 4) {
+            //репорт: враг активирует ядовитую (кислотную) ловушку так же, как герой —
+            //выпускает облако (одно на ловушку); урон приносит само облако (cloudDamage
+            //бьёт всех в зоне 3×3, включая этого врага). Прежде кислота скипалась
+            //целиком — для врагов ловушка не работала никогда
+            !obj[14] && releaseCloud(obj)
             enemy.trapTime = 0
             continue
         }

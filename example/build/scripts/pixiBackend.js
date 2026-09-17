@@ -151,13 +151,22 @@ function rebuildFrames(src, times, frames, w, h) {
     let base, fw, fh
     if (map) {
         base = texCache.get(map.sheet) || getTexture(map.sheet)
-        fw = Math.max(1, Math.floor((num(w) || frames._w || map.fw * n) / n))
-        fh = Math.max(1, num(h) || frames._h || map.fh)
+        // окно кадра — ТОЛЬКО листовая геометрия манифеста (fw/fh клетки со смещением
+        // dx/dy). Раньше fw пёкся из display-ширины вызова (w), а кэш src|times общий:
+        // иконки библиотеки (fit=1.65, w=211) замораживали окно 52px в 64-клетке —
+        // вылезало в соседнюю клетку (16+52>64) и «мельчало» (кадр 32 = часть окна);
+        // в игре наоборот: полоса атаки, не кэшированная до открытия библиотеки,
+        // рисовалась 52px-окном в node.width=32 — спрайт «уменьшался и резался».
+        // Display-масштаб живёт ТОЛЬКО в node.width/height (_frameW), не в текстуре.
+        fw = Math.max(1, map.fw || Math.floor((num(w) || frames._w || (map.cell - map.dx)) / n))
+        fh = Math.max(1, map.fh || num(h) || frames._h || base.height)
     } else {
         base = texCache.get(src) || getTexture(src)
         fw = Math.max(1, Math.floor(base.width / n))
         fh = base.height
     }
+    frames._w = fw
+    frames._h = fh
     frames.length = 0
     for (let i = 0; i < n; i++) {
         frames.push(new PIXI.Texture({
@@ -676,7 +685,7 @@ function defaultNum(shim, name) {
 function makeStyleProxy(shim) {
     const store = shim._style
     return {
-        set filter(v) { store.filter = v; applyDropShadow(shim, v) },
+        set filter(v) { store.filter = v; applyFilterString(shim, v) },
         get filter() { return store.filter || "" },
         set outline(v) { store.outline = v; applyOutline(shim, v) },
         get outline() { return store.outline || "" },
@@ -846,12 +855,26 @@ function applyAttr(shim, name, value) {
     }
 }
 
+// filter-строка: drop-shadow (glow-запекалка) + brightness → tint. Репорт-класс дыры
+// эмуляции: силуэты неубитых врагов в Библиотеке/окне противника задаются через
+// filter: brightness(0) (img.style.filter = ...) и молча не применялись — карточки
+// рисовались цветными. Отсутствие brightness в строке = сброс tint в белый
+function applyFilterString(shim, filterStr) {
+    applyDropShadow(shim, filterStr)
+    const brightMatch = filterStr && /brightness\(([-\d.]+)\)/.exec(filterStr)
+    if (shim.node && shim.node.tint !== undefined) {
+        const b = brightMatch ? Math.min(1, Math.max(0, parseFloat(brightMatch[1]))) : 1
+        const c = Math.round(b * 255)
+        shim.node.tint = (c << 16) | (c << 8) | c
+    }
+}
+
 function applyStyleString(shim, str) {
     // сохраняем paint-order/user-select (не влияют на Pixi), извлекаем filter/display
     shim._styleRaw = str
     if (!str) return
     const filterMatch = /filter:\s*([^;]+)/.exec(str)
-    applyDropShadow(shim, filterMatch ? filterMatch[1] : "")
+    applyFilterString(shim, filterMatch ? filterMatch[1] : "")
     const dispMatch = /display:\s*([^;]+)/.exec(str)
     if (dispMatch && shim.node) shim.node.visible = dispMatch[1].trim() !== "none"
 }
