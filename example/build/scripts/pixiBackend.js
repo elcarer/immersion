@@ -196,19 +196,20 @@ async function preloadGameTextures(fromFile, basePath) {
     }
 }
 
-// ---------- scaleMode (аналог image-rendering: pixelated) ----------
+// ---------- scaleMode текстур ----------
+// R2.5 (паритет SVG): ВСЕГДА linear. Прежний переключатель «nearest при целом
+// масштабе» в связке с roundPixels квантил дробные шаги движения в неровные целые
+// («подпрыгивание» спрайтов каждый кадр — репорт юзера 2026-09-17). Старый SVG
+// рисовал дробные позиции с антиалиасингом — воспроизводим именно это: дробные
+// шаги скользят плавно. Вызов оставлен (много точек), тело — идемпотентный фикс линейного режима.
 function applyPixelated() {
-    const scale = (windowSize.wt / 1920) * (1920 / cameraVB.width)
-    const r = scale >= 1 ? scale : 1 / scale
-    const pixelated = Math.abs(r - Math.round(r)) < 0.02
-    if (pixelated === pixelatedNow) return
-    pixelatedNow = pixelated
-    const mode = pixelated ? "nearest" : "linear"
+    if (pixelatedNow === "linear") return
+    pixelatedNow = "linear"
     for (const t of texCache.values()) {
-        if (t && t.source) t.source.style.scaleMode = mode
+        if (t && t.source) t.source.style.scaleMode = "linear"
     }
     for (const frames of frameCache.values()) {
-        for (const t of frames) if (t && t.source) t.source.style.scaleMode = mode
+        for (const t of frames) if (t && t.source) t.source.style.scaleMode = "linear"
     }
 }
 
@@ -1406,10 +1407,10 @@ function createImage(place, x, y, w, h, src, obj = {}) {
     if (sprite.texture === PIXI.Texture.EMPTY) registerPending(String(src), shim)
     sprite.position.set(num(x), num(y))
     sprite.width = wN; sprite.height = hN
-    // R1: привязка к целым экранным пикселям у мировых слоёв — при дробном масштабе
-    // камеры (окно не кратно viewBox, зум) спрайты не «ползут» субпиксельно при
-    // скролле (рябь краёв). UI-слой (2) не трогаем — там точность макета важнее.
-    if (place._layer !== layers[2]) sprite.roundPixels = true
+    // R2.5 (паритет SVG): БЕЗ roundPixels — мир рендерится в субпиксельных позициях
+    // с линейной фильтрацией (см. applyPixelated): дробные шаги движения скользят
+    // плавно, как это делал браузерный SVG-рендер. roundPixels давал «подпрыгивание»:
+    // дробный шаг (мирШаг × дробный масштаб камеры) квантился в неровные целые.
     shim.attrs.href = String(src)
     // контракт svg.js: id статичных картинок хранится С суффиксом «I» (getElementById
     // в game-коде ищет именно «…I»: expBarI/hpBarI — полосы ХП/опыта и т.д.)
@@ -1466,8 +1467,7 @@ function createAnimImage(place, x, y, w, h, src, obj = {}) {
     sprite.width = wN / n
     sprite.height = hN
     sprite.eventMode = "none"
-    // R1: мировые спрайты — целые экранные пиксели (см. createImage)
-    if (place._layer !== layers[2]) sprite.roundPixels = true
+    // R2.5: субпиксельный рендер мира — см. комментарий в createImage
     applyPixelated()
     place.appendChild(shim)
     registerFrameUser(String(src), times, shim)
