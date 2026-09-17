@@ -11,7 +11,7 @@
 //Открытие — автоскролл к низу (свежие события). Игра на паузе (как инвентарь/карта).
 import { status } from "../scripts/start.js"
 import { T } from "../scripts/localization.js"
-import { svgArr, image, text, rect, releaseSprite, getCTM } from "../scripts/svg.js"
+import { svgArr, image, text, rect, releaseSprite, getCTM, nativeGroup } from "../scripts/svg.js"
 import { playback, strike, musicDuck } from "../scripts/sound.js"
 
 //геометрия — как у Библиотеки (та же панель lib.png, view 1920×1080)
@@ -26,7 +26,6 @@ const ROW_MAX_W = VIEW_W - 70     //лимит ширины строки (не �
 const COL = "rgb(204, 153, 102)"  //фирменный цвет панелей
 const COL_DIM = "rgb(110, 90, 70)" //приглушённый цвет плейсхолдера
 const LOG_MAX = 200               //журнал помнит последние 200 событий
-const NS = "http://www.w3.org/2000/svg"
 
 //цвета строк — палитра игры (floatText/панели); экспорт для хуков
 export const J_GREEN = "#33FF66"  //урон игрока врагу
@@ -114,22 +113,11 @@ function journal() {
     journalTemp.push(image(svgArr[2], PANEL_X, PANEL_Y, PANEL_W, PANEL_H, "./images/UI/panels/lib.png"))
     journalTemp.push(text(svgArr[2], 1920 / 2, 198, "0pt", "50pt", "black", "2px", COL, T("journal.title"), {"id": "delItemText", "size": 60, "font": "baseFont4", "anchor": "middle"}))
     //слой строк с клипом по зоне просмотра — строки, выезжающие при скролле за верхнюю/
-    //нижнюю границу зоны, срезаются клипом (сами узлы продолжают ездить внутри слоя)
-    let defs = document.createElementNS(NS, "defs")
-    let clip = document.createElementNS(NS, "clipPath")
-    clip.setAttribute("id", "journalClip")
-    let clipRect = document.createElementNS(NS, "rect")
-    clipRect.setAttribute("x", VIEW_X)
-    clipRect.setAttribute("y", VIEW_Y)
-    clipRect.setAttribute("width", VIEW_W)
-    clipRect.setAttribute("height", VIEW_H)
-    clip.appendChild(clipRect)
-    defs.appendChild(clip)
-    jGroup = document.createElementNS(NS, "g")
-    jGroup.setAttribute("clip-path", "url(#journalClip)")
-    svgArr[2].appendChild(defs)
-    svgArr[2].appendChild(jGroup)
-    journalTemp.push(defs)
+    //нижнюю границу зоны, срезаются клипом (сами узлы продолжают ездить внутри слоя).
+    //R4.4: нативная группа (контейнер + Graphics-маска) вместо createElementNS-клипа
+    jGroup = nativeGroup(svgArr[2])
+    jGroup.setClip(VIEW_X, VIEW_Y, VIEW_W, VIEW_H)
+    svgArr[2].append(jGroup)
     journalTemp.push(jGroup)
     let log = (status.info && status.info.log) || []
     if (log.length === 0) {

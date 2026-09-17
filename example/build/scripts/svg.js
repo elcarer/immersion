@@ -81,6 +81,24 @@ function worldBar(place,x,y,w,h,src,obj={}) {
 function nativeText(place,x,y,w,h,stroke,strokeWidth,fill,textContent,obj={}) {
     return backend.createNativeText(place,x,y,w,h,stroke,strokeWidth,fill,textContent,obj)
 }
+// R4.4: нативные примитивы панелей — замены shim-эмуляций, которые сносит R5:
+// nativeGroup — слой прокрутки journal/library (контейнер + setClip-маска) вместо
+// createElementNS("g") с clip-path; nativeHtml — текстовый блок от левого верхнего
+// угла с переносом по словам вместо textHtml/foreignObject; nativeSector — сектор
+// кулдауна (setSector(angle,clockwise)) вместо path()+clipPath; nativePoly — полигон
+// с federated-событиями на node вместо createElementNS("polygon")
+function nativeGroup(place,obj={}) {
+    return backend.createNativeGroup(place,obj)
+}
+function nativeHtml(place,x,y,w,h,stroke,strokeWidth,fill,textContent,obj={}) {
+    return backend.createNativeHtml(place,x,y,w,h,stroke,strokeWidth,fill,textContent,obj)
+}
+function nativeSector(place,cx,cy,r,clipW,obj={}) {
+    return backend.createNativeSector(place,cx,cy,r,clipW,obj)
+}
+function nativePoly(place,points,fill,stroke,strokeWidth,obj={}) {
+    return backend.createNativePoly(place,points,fill,stroke,strokeWidth,obj)
+}
 function path(place,obj,fill='rgba(0, 0, 0, 0.65)') {
     return backend.createPath(place,obj,fill)
 }
@@ -97,4 +115,4 @@ function gamepadDragMove (x,y) { backend.dragState().move(x,y) }
 function gamepadDragEnd () { backend.dragState().end() }
 function isDragging () { return backend.dragState().isDragging() }
 
-export {svg,svgArr,circle,rect,text,image,textHtml,path,worldImage,worldBar,nativeText,picById,nativeGraphics,gamepadDragStart,gamepadDragMove,gamepadDragEnd,isDragging,spritePos,moveSprite,releaseSprite,rectPos,getCTM}
+export {svg,svgArr,circle,rect,text,image,textHtml,path,worldImage,worldBar,nativeText,nativeGroup,nativeHtml,nativeSector,nativePoly,picById,nativeGraphics,gamepadDragStart,gamepadDragMove,gamepadDragEnd,isDragging,spritePos,moveSprite,releaseSprite,rectPos,getCTM}

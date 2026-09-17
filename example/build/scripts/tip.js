@@ -1,4 +1,4 @@
-import { svgArr,image,rect,text,textHtml } from "../scripts/svg.js"
+import { svgArr,image,rect,text,nativeHtml } from "../scripts/svg.js"
 import * as basicData from "../scripts/data.js"
 import { status } from "../scripts/start.js"
 //V53: окошко сета «Великий вор» — рисуется под основным тултипом идентифицированной легендарки
@@ -366,23 +366,23 @@ function tipDel () {
 function helpWord(color,dop,x,y,arr1=statArrDop,arr2=statArrDopDesc) {
     tempTip.push(rect(svgArr[2],x+420,y,300,250,color,"4px","black",{"id":"tip","rx":"6px"}))
     tempTip.push(text(svgArr[2],x+570,y+45,"0pt","50pt","none","2px","#CC9900",T(arr1[dop]),{"id":"wordName","size":38,"font":"baseFont4","anchor":"middle"}))
-    tempTip.push(textHtml(svgArr[2],x+440,y+60,260,280,"none","2px","#CCCCCC",T(arr2[dop]),{"id":"wordNameText","size":32,"font":"baseFont4","anchor":"middle"}))
+    tempTip.push(nativeHtml(svgArr[2],x+440,y+60,260,280,"none","2px","#CCCCCC",T(arr2[dop]),{"id":"wordNameText","size":32,"font":"baseFont4","anchor":"middle"}))
 }
 function helpWord2(color,abil,x,y) {
     tempTip.push(rect(svgArr[2],x+420,y,300,250,color,"4px","black",{"id":"tip","rx":"6px"}))
     tempTip.push(text(svgArr[2],x+570,y+45,"0pt","50pt","none","2px","#CC9900",T(abil.desc),{"id":"wordName","size":38,"font":"baseFont4","anchor":"middle"}))
-    tempTip.push(textHtml(svgArr[2],x+440,y+60,260,280,"none","2px","#CCCCCC",T(abil.desc2),{"id":"wordNameText","size":32,"font":"baseFont4","anchor":"middle"}))
+    tempTip.push(nativeHtml(svgArr[2],x+440,y+60,260,280,"none","2px","#CCCCCC",T(abil.desc2),{"id":"wordNameText","size":32,"font":"baseFont4","anchor":"middle"}))
 }
 //V58: подписи статов 5/6 (ячейки/броня) — ключи локализации
 let superStatArr = ["supstat.0","supstat.1"]
 function helpWord3(color,stat,x,y) {
     tempTip.push(rect(svgArr[2],x-300,y-250,300,250,color,"4px","black",{"id":"tip","rx":"6px"}))
     tempTip.push(text(svgArr[2],x-150,y-205,"0pt","50pt","none","2px","#CC9900",T(statArr[stat]),{"id":"wordName","size":38,"font":"baseFont4","anchor":"middle"}))
-    tempTip.push(textHtml(svgArr[2],x-280,y-190,260,280,"none","2px","#CCCCCC",T(superStatArr[stat-5]),{"id":"wordNameText","size":32,"font":"baseFont4","anchor":"middle"}))
+    tempTip.push(nativeHtml(svgArr[2],x-280,y-190,260,280,"none","2px","#CCCCCC",T(superStatArr[stat-5]),{"id":"wordNameText","size":32,"font":"baseFont4","anchor":"middle"}))
 }
 function addToSkill(x,y,descFull,color) {
     //MIGRATION: шрифт 40px не влезал во фрейм тултипа способности (репорт) — уменьшен до 32
-    tempTip.push(textHtml(svgArr[2],x+30,y+340,340,260,"none","2px","#CCCCCC",descFull,{"id":"deckSkillText","size":32,"font":"baseFont4","anchor":"middle"}))
+    tempTip.push(nativeHtml(svgArr[2],x+30,y+340,340,260,"none","2px","#CCCCCC",descFull,{"id":"deckSkillText","size":32,"font":"baseFont4","anchor":"middle"}))
 }
 //V94: rarityColor отдаётся наружу — обводка редкости на ячейках (лобби/инвентарь/кукла/
 //алхимия/экран предметов) обязана совпадать по цвету с рамкой тултипа, один источник

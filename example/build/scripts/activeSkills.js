@@ -1,5 +1,5 @@
 import { status } from "../scripts/start.js"
-import { svgArr,image,worldImage,path, spritePos } from "../scripts/svg.js"
+import { svgArr,image,worldImage,nativeSector, spritePos } from "../scripts/svg.js"
 import { delPins } from "../scripts/checkBuffs.js"
 import { checkCollision,playEffect,createSplash } from "../scripts/damage.js"
 import { data } from "../scripts/data.js"
@@ -34,8 +34,9 @@ function activeSkills() {
         //ряд продолжается ВТОРОЙ СТРОКОЙ над первой (прежде i=5 рисовал x=1920 — за экраном)
         let xIcon = 1370 + (i >= 5 ? i - 5 : i) * 110
         activeSkillsTemp.push(image(svgArr[2],xIcon,970 - yUp,96,96,status.info.activeSkills[i].skill.img,{}))
-        let sector = path(svgArr[2],{"id":i,"clipPath":[96,96],
-        "x":xIcon+48,"y":970+48 - yUp,"r":64,"d":getSectorPath(360,xIcon+48,970+48 - yUp,64)})
+        //R4.4: нативный сектор (Graphics + маска-окно 96×96) вместо path()+clipPath;
+        //геометрия d-string — та же (getSectorPath переехал в pixiBackend)
+        let sector = nativeSector(svgArr[2], xIcon + 48, 970 + 48 - yUp, 64, 96, {"id": i})
         sector._sx = xIcon + 48
         sector._sy = 970 + 48 - yUp
         sector._sr = 64
@@ -51,7 +52,7 @@ function activeSkills() {
         } else if(skillEntry.duration > 0) {
             updateCooldown(skillEntry.duration,0,sector,skillEntry.skill.duration,true)
         } else {
-            sector.setAttribute("d", "")
+            sector.setSector(0)
         }
         activeSkillsTemp.push(sector)
     }
@@ -98,26 +99,6 @@ function activeSkillsCD() {
         }
     }
 }
-function getSectorPath(angleDeg,cx,cy,r,clockwise = false) {
-    // Если угол >= 360 – полный круг
-    if (angleDeg >= 360) {
-        return `M ${cx} ${cy} m -${r},0 a ${r},${r} 0 1,0 ${r*2},0 a ${r},${r} 0 1,0 -${r*2},0 Z`;
-    }
-    // Если угол <= 0 – вообще нет сектора (пустой путь)
-    if (angleDeg <= 0) {
-        return ''; // ничего не рисуем, затемнение полностью открыто
-    }
-    // Угол в радианах (0 – верх, по часовой)
-    const rad = (angleDeg - 90) * Math.PI / 180;
-    const x = cx + r * Math.cos(rad);
-    const y = cy + r * Math.sin(rad);
-    // Флаг большой дуги (1 если угол > 180 градусов)
-    let largeArc = angleDeg > 180 ? 0 : 1;
-    clockwise ? largeArc = (largeArc == 0 ? 1 : 0) : false;
-    // sweep-флаг: 1 = по часовой, 0 = против часовой.
-    const sweep = clockwise ? 1 : 0;
-    return `M ${cx} ${cy} L ${cx} ${cy - r} A ${r} ${r} 0 ${largeArc} ${sweep} ${x} ${y} Z`;
-}
 function updateCooldown(now,startTime,sectorPath,cooldownDuration,clockwise) {
     //сцена могла быть удалена (endScreen/comix → del()) — сектора кулдауна больше нет в DOM
     if (!sectorPath) return
@@ -133,10 +114,10 @@ function updateCooldown(now,startTime,sectorPath,cooldownDuration,clockwise) {
         sectorPath._sy = parseInt(sectorPath.getAttribute('y'))
         sectorPath._sr = parseInt(sectorPath.getAttribute('r'))
     }
-    sectorPath.setAttribute('d', getSectorPath(angle,sectorPath._sx,sectorPath._sy,sectorPath._sr,clockwise))
+    sectorPath.setSector(angle, clockwise)
     if (elapsed === 0) {
         // Кулдаун окончен – убираем оверлей совсем (или скрываем)
-        sectorPath.setAttribute('d', '');  // полностью открыто
+        sectorPath.setSector(0)  // полностью открыто
     }
 }
 function useSkill(skill) {

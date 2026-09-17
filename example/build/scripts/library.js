@@ -28,7 +28,7 @@
 import { status } from "../scripts/start.js"
 import { T } from "../scripts/localization.js"
 import { data } from "../scripts/data.js"
-import { svgArr, image, text, rect, textHtml, releaseSprite, spritePos, getCTM } from "../scripts/svg.js"
+import { svgArr, image, text, rect, nativeHtml, releaseSprite, spritePos, getCTM, nativeGroup } from "../scripts/svg.js"
 import { playback, strike, musicDuck } from "../scripts/sound.js"
 //V52: реестр достижений (карточки третьего режима)
 import { ACH_LIST } from "../scripts/achievements.js"
@@ -70,7 +70,6 @@ const ABIL_SIZE = 24, ABIL_Y = 246, ABIL_H = 78
 const MODE_X = 1740, MODE_Y = VIEW_Y + 24
 const OBJ_MAX_H = 110
 const OBJ_DESC_Y = 186, OBJ_DESC_H = 130
-const NS = "http://www.w3.org/2000/svg"
 
 let libraryTemp = [] //ВСЕ созданные узлы панели (для удаления и проверки closePanels)
 let libNodes = []    //узлы, ездящие со скроллом: {el, x, y, pooled}
@@ -146,14 +145,11 @@ function createCard(en, col, row, place) {
             regNode(fitText(text(place, cardX + STAT_LX, ly, "0pt", "50pt", "black", "2px", COL, rows[i][0], {"size": STAT_SIZE, "font": "baseFont4"}), STAT_LW), cardX + STAT_LX, ly, false)
             regNode(fitText(text(place, cardX + STAT_RX, ly, "0pt", "50pt", "black", "2px", COL, rows[i][1], {"size": STAT_SIZE, "font": "baseFont4"}), STAT_RW), cardX + STAT_RX, ly, false)
         }
-        //способность ниже колонок во всю ширину карточки: textHtml (foreignObject, как в tip.js,
-        //где перенос pre-wrap работает). Причина бага «одной строкой»: div внутри foreignObject
-        //получал ширину из вьюпорта foreignObject, а внутри клип-группы Chrome оставлял блок
-        //шириной по содержимому — задаём ширину div ЯВНО, pre-wrap переносит по словам
+        //способность ниже колонок во всю ширину карточки: нативный html-блок (R4.4,
+        //перенос по словам на ширине блока — как foreignObject в оригинале)
         let desc = abilityDesc(s)
         if (desc) {
-            let fo = textHtml(place, cardX + STAT_LX, cardY + ABIL_Y, CARD_W - STAT_LX * 2, ABIL_H, "black", "2px", COL, desc, {"size": ABIL_SIZE, "font": "baseFont4"})
-            fo.firstChild.style.width = (CARD_W - STAT_LX * 2) + "px"
+            let fo = nativeHtml(place, cardX + STAT_LX, cardY + ABIL_Y, CARD_W - STAT_LX * 2, ABIL_H, "black", "2px", COL, desc, {"size": ABIL_SIZE, "font": "baseFont4"})
             regNode(fo, cardX + STAT_LX, cardY + ABIL_Y, false)
         }
     }
@@ -180,9 +176,8 @@ function createObjectCard(ob, col, row, place) {
     !unlocked && (img.style.filter = "brightness(0)") //чёрный силуэт для неиспользованного
     regNode(img, sx, sy, false)
     if (unlocked) {
-        //эффект: foreignObject с ЯВНОЙ шириной div (перенос по словам — приём из карточки врага)
-        let fo = textHtml(place, cardX + STAT_LX, cardY + OBJ_DESC_Y, CARD_W - STAT_LX * 2, OBJ_DESC_H, "black", "2px", COL, T("lib.effect",T(ob.desc)), {"size": ABIL_SIZE, "font": "baseFont4"})
-        fo.firstChild.style.width = (CARD_W - STAT_LX * 2) + "px"
+        //эффект: нативный html-блок с переносом по словам (R4.4)
+        let fo = nativeHtml(place, cardX + STAT_LX, cardY + OBJ_DESC_Y, CARD_W - STAT_LX * 2, OBJ_DESC_H, "black", "2px", COL, T("lib.effect",T(ob.desc)), {"size": ABIL_SIZE, "font": "baseFont4"})
         regNode(fo, cardX + STAT_LX, cardY + OBJ_DESC_Y, false)
     }
     libCards.push({"from": from, "to": libNodes.length - 1, "y0": cardY, "y1": cardY + CARD_H})
@@ -207,9 +202,8 @@ function createAchCard(ach, col, row, place) {
     !unlocked && (img.style.filter = "brightness(0)") //чёрный силуэт для неоткрытого
     regNode(img, sx, sy, false)
     if (unlocked) {
-        //текст: foreignObject с ЯВНОЙ шириной div (перенос по словам — приём карточки врага)
-        let fo = textHtml(place, cardX + STAT_LX, cardY + OBJ_DESC_Y, CARD_W - STAT_LX * 2, OBJ_DESC_H, "black", "2px", COL, T(ach.desc), {"size": ABIL_SIZE, "font": "baseFont4"})
-        fo.firstChild.style.width = (CARD_W - STAT_LX * 2) + "px"
+        //текст: нативный html-блок с переносом по словам (R4.4)
+        let fo = nativeHtml(place, cardX + STAT_LX, cardY + OBJ_DESC_Y, CARD_W - STAT_LX * 2, OBJ_DESC_H, "black", "2px", COL, T(ach.desc), {"size": ABIL_SIZE, "font": "baseFont4"})
         regNode(fo, cardX + STAT_LX, cardY + OBJ_DESC_Y, false)
     }
     libCards.push({"from": from, "to": libNodes.length - 1, "y0": cardY, "y1": cardY + CARD_H})
@@ -333,22 +327,11 @@ function library() {
     libraryTemp.push(image(svgArr[2], PANEL_X, PANEL_Y, PANEL_W, PANEL_H, "./images/UI/panels/lib.png"))
     libraryTemp.push(text(svgArr[2], 1920 / 2, 198, "0pt", "50pt", "black", "2px", COL, T("lib.title"), {"id": "delItemText", "size": 60, "font": "baseFont4", "anchor": "middle"}))
     //V36: слой карточек с клипом по зоне просмотра — карточки, выезжающие при скролле за
-    //верхнюю/нижнюю границу сетки, срезаются клипом (сами узлы продолжают ездить внутри слоя)
-    let defs = document.createElementNS(NS, "defs")
-    let clip = document.createElementNS(NS, "clipPath")
-    clip.setAttribute("id", "libClip")
-    let clipRect = document.createElementNS(NS, "rect")
-    clipRect.setAttribute("x", VIEW_X)
-    clipRect.setAttribute("y", VIEW_Y)
-    clipRect.setAttribute("width", VIEW_W)
-    clipRect.setAttribute("height", VIEW_H)
-    clip.appendChild(clipRect)
-    defs.appendChild(clip)
-    libGroup = document.createElementNS(NS, "g")
-    libGroup.setAttribute("clip-path", "url(#libClip)")
-    svgArr[2].appendChild(defs)
-    svgArr[2].appendChild(libGroup)
-    libraryTemp.push(defs)
+    //верхнюю/нижнюю границу сетки, срезаются клипом (сами узлы продолжают ездить внутри
+    //слоя). R4.4: нативная группа (контейнер + Graphics-маска) вместо createElementNS-клипа
+    libGroup = nativeGroup(svgArr[2])
+    libGroup.setClip(VIEW_X, VIEW_Y, VIEW_W, VIEW_H)
+    svgArr[2].append(libGroup)
     libraryTemp.push(libGroup)
     //V48: кнопки режимов в свободной полосе справа от трека; каждый открытие стартует «Врагами»
     libMode = "enemy"

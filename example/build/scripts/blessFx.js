@@ -1,6 +1,6 @@
 import { status } from "../scripts/start.js"
 import { T } from "../scripts/localization.js"
-import { svgArr,image,worldImage,picById,text,rect,textHtml } from "../scripts/svg.js"
+import { svgArr,image,worldImage,picById,text,rect,nativeHtml } from "../scripts/svg.js"
 import { screenPic } from "../scripts/del.js"
 //V69: доп. кучка эха не должна застревать в стенах — тот же placeDrop, что у основного дропа
 import { placeDrop } from "../scripts/dropSafe.js"
@@ -90,10 +90,8 @@ function openAncient(obj) {
         ancientTemp.push(image(svgArr[2],x,230,380,560,"./images/UI/panels/panel.png",{"glow":1,"func":e => grantBless(id,ancientObj)}))
         ancientTemp.push(image(svgArr[2],x + 142,290,96,99,"./images/effects/bless.png"))
         ancientTemp.push(text(svgArr[2],x + 190,455,"0pt","50pt","black","2px",COL,T("bless." + id + ".name"),{"id":"ancientN"+i,"size":40,"font":"baseFont4","anchor":"middle"}))
-        //приём карточек Библиотеки: ширина div внутри foreignObject задаётся ЯВНО —
-        //иначе перенос текста идёт по ширине содержимого
-        let fo = textHtml(svgArr[2],x + 30,495,320,260,"black","2px",COL,T("bless." + id + ".desc"),{"id":"ancientD"+i,"size":26,"font":"baseFont4"})
-        fo.firstChild.style.width = "320px"
+        //R4.4: нативный html-блок с переносом по словам на ширине блока
+        let fo = nativeHtml(svgArr[2],x + 30,495,320,260,"black","2px",COL,T("bless." + id + ".desc"),{"id":"ancientD"+i,"size":26,"font":"baseFont4"})
         ancientTemp.push(fo)
     }
     //кнопка выхода: закрыть меню и возобновить игру, объект остаётся используемым
@@ -191,8 +189,7 @@ function showBlessTip(id,ix) {
     x > 1490 && (x = 1490)
     blessTip.push(rect(svgArr[2],x,48,420,170,COL,"2px","black"))
     blessTip.push(text(svgArr[2],x + 210,84,"0pt","50pt","black","2px",COL,T("bless." + id + ".name"),{"size":30,"font":"baseFont4","anchor":"middle"}))
-    let fo = textHtml(svgArr[2],x + 20,100,380,110,"black","2px",COL,T("bless." + id + ".desc"),{"size":22,"font":"baseFont4"})
-    fo.firstChild.style.width = "380px"
+    let fo = nativeHtml(svgArr[2],x + 20,100,380,110,"black","2px",COL,T("bless." + id + ".desc"),{"size":22,"font":"baseFont4"})
     blessTip.push(fo)
 }
 function hideBlessTip() {

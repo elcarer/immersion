@@ -1,4 +1,4 @@
-import { svgArr,rect,circle,image } from "../scripts/svg.js"
+import { svgArr,rect,circle,image,nativePoly } from "../scripts/svg.js"
 import { status } from "../scripts/start.js"
 import { playback,strike } from "../scripts/sound.js"
 import { dataGeneric } from "../scripts/sceneGenerate.js"
@@ -117,28 +117,21 @@ function minimapBtn () {
     minimapBtnDel()
     closeMinimap()
     const bx = 1920 - BTN_LEG
-    const poly = document.createElementNS("http://www.w3.org/2000/svg", "polygon")
-    poly.setAttribute("points", bx + ",0 " + "1920,0 " + "1920," + BTN_LEG)
-    poly.setAttribute("id", "minimapBtn")
-    poly.setAttribute("stroke", "rgb(204,153,102)")
-    poly.setAttribute("stroke-width", BTN_STROKE)
-    poly.setAttribute("fill", "rgba(30,22,17,0.65)")
+    //R4.4: нативный Graphics-полигон с federated-событиями на узле вместо
+    //createElementNS("polygon"); eventMode static в фабрике = бывший pointer-events:all.
+    //Стилевой курсор НЕ переопределяем: курсор в игре один (body url cur.png)
+    const poly = nativePoly(svgArr[2], [[bx, 0], [1920, 0], [1920, BTN_LEG]], "rgba(30,22,17,0.65)", "rgb(204,153,102)", BTN_STROKE, {"id": "minimapBtn"})
     poly.setAttribute("opacity", "0.7")
-    //обёртка UI-слоя создаётся с pointerEvents="none" (svg.js): без явного opt-in
-    //сырой узел невидим для хит-теста — все интерактивные узлы игры ставят это сами
-    poly.setAttribute("pointer-events", "all")
-    //стилевой курсор НЕ переопределяем: курсор в игре один (body url cur.png)
-    poly.addEventListener("mouseenter", () => {
+    poly.node.on("pointerover", () => {
         //V30a: подсветка заметнее — полная непрозрачность + двойное свечение
         poly.setAttribute("opacity", "1")
-        poly.style.filter = "drop-shadow(0 0 8px rgba(255,214,140,0.95)) drop-shadow(0 0 3px rgb(204,153,102))"
+        poly.setAttribute("style", "filter: drop-shadow(0 0 8px rgba(255,214,140,0.95)) drop-shadow(0 0 3px rgb(204,153,102))")
     })
-    poly.addEventListener("mouseleave", () => {
+    poly.node.on("pointerout", () => {
         poly.setAttribute("opacity", "0.7")
-        poly.style.filter = ""
+        poly.setAttribute("style", "")
     })
-    poly.addEventListener("click", toggleMinimap)
-    svgArr[2].appendChild(poly)
+    poly.node.on("pointertap", toggleMinimap)
     btnNodes.push(poly)
 }
 function minimapBtnDel () {

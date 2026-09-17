@@ -753,6 +753,13 @@ function applyAttr(shim, name, value) {
             syncShadowCopies(shim)
             return
         }
+        case "visibility": {
+            // журнал/библиотека прячут строки вне зоны скролла (applyScroll): в настоящем
+            // SVG visibility="hidden" работает — без этого кейса строки с устаревшей y
+            // оставались видимыми и накладывались на видимые (репорт-качество R4.4)
+            if (shim.node) shim.node.visible = value !== "hidden"
+            return
+        }
         case "clip-path": {
             applyClipPath(shim, value)
             return
@@ -1191,7 +1198,7 @@ function applyTextStyle(shim) {
     // textHtml (foreignObject) — блок от ЛЕВОГО ВЕРХНЕГО угла (x,y), text-anchor
     // на foreignObject НЕ действовал: если рисовать html от центра/базлайна,
     // текст «вылезает» влево-вверх из своих фреймов (helpWord/ addToSkill/library)
-    const isHtml = shim.kind === "html"
+    const isHtml = shim.kind === "html" || shim._htmlBlock === true
     const anchorX = !isHtml && shim.attrs["text-anchor"] === "middle" ? 0.5 : 0
     const st = {
         fontFamily: family,
@@ -1373,6 +1380,9 @@ class WorldSprite {
             case "display":
                 this.node.visible = value !== "none"
                 break
+            case "visibility":
+                this.node.visible = value !== "hidden"
+                break
             case "style":
                 applyStyleString(this, value)
                 break
@@ -1393,6 +1403,13 @@ class WorldSprite {
             this.node.mask = null
             if (m.parent) m.parent.removeChild(m)
             m.destroy()
+        }
+        if (this._clipMask) {
+            // клип-маска (R4.4: NativeGroup.setClip / nativeSector) — тоже sibling в слое
+            this.node.mask = null
+            if (this._clipMask.parent) this._clipMask.parent.removeChild(this._clipMask)
+            this._clipMask.destroy()
+            this._clipMask = null
         }
         if (this.node.parent) this.node.parent.removeChild(this.node)
         this.node.destroy()
@@ -1515,6 +1532,152 @@ function createNativeGraphics(place) {
 // поиск мирового узла по id-ключу («15OI», «3RI») — O(1) вместо сканов screenPic
 function worldById(key) {
     return shimById.get(String(key)) || null
+}
+
+// ----------------------------------------------------------------------------
+// R4.4: нативные примитивы панелей — группа с клипом, html-блок текста,
+// сектор кулдауна, полигон. Заменяют shim-эмуляции createElementNS/clipPath/
+// textHtml/createPath, которые R5 сносит вместе с шимом
+// ----------------------------------------------------------------------------
+
+// нативная группа-контейнер (слой прокрутки journal/library): PIXI.Container-хост
+// для шим-детей (attachShim) и нативных узлов; setClip — маска-Graphics в слое,
+// срезающая детей, выезжающих за зону просмотра при скролле
+class NativeGroup extends WorldSprite {
+    constructor(node, layer) {
+        super(node, layer)
+        this.kind = "group"
+        this.children = [] // хост attachShim: shim-дети ездят внутри контейнера
+        this._clipMask = null
+    }
+    appendChild(s) {
+        if (s instanceof WorldSprite) {
+            if (!s._dead) { s.parent = this; this.node.addChild(s.node) }
+            return s
+        }
+        return attachShim(this, s, this.children.length)
+    }
+    // shim-семантика removeChild (ShimEl.removeChild): splice из children + detachShim —
+    // иначе remove() шим-ребёнка падает на parent.removeChild (родитель — не ShimEl)
+    removeChild(s) {
+        const i = this.children.indexOf(s)
+        if (i !== -1) { this.children.splice(i, 1); detachShim(s) }
+        return s
+    }
+    append(...ss) { for (const s of ss) this.appendChild(s); return this }
+    setClip(x, y, w, h) {
+        if (!this._clipMask) {
+            this._clipMask = new PIXI.Graphics()
+            this._layer.node.addChild(this._clipMask)
+            this.node.mask = this._clipMask
+        }
+        this._clipMask.clear().rect(num(x), num(y), num(w), num(h)).fill(0xffffff)
+    }
+    remove() {
+        if (this._dead) return
+        // дети сносятся первыми: контейнер уничтожается пустым, а повторные remove()
+        // детей из journalTemp/libraryTemp — no-op по _dead
+        for (const c of this.children.slice()) c && c.remove && c.remove()
+        this.children.length = 0
+        if (this._clipMask) {
+            this.node.mask = null
+            if (this._clipMask.parent) this._clipMask.parent.removeChild(this._clipMask)
+            this._clipMask.destroy()
+            this._clipMask = null
+        }
+        super.remove()
+    }
+}
+function createNativeGroup(place, obj = {}) {
+    const grp = new NativeGroup(new PIXI.Container(), place)
+    grp.node.__isNativeGroup = true // для headless-проб (классы PIXI минифицированы)
+    if (obj.id !== undefined && obj.id !== "") {
+        grp.attrs.id = String(obj.id)
+        shimById.set(grp.attrs.id, grp)
+    }
+    place.node.addChild(grp.node)
+    return grp
+}
+// html-блок текста (контракт createTextHtml: блок от ЛЕВОГО ВЕРХНЕГО угла, перенос
+// по словам на ширине w, id БЕЗ суффикса «I») — заменяет textHtml в library/tip/enemyHover
+function createNativeHtml(place, x, y, w, h, stroke, strokeWidth, fill, textContent, obj = {}) {
+    const t = createNativeText(place, x, y, w, h, stroke, strokeWidth, fill, textContent, obj)
+    t._htmlBlock = true
+    t.attrs.width = num(w); t.attrs.height = num(h)
+    if (obj.id !== undefined && obj.id !== "") {
+        if (t.attrs.id) shimById.delete(t.attrs.id) // суффиксовый вариант не нужен
+        t.attrs.id = String(obj.id)
+        shimById.set(t.attrs.id, t)
+    }
+    applyTextStyle(t)
+    return t
+}
+// геометрия сектора кулдауна — перенесена из activeSkills.js без изменений:
+// тот же d-string рисует и нативный сектор (через pathPoints, как redrawPath) —
+// паритет формы гарантирован
+function getSectorPath(angleDeg,cx,cy,r,clockwise = false) {
+    // Если угол >= 360 – полный круг
+    if (angleDeg >= 360) {
+        return `M ${cx} ${cy} m -${r},0 a ${r},${r} 0 1,0 ${r*2},0 a ${r},${r} 0 1,0 -${r*2},0 Z`;
+    }
+    // Если угол <= 0 – вообще нет сектора (пустой путь)
+    if (angleDeg <= 0) {
+        return ''; // ничего не рисуем, затемнение полностью открыто
+    }
+    // Угол в радианах (0 – верх, по часовой)
+    const rad = (angleDeg - 90) * Math.PI / 180;
+    const x = cx + r * Math.cos(rad);
+    const y = cy + r * Math.sin(rad);
+    // Флаг большой дуги (1 если угол > 180 градусов)
+    let largeArc = angleDeg > 180 ? 0 : 1;
+    clockwise ? largeArc = (largeArc == 0 ? 1 : 0) : false;
+    // sweep-флаг: 1 = по часовой, 0 = против часовой.
+    const sweep = clockwise ? 1 : 0;
+    return `M ${cx} ${cy} L ${cx} ${cy - r} A ${r} ${r} 0 ${largeArc} ${sweep} ${x} ${y} Z`;
+}
+// сектор кулдауна активных способностей: нативный Graphics вместо shim-path с
+// clipPath-окном; setSector(angle, clockwise) перерисовывает заливку rgba(0,0,0,0.65)
+// (дефолт redrawPath), окно clipW×clipW вокруг центра = та же маска-обрезка 96×96
+function createNativeSector(place, cx, cy, r, clipW, obj = {}) {
+    const ws = createNativeGraphics(place)
+    ws._sx = num(cx); ws._sy = num(cy); ws._sr = num(r)
+    ws.setSector = (angleDeg, clockwise = false) => {
+        const g = ws.node
+        g.clear()
+        const pts = pathPoints(getSectorPath(+angleDeg || 0, ws._sx, ws._sy, ws._sr, clockwise))
+        if (pts.length >= 6) g.poly(pts).fill({ color: "rgba(0, 0, 0, 0.65)" })
+    }
+    // окно-клип clipW×clipW вокруг центра (у активных способностей 96×96) —
+    // маска-Graphics sibling'ом в слое, уходит с remove() через WorldSprite._clipMask
+    const mask = new PIXI.Graphics()
+    place.node.addChild(mask)
+    mask.rect(ws._sx - clipW / 2, ws._sy - clipW / 2, clipW, clipW).fill(0xffffff)
+    ws.node.mask = mask
+    ws._clipMask = mask
+    if (obj.id) {
+        ws.attrs.id = String(obj.id)
+        shimById.set(ws.attrs.id, ws)
+    }
+    return ws
+}
+// нативный полигон (кнопка-уголок миникарты) — Graphics + federated-события напрямую
+// на узле (pointerover/pointerout/pointertap в call-site); eventMode static — opt-in
+// хит-теста, как pointer-events:all у шима
+function createNativePoly(place, points, fill, stroke, strokeWidth, obj = {}) {
+    const g = new PIXI.Graphics()
+    const ws = new WorldSprite(g, place)
+    const flat = []
+    for (const p of points) { flat.push(num(p[0]), num(p[1])) }
+    g.poly(flat)
+    fill && fill !== "none" && g.fill({ color: fill })
+    stroke && stroke !== "none" && num(strokeWidth) > 0 && g.stroke({ color: stroke, width: num(strokeWidth) })
+    g.eventMode = "static"
+    place.node.addChild(g)
+    if (obj.id) {
+        ws.attrs.id = String(obj.id)
+        shimById.set(ws.attrs.id, ws)
+    }
+    return ws
 }
 
 // ----------------------------------------------------------------------------
@@ -2232,6 +2395,7 @@ export {
     createImage, createAnimImage, acquirePooled, releaseSprite,
     createRect, createCircle, createTextEl, createTextHtml, createPath, createGroup,
     createWorldImage, createWorldBar, createNativeGraphics, createNativeText, worldById,
+    createNativeGroup, createNativeHtml, createNativeSector, createNativePoly,
     spritePos, moveSprite, rectPos, getCTMExport, applyPixelated, cameraView,
     preloadGameTextures, backendHooks, dragState,
     installGameTicks, gameTickSystem, applyStillTexture,

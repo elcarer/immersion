@@ -30,7 +30,7 @@ import { status } from "../scripts/start.js"
 import { T } from "../scripts/localization.js"
 import { data } from "../scripts/data.js"
 import { dataGeneric } from "../scripts/sceneGenerate.js"
-import { svgArr, image, rect, text, textHtml, releaseSprite, spritePos, rectPos, isDragging } from "../scripts/svg.js"
+import { svgArr, image, rect, text, nativeHtml, releaseSprite, spritePos, rectPos, isDragging } from "../scripts/svg.js"
 import { objectValues, screenPic } from "../scripts/del.js"
 //V63: спрайт/id ловушки по её состоянию и типу — та же формула, что в createRoom/useObject
 import { trapSpriteSrc } from "../scripts/trapSprite.js"
@@ -185,11 +185,10 @@ function openWindow(h) {
                 winNodes.push({"el": fitText(text(svgArr[2], winX + STAT_RX, winY + ly, "0pt", "50pt", "black", "2px", COL, rows[i][1], {"size": STAT_SIZE, "font": "baseFont4"}), STAT_RW), "dx": STAT_RX, "dy": ly})
                 i === 0 && (cardHpText = winNodes[winNodes.length - 2].el) //«Жизни: …» — обновляется каждый тик
             }
-            //способность: foreignObject с ЯВНОЙ шириной div (перенос по словам, как в library.js)
+            //способность: нативный html-блок с переносом по словам (R4.4)
             let desc = abilityDesc(s)
             if (desc) {
-                let fo = textHtml(svgArr[2], winX + STAT_LX, winY + ABIL_Y, CARD_W - STAT_LX * 2, ABIL_H, "black", "2px", COL, desc, {"size": ABIL_SIZE, "font": "baseFont4"})
-                fo.firstChild.style.width = (CARD_W - STAT_LX * 2) + "px"
+                let fo = nativeHtml(svgArr[2], winX + STAT_LX, winY + ABIL_Y, CARD_W - STAT_LX * 2, ABIL_H, "black", "2px", COL, desc, {"size": ABIL_SIZE, "font": "baseFont4"})
                 winNodes.push({"el": fo, "dx": STAT_LX, "dy": ABIL_Y})
             }
             cardHpLast = T("eh.hp",s.hp)
@@ -204,9 +203,8 @@ function openWindow(h) {
     !unlocked && (img.style.filter = "brightness(0)") //чёрный силуэт для неиспользованного
     winNodes.push({"el": img, "dx": CARD_W / 2 - w / 2, "dy": ANIM_Y})
     if (unlocked) {
-        //эффект: foreignObject с ЯВНОЙ шириной div (перенос по словам)
-        let fo = textHtml(svgArr[2], winX + STAT_LX, winY + OBJ_DESC_Y, CARD_W - STAT_LX * 2, OBJ_DESC_H, "black", "2px", COL, T(ob.desc), {"size": ABIL_SIZE, "font": "baseFont4"})
-        fo.firstChild.style.width = (CARD_W - STAT_LX * 2) + "px"
+        //эффект: нативный html-блок с переносом по словам (R4.4)
+        let fo = nativeHtml(svgArr[2], winX + STAT_LX, winY + OBJ_DESC_Y, CARD_W - STAT_LX * 2, OBJ_DESC_H, "black", "2px", COL, T(ob.desc), {"size": ABIL_SIZE, "font": "baseFont4"})
         winNodes.push({"el": fo, "dx": STAT_LX, "dy": OBJ_DESC_Y})
     }
 }
