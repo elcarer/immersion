@@ -32,6 +32,8 @@ function openDoor () {
         for (let i2 = 0; i2 < length2; i2++) {
             if (href === walls[i2][0]&&checkCollision(pic.x.animVal.value,status.hero.x,pic.width.animVal.value,32,pic.y.animVal.value,status.hero.y+19,pic.height.animVal.value,32)) {
                 pic.setAttribute("href",walls[i2][1])
+                //E-9: navMatrix ИИ врагов (enemyAI) перестраивается — дверь проходима
+                status.navVersion = (status.navVersion || 0) + 1
                 //V4: открывшаяся дверь стала накладкой (27/28 на 1-м этаже, 57/58 на 2-м) —
                 //добавляем в кэш Z-сортировки (при создании тайла она была 9/12/23/24 и в кэш не попала)
                 if (Array.isArray(wallsOverlay) && wallsOverlay.indexOf(pic) === -1 &&

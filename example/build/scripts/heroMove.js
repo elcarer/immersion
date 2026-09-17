@@ -367,6 +367,8 @@ function checkNewRoom (data,num,x,y) {
             createRoom (level,i0,32,32)
             level.roomsArr[i0][3] = 1
             openRoom(level.roomsArr[i0])
+            //E-9: navMatrix ИИ врагов (enemyAI) перестраивается — новая комната проходима
+            status.navVersion = (status.navVersion || 0) + 1
             tryFinSummon()
             svgArr[1].append(status.hero.obj.img)
             break
@@ -380,6 +382,8 @@ function checkNewRoom (data,num,x,y) {
             x<level.floor[i][0]*32+32+64&&
             y<level.floor[i][1]*32+32+64) {
             createCorridor(level.floor[i],32,32,level)
+            //E-9: navMatrix ИИ врагов (enemyAI) перестраивается — коридор проходим
+            status.navVersion = (status.navVersion || 0) + 1
             svgArr[1].append(status.hero.obj.img)
             break
         }

@@ -5,13 +5,20 @@
 //   IDLE            стоит на месте; заметив героя (range) — переходит в CHASE
 //   PATROL_LOOP     патруль «туда-сюда» (маятник: клетка спавна <-> случайная точка)
 //   PATROL_WANDER   патруль-блуждание по случайным точкам своей комнаты
-//   CHASE           преследование: идёт к последней известной клетке героя
-//                   (path/pathTarget); потеряв героя, доходит до этой клетки
+//   CHASE           преследование: идёт по построенному пути к клетке героя; путь
+//                   перестраивается в конечной клетке (onPathEnd → enemyChase), после
+//                   конца анимации атаки (checkEndAnim → enemyChase) и после 3 смен
+//                   клетки героя (PATH_HERO_MOVES — компромисс живости и покоя, E-9).
+//                   Потеряв героя, доходит до последней известной клетки
 //                   и переходит в PATROL_WANDER
 //   ATTACK          проигрывает анимацию атаки (снаряд спавнится в animPlay по
 //                   attackNew); по концу анимации — CHASE (видит героя) или IDLE
 //   STUN            оглушён (noStunTime); по окончании — CHASE (видит) или IDLE
 //   DOWN            лежит (только Mummy, reanimate): неубиваем, через 3с встаёт
+//   FLEE            раненый (E-10): ≤25% ХП спавна (не босс) — фаза "flee" убегает от
+//                   героя, фаза "sneak" подкрадывается со спины/сбоку, избегая линию
+//                   огня «герой→другой враг» и сектор перед героем; дальнобойные
+//                   только отходят на дистанцию стрельбы. Боссы — всегда напролом
 // Мёртвый враг = type "corpse" (машина его не трогает). type "pet" (ручная крыса
 // из checkRat) просто доходит по остатку пути.
 //
@@ -19,13 +26,27 @@
 // в выбранном направлении реально пересекает героя; летящие снаряды (range) —
 // только когда герой стоит на оси полёта в пределах дальности. Никаких атак
 // «в пустоту», сквозь стены и по диагонали мимо цели.
+//
+// E-9 (2026-09-17, «ИИ не дёргается»): поиск пути — только когда активного пути нет:
+// в конечной клетке предыдущего (onPathEnd → enemyChase) и после конца анимации атаки,
+// плюс после PATH_HERO_MOVES смен клетки героя (перечитывает заметно ушедшего героя,
+// не дожидаясь конца пути — решение пользователя). Перестроение пути при КАЖДОЙ смене
+// клетки героя снесено; атака при этом проверяется каждый тик (enemyTryAttack), так что
+// «пройти мимо» героя в зоне удара враг не может. Прямые шаги по осям тоже снесены
+// (у тонкой стенки «пилили» и не находили окружной путь) — движение всегда по пути.
+// E-9b: проходимость для ИИ — navMatrix: пол matrixLevel ТОЛЬКО в открытых героем
+// комнатах (roomsArr[k][3]===1) и коридорах (floor[i][7]===1) минус клетки закрытых
+// дверей (открывает только герой; status.navVersion — счётчик изменений, инкрементится
+// в heroMove.checkNewRoom и openDoor). Путь строится по всей карте, но только по
+// разведанному — враг больше не идёт сквозь закрытые двери в неоткрытые комнаты.
+// E-10: раненые враги убегают и заходят со спины (состояние FLEE); прежний комнатный
+// A* снесён (astar.js и pathfinding.js удалены) — патруль тоже ходит общим bfsPath.
 // ============================================================================
 import { status } from "../scripts/start.js"
 import { T } from "../scripts/localization.js"
 import { data } from "../scripts/data.js"
 import { dataGeneric } from "../scripts/sceneGenerate.js"
 import { checkCollision, playEffect, dropKey, checkExp, reanimateCheck } from "../scripts/damage.js"
-import { aStar } from "../scripts/astar.js"
 import { svgArr, image, worldImage, spritePos, moveSprite, rectPos, releaseSprite } from "../scripts/svg.js"
 import { checkZOrder } from "../scripts/heroMove.js"
 import { enemyOnTrail } from "../scripts/valkyrie.js"
@@ -34,7 +55,7 @@ import { floatText } from "../scripts/floatText.js"
 //V90: снятие полосы ХП босса при смерти владельца (полоса оставалась после убийства)
 import { changeBossHP, bossBarOwnerDied } from "../scripts/hpBar.js"
 import { playback, strike } from "../scripts/sound.js"
-import { objectValues,screenPic } from "../scripts/del.js"
+import { objectValues,screenPic,doorPics } from "../scripts/del.js"
 //V52: «Массовик-затейник» — окно смертей врагов «одной атакой»
 import { achKill } from "../scripts/achievements.js"
 //V64: смерть монстра арены — счёт «все 9 убиты» и появление рычага арены
@@ -62,7 +83,7 @@ import { blessEcho } from "../scripts/blessFx.js"
 //V85: Медуза пустоты — этаж завершается только гибелью ПОСЛЕДНЕГО осколка
 import { voidBossFinale, medusaPieceDied } from "../scripts/voidBoss.js"
 
-export const ENEMY_STATE = { IDLE: 0, PATROL_LOOP: 1, PATROL_WANDER: 2, CHASE: 3, ATTACK: 4, STUN: 5, DOWN: 6 }
+export const ENEMY_STATE = { IDLE: 0, PATROL_LOOP: 1, PATROL_WANDER: 2, CHASE: 3, ATTACK: 4, STUN: 5, DOWN: 6, FLEE: 7 }
 
 // ---------- поза (анимация) и переход состояния ----------
 //интервал смены кадра (в тиках ≈62.5 Гц): переключение кадров зависит от параметра
@@ -141,8 +162,80 @@ export function resetEmoFx() {
     emoFx.length = 0
 }
 
-// ---------- flow-field: один общий BFS от клетки героя по всему этажу ----------
-let flowMatrixRef = null
+// ---------- navMatrix: проходимость этажа для ИИ (E-9b) ----------
+// Пол matrixLevel ТОЛЬКО в открытых героем комнатах (roomsArr[k][3]===1) и открытых
+// коридорах (клетки floor[i] с [2]===1 и флагом [7]===1), минус клетки закрытых дверей
+// (закрытые текстуры из openDoor.js — открывает только герой). Кэш по паре
+// (matrixLevel ref, status.navVersion): счётчик инкрементится в heroMove.checkNewRoom
+// (открытие комнаты/коридора) и openDoor (открытие двери) — navMatrix перестраивается
+// только после реальных изменений карты, между ними это чистые чтения типизированного
+// массива. Flow-field и bfsPath ходят ТОЛЬКО по navMatrix — враг не строит путь сквозь
+// закрытые двери и в неоткрытые комнаты.
+let navMatrixRef = null   // status.matrixLevel, по которому построен nav
+let navVersionRef = -1    // status.navVersion на момент постройки
+let nav = null            // Uint8Array w*h: 1 — проходимо для ИИ
+let navW = 0
+let navH = 0
+// закрытые двери всех этажей (пара «закрытая» из openDoor.js); при открытии href
+// меняется на открытую текстуру — клетка снова проходима
+const CLOSED_DOOR_HREFS = new Set(
+    [9, 12, 23, 24, 39, 42, 53, 54, 69, 72, 83, 84].map(n => "./images/dungeon/walls/" + n + ".png"))
+function ensureNavMatrix() {
+    const matrix = status.matrixLevel
+    if (!matrix || !matrix[0]) return null
+    const ver = status.navVersion || 0
+    if (nav && navMatrixRef === matrix && navVersionRef === ver) return nav
+    const h = matrix.length
+    const w = matrix[0].length
+    const n = new Uint8Array(w * h)
+    const lv = dataGeneric.scenes[status.levelFloor]
+    // комнаты: прямоугольник пола открытой комнаты
+    for (let k = 0; k < lv.roomsArr.length; k++) {
+        if (lv.roomsArr[k][3] !== 1) continue
+        const f = lv.floor[lv.roomsArr[k][0]]
+        for (let y = f[1]; y < f[1] + f[3]; y++) {
+            const row = matrix[y]
+            if (!row) continue
+            for (let x = f[0]; x < f[0] + f[2]; x++) {
+                if (row[x] === 1) n[y * w + x] = 1
+            }
+        }
+    }
+    // коридоры: одиночные клетки floor[i] ([2]===1 — размер клетки), флаг открытости [7]
+    for (let i = 0; i < lv.floor.length; i++) {
+        const f = lv.floor[i]
+        if (f[2] === 1 && f[7] === 1 && matrix[f[1]] && matrix[f[1]][f[0]] === 1) {
+            n[f[1] * w + f[0]] = 1
+        }
+    }
+    // закрытые двери — блокеры (могут перекрывать больше одной клетки, если тайл шире 32px)
+    for (let i = 0; i < doorPics.length; i++) {
+        const p = doorPics[i]
+        if (!p || typeof p.getAttribute !== "function") continue
+        const href = p.getAttribute("href")
+        if (!href || !CLOSED_DOOR_HREFS.has(href)) continue
+        const px = p.x.animVal.value
+        const py = p.y.animVal.value
+        const x0 = Math.floor(px / 32)
+        const y0 = Math.floor(py / 32)
+        const x1 = Math.floor((px + p.width.animVal.value - 1) / 32)
+        const y1 = Math.floor((py + p.height.animVal.value - 1) / 32)
+        for (let y = y0; y <= y1; y++) {
+            for (let x = x0; x <= x1; x++) {
+                if (x >= 0 && y >= 0 && x < w && y < h) n[y * w + x] = 0
+            }
+        }
+    }
+    navMatrixRef = matrix
+    navVersionRef = ver
+    navW = w
+    navH = h
+    nav = n
+    return n
+}
+
+// ---------- flow-field: один общий BFS от клетки героя по всему открытому этажу ----------
+let flowNavRef = null
 let flowCenter = [-1, -1]
 let flowDirs = null
 let flowW = 0
@@ -155,12 +248,12 @@ let flowQy = null
 const DX = [0, 0, -1, 1]
 const DY = [-1, 1, 0, 0]
 function ensureFlowField() {
-    const matrix = status.matrixLevel
-    if (!matrix || !matrix[0]) return false
+    const n = ensureNavMatrix()
+    if (!n) return false
     const heroCell = [Math.trunc(status.hero.x / 32), Math.trunc(status.hero.y / 32)]
-    if (flowMatrixRef === matrix && flowDirs && flowCenter[0] === heroCell[0] && flowCenter[1] === heroCell[1]) return true
-    const h = matrix.length
-    const w = matrix[0].length
+    if (flowNavRef === n && flowDirs && flowCenter[0] === heroCell[0] && flowCenter[1] === heroCell[1]) return true
+    const h = navH
+    const w = navW
     const size = w * h
     if (!flowDist || flowDist.length !== size) {
         flowDist = new Int32Array(size)
@@ -178,6 +271,8 @@ function ensureFlowField() {
     let tail = 0
     const sx = heroCell[0]
     const sy = heroCell[1]
+    // герой может стоять в клетке закрытой двери (момент её открытия) — сеем её всегда,
+    // расширяемся только по navMatrix
     if (sx >= 0 && sx < w && sy >= 0 && sy < h) {
         dist[sy * w + sx] = 0
         qx[tail] = sx
@@ -193,7 +288,7 @@ function ensureFlowField() {
             const nx = cx + DX[k]
             const ny = cy + DY[k]
             if (nx < 0 || ny < 0 || nx >= w || ny >= h) continue
-            if (matrix[ny][nx] !== 1) continue
+            if (n[ny * w + nx] !== 1) continue
             if (dist[ny * w + nx] !== -1) continue
             dist[ny * w + nx] = d + 1
             dirs[ny * w + nx] = k ^ 1
@@ -202,7 +297,7 @@ function ensureFlowField() {
             tail++
         }
     }
-    flowMatrixRef = matrix
+    flowNavRef = n
     flowCenter = heroCell
     flowDirs = dirs
     flowW = w
@@ -231,6 +326,8 @@ const CROWD_R = 72                 // px между центрами — «ря�
 const CROWD_MIN = 3                // столпилось столько — включается режим обхода
 const MAX_DIRECT_PER_CROWD = 2     // напрямую идут максимум двое
 const FLANK_SCAN = 6               // окно поиска точки обхода вокруг героя (клетки)
+const PATH_RETRY_TICKS = 30        // пауза между попытками построить путь (не каждый тик)
+const PATH_HERO_MOVES = 3          // живой путь перечитывается после стольких смен клетки героя
 // V57: боссы (class.boss / «Босс» в имени) из толпы исключены целиком — см. crowdRankOf:
 // сами всегда идут напрямую и в size толпы не входят
 function crowdRankOf(enemy) {
@@ -249,7 +346,8 @@ function crowdRankOf(enemy) {
         const o = DATA.bag[snap[i]]
         if (!o || o.type !== "enemy") continue
         if (o.lying !== undefined || o.shadowFx) continue
-        if (o.state === ENEMY_STATE.STUN || o.state === ENEMY_STATE.ATTACK) continue
+        //E-10: раненые в бегстве/подкрадывании к герою не приближаются — из толпы исключены
+        if (o.state === ENEMY_STATE.STUN || o.state === ENEMY_STATE.ATTACK || o.state === ENEMY_STATE.FLEE) continue
         //V57: боссы вне «толпы» (fix «Демон путается и не может подойти к герою»):
         //class.boss (Демон, Лидер гоблинов) и «Босс-паук» (по имени) всегда идут на героя
         //НАПРЯМУЮ — rank −1 отключает им фланг-обход — и не раздувают толпу для других.
@@ -272,7 +370,7 @@ function crowdRankOf(enemy) {
 function flankTargetFor(heroCell, mx, my, wob) {
     if (!ensureFlowField()) return null
     const dist = flowDist
-    const matrix = status.matrixLevel
+    const n = nav
     const w = flowW
     const hx = heroCell[0]
     const hy = heroCell[1]
@@ -288,7 +386,8 @@ function flankTargetFor(heroCell, mx, my, wob) {
         for (let dx = -FLANK_SCAN; dx <= FLANK_SCAN; dx++) {
             const x = hx + dx
             const y = hy + dy
-            if (!matrix[y] || matrix[y][x] !== 1) continue
+            if (x < 0 || y < 0 || x >= w || y >= flowH) continue
+            if (n[y * w + x] !== 1) continue
             const d = dist[y * w + x]
             if (d < 2 || d > 5) continue // не сама клетка и не дальние подступы
             const len = Math.hypot(dx, dy) || 1
@@ -300,21 +399,25 @@ function flankTargetFor(heroCell, mx, my, wob) {
     return best
 }
 let bfsSeen = null
-// BFS по проходимым клеткам от from до to: массив узлов ПОСЛЕ стартовой клетки,
-// последний узел = to; unreachable/кривые входы → []
+let bfsQ = null
+// BFS по navMatrix (E-9b: открытые комнаты/коридоры минус закрытые двери) от from до to:
+// массив узлов ПОСЛЕ стартовой клетки, последний узел = to; unreachable/кривые входы → [].
+// Стартовая клетка допускается на «сыром» полу (matrix===1) даже вне nav — враг мог быть
+// выдавлен расталкиванием в клетку закрытой двери, пути оттуда всё равно должны строиться.
 function bfsPath(from, to) {
-    const matrix = status.matrixLevel
-    if (!matrix || !matrix[0]) return []
-    const w = matrix[0].length
-    const h = matrix.length
+    const n = ensureNavMatrix()
+    if (!n) return []
+    const w = navW
+    const h = navH
     if (from[0] === to[0] && from[1] === to[1]) return []
     if (from[0] < 0 || from[1] < 0 || from[0] >= w || from[1] >= h) return []
     if (to[0] < 0 || to[1] < 0 || to[0] >= w || to[1] >= h) return []
-    if (matrix[from[1]][from[0]] !== 1 || matrix[to[1]][to[0]] !== 1) return []
+    if (status.matrixLevel[from[1]][from[0]] !== 1 || n[to[1] * w + to[0]] !== 1) return []
     const size = w * h
     if (!bfsSeen || bfsSeen.length !== size) bfsSeen = new Int32Array(size)
+    if (!bfsQ || bfsQ.length !== size) bfsQ = new Int32Array(size)
     bfsSeen.fill(-1)
-    const q = new Int32Array(size)
+    const q = bfsQ
     let head = 0
     let tail = 0
     const si = from[1] * w + from[0]
@@ -330,8 +433,8 @@ function bfsPath(from, to) {
             const nx = cx + DX[k]
             const ny = cy + DY[k]
             if (nx < 0 || ny < 0 || nx >= w || ny >= h) continue
-            if (matrix[ny][nx] !== 1) continue
             const ni = ny * w + nx
+            if (n[ni] !== 1) continue
             if (bfsSeen[ni] !== -1) continue
             bfsSeen[ni] = cur
             q[tail++] = ni
@@ -361,7 +464,7 @@ function bfsPath(from, to) {
 export function buildChasePath(enemyCell, heroCell, enemy) {
     if (!ensureFlowField()) return []
     const dist = flowDist
-    const matrix = status.matrixLevel
+    const n = nav
     const w = flowW
     const flank = enemy ? flankOf(enemy) : 0
     const wob = enemy ? (enemy._wob = enemy._wob ?? Math.random() * 1000) : 0
@@ -394,7 +497,8 @@ export function buildChasePath(enemyCell, heroCell, enemy) {
         for (let k = 0; k < 4; k++) {
             const nx = cx + DX[k]
             const ny = cy + DY[k]
-            if (!matrix[ny] || matrix[ny][nx] !== 1) continue
+            if (nx < 0 || ny < 0 || nx >= w || ny >= flowH) continue
+            if (n[ny * w + nx] !== 1) continue
             if (dist[ny * w + nx] !== cd - 1) continue // только оптимальный спуск
             const dot = vx * DX[k] + vy * DY[k]
             const cross = vx * DY[k] - vy * DX[k]
@@ -992,46 +1096,13 @@ export function callAllies(enemy) {
 }
 
 // ---------- патруль ----------
-// путь по комнате врага (карта из cells + aStar, как старый createPath)
-function buildRoomPath(enemy, cell) {
-    const roomFloor = dataGeneric.scenes[status.levelFloor].floor[enemy.room[0]]
-    const len1 = roomFloor[2]
-    const len2 = roomFloor[3]
-    const arr = []
-    const cellsLen = enemy.cells.length
-    for (let i = 0; i < len1; i++) {
-        arr.push([])
-        for (let j = 0; j < len2; j++) {
-            let floor = 0
-            for (let k = 0; k < cellsLen; k++) {
-                if (enemy.cells[k][0] - roomFloor[0] === i && enemy.cells[k][1] - roomFloor[1] === j) {
-                    floor = 1
-                    break
-                }
-            }
-            arr[i][j] = floor
-        }
-    }
-    const map = arr[0].map((_, colIndex) => arr.map(row => row[colIndex]))
-    const e1 = cell[0] - roomFloor[0]
-    const e2 = cell[1] - roomFloor[1]
-    //V17: враг мог угнаться за героем ВНЕ своей комнаты — его текущая клетка (s1/s2)
-    //оказывается вне сетки комнаты (map: width=len1, height=len2). Раньше это падало
-    //в aStar: PF.Grid.setWalkableAt на несуществующем узле — «Cannot set properties
-    //of undefined (setting 'walkable')» (стек: chaseStep → startPatrolWander →
-    //pickPatrolTarget → buildRoomPath → aStar). Вне комнаты путь по комнате не строим:
-    //pickPatrolTarget вернёт null → IDLE (героя враг заметит из IDLE и возобновит
-    //преследование — он не застревает навсегда).
-    if (e1 < 0 || e1 >= len1 || e2 < 0 || e2 >= len2) return []
-    const s1 = Math.trunc((rectPos(enemy.rect)[0] + 16) / 32) - roomFloor[0]
-    const s2 = Math.trunc((rectPos(enemy.rect)[1] + 25) / 32) - roomFloor[1]
-    if (s1 < 0 || s1 >= len1 || s2 < 0 || s2 >= len2) return []
-    const path = aStar(map, [e1, e2], [s1, s2])
-    for (let i = 0; i < path.length; i++) {
-        path[i][0] += roomFloor[0]
-        path[i][1] += roomFloor[1]
-    }
-    return path
+// E-9: путь строится общим bfsPath по navMatrix — враг может вернуться в свою комнату
+// из чужого конца этажа через открытые коридоры. Прежний комнатный A* (astar.js,
+// библиотека pathfinding.js) снесён: один поисковый движок на все режимы ИИ.
+// Цели патруля — клетки enemy.cells (свободные клетки своей комнаты), как раньше.
+function patrolPathTo(enemy, cell) {
+    const cur = [Math.trunc((enemy.rect.x.animVal.value + 16) / 32), Math.trunc((enemy.rect.y.animVal.value + 25) / 32)]
+    return bfsPath(cur, cell)
 }
 // случайная достижимая точка комнаты (не текущая клетка; пустой путь исключён)
 function pickPatrolTarget(enemy) {
@@ -1041,7 +1112,7 @@ function pickPatrolTarget(enemy) {
     for (let tries = 0; tries < 8; tries++) {
         const c = enemy.cells[Math.trunc(Math.random() * enemy.cells.length)]
         if (c[0] === cur[0] && c[1] === cur[1]) continue
-        const path = buildRoomPath(enemy, c)
+        const path = patrolPathTo(enemy, c)
         if (path.length) return { cell: c, path }
     }
     return null
@@ -1071,7 +1142,7 @@ function startPatrolLoop(enemy) {
         const tmp = enemy.patrol.from
         enemy.patrol.from = enemy.patrol.to
         enemy.patrol.to = tmp
-        const path = buildRoomPath(enemy, enemy.patrol.to)
+        const path = patrolPathTo(enemy, enemy.patrol.to)
         if (!path.length) {
             enemy.patrol = null
             idlePose(enemy)
@@ -1082,10 +1153,17 @@ function startPatrolLoop(enemy) {
     }
 }
 
-// ---------- преследование: прямой шаг к цели ----------
-// Шаг выбирается по оси с БОЛЬШЕЙ разницей координат до цели (сначала сокращаем её) —
-// враг не «зеркалит» бегающего влево-вправо героя, а настойчиво приближается.
-// Прямые шаги проверяются на проходимость; при стенах — обход по flow-field.
+// ---------- преследование ----------
+// E-9: путь живёт до конечной клетки. Пока путь есть — идём по нему БЕЗ пересчёта:
+// ни смена клетки героя, ни прицельные манёвры путь не перестраивают. Пересчёт —
+// когда пути нет (старт преследования), когда он исчерпан (конечная клетка; дальше
+// onPathEnd → enemyChase), после конца анимации атаки/стана (checkEndAnim → enemyChase)
+// и после PATH_HERO_MOVES смен клетки героя (живой путь перечитывается). Неудачная
+// постройка (герой в закрытом регионе за порталом) ретраится раз в PATH_RETRY_TICKS.
+// Прямые шаги по осям снесены (E-9): у тонкой стенки враг «пилил», тыкался по осям
+// и не находил длинный окружной путь — теперь движение всегда по пути через весь
+// открытый этаж (navMatrix), а прицельное позиционирование (блок ниже) — часть
+// атаки и тикает каждый тик, путь не трогает.
 function chaseStep(enemy) {
     if (enemyOnTrail(enemy) && status.time % 5 === 0) return
     if (enemy.cold) {
@@ -1096,8 +1174,15 @@ function chaseStep(enemy) {
     const sees = enemySeesHero(enemy)
     let tx, ty
     if (sees || enemy.called) {
-        //цель — живая позиция героя; запоминаем клетку как «последнюю известную»
-        enemy.lastSeen = [Math.trunc(status.hero.x / 32), Math.trunc(status.hero.y / 32)]
+        //цель — живая позиция героя; запоминаем клетку как «последнюю известную».
+        //E-9: попутно считаем смены клетки героя с момента постройки живого пути —
+        //их счётчик решает, не пора ли перечитать путь (PATH_HERO_MOVES)
+        const hcNow = [Math.trunc(status.hero.x / 32), Math.trunc(status.hero.y / 32)]
+        if (enemy._lastHeroCell && (enemy._lastHeroCell[0] !== hcNow[0] || enemy._lastHeroCell[1] !== hcNow[1])) {
+            enemy._heroCellMoves = (enemy._heroCellMoves || 0) + 1
+        }
+        enemy._lastHeroCell = hcNow
+        enemy.lastSeen = hcNow
         tx = status.hero.x + 16
         ty = status.hero.y + 25
     } else if (enemy.lastSeen) {
@@ -1113,8 +1198,14 @@ function chaseStep(enemy) {
     const my = ePos[1] + 25
     const dx = tx - mx
     const dy = ty - my
-    const matrix = status.matrixLevel
-    const walkable = (cx, cy) => !!(matrix && matrix[cy] && matrix[cy][cx] === 1)
+    const nav = ensureNavMatrix()
+    const walkable = (cx, cy) => !!(nav && nav[cy * navW + cx] === 1)
+    // герой потерян: дошли до последней известной клетки — блуждаем
+    if (!sees && !enemy.called && Math.abs(dx) < 8 && Math.abs(dy) < 8) {
+        enemy.noticed = 0
+        startPatrolWander(enemy)
+        return
+    }
     // герой видим: цель движения — позиция, с которой атака РЕАЛЬНО достаёт героя.
     // Уже достаёт — стоим (enemyTryAttack бьёт по кулдауну КАЖДЫЙ тик из enemyTick,
     // до chaseStep — проверка атаки чаще, чем движение). Не достаёт — шагаем туда,
@@ -1155,64 +1246,37 @@ function chaseStep(enemy) {
                 return
             }
         }
-        //V18: прямого шага нет (герой за стеной/вне близкой зоны) — строим путь к
-        //клетке героя ЧЕРЕЗ ВЕСЬ ЭТАЖ (flow-field) и идём по нему. Раньше враг
-        //«крутился» у стены, упираясь в неё: шаг ВДОЛЬ стены по осям всегда
-        //проходим, и до flow-field-обхода дело не доходило, пока герой двигался.
-        //Пока путь есть — идём по нему БЕЗ пересчёта прицела/поиска пути каждый
-        //кадр: решение о новом поведении принимается на клетке пути (onPathEnd →
-        //enemyChase) и при смене клетки героя (сравнение pathTarget — не каждый
-        //тик, BFS пересчитывается только когда герой реально сменил клетку).
+    }
+    // E-9: путь живёт до конечной клетки, но не дольше PATH_HERO_MOVES смен клетки
+    // героя — заметно ушедшего героя враг перечитывает, не доходя до конца пути
+    if (enemy.path && enemy.path.length && (enemy._heroCellMoves || 0) >= PATH_HERO_MOVES) {
+        enemy.path = []
+        enemy.pathTarget = null
+    }
+    // E-9: путь строится ТОЛЬКО когда активного пути нет (старт преследования или
+    // конечная клетка предыдущего). Живой путь не перестраивается при движении героя.
+    // Неудачная постройка: первая — пауза PATH_RETRY_TICKS (враг караулит у закрытой
+    // двери, героя видит сквозь неё), повторная — героя нет в достижимой зоне
+    // (регион за порталом), обычный патруль.
+    if (!enemy.path || !enemy.path.length) {
+        const retry = enemy.pathFail !== undefined && status.time - enemy.pathFail >= PATH_RETRY_TICKS
+        if (enemy.pathFail !== undefined && !retry) return
         const goal = [Math.trunc(tx / 32), Math.trunc(ty / 32)]
         const start = [Math.trunc(mx / 32), Math.trunc(my / 32)]
-        if (!enemy.path || !enemy.path.length || !enemy.pathTarget || enemy.pathTarget[0] !== goal[0] || enemy.pathTarget[1] !== goal[1]) {
-            enemy.path = buildChasePath(start, goal, enemy)
-            enemy.pathTarget = enemy.path.length ? goal : null
-        }
-        if (enemy.path.length) {
-            stepAlongPath(enemy)
-            return
-        }
-        // пути к клетке героя нет (изолированная область) — ниже старый обход по осям
-    }
-    // герой потерян: дошли до последней известной клетки — блуждаем
-    if (!sees && !enemy.called && Math.abs(dx) < 8 && Math.abs(dy) < 8) {
-        enemy.noticed = 0
-        startPatrolWander(enemy)
-        return
-    }
-    // оси по приоритету: сначала с большей разницей координат (герой потерян —
-    // идём к lastSeen; или виден, но пути через этаж нет)
-    const steps = Math.abs(dx) >= Math.abs(dy)
-        ? [[Math.sign(dx), 0], [0, Math.sign(dy)]]
-        : [[0, Math.sign(dy)], [Math.sign(dx), 0]]
-    for (let k = 0; k < 2; k++) {
-        const sx = steps[k][0]
-        const sy = steps[k][1]
-        if (sx === 0 && sy === 0) continue
-        const nx = Math.trunc((mx + sx * 16) / 32)
-        const ny = Math.trunc((my + sy * 16) / 32)
-        if (walkable(nx, ny)) {
-            const mv = stepBudget(enemy)
-            for (let s = 0; s < mv; s++) shiftEnemy(enemy, sx, sy)
-            setMovePose(enemy, sx > 0 ? 3 : sx < 0 ? 2 : sy > 0 ? 1 : 0)
-            ;(enemy.class.id === 6 || enemy.class.id === 13) && checkRat(enemy)
-            checkZOrder(enemy)
-            return
-        }
-    }
-    // обе прямые оси заблокированы (стена) — обходим по flow-field
-    const goal = [Math.trunc(tx / 32), Math.trunc(ty / 32)]
-    const start = [Math.trunc(mx / 32), Math.trunc(my / 32)]
-    if (!enemy.path || !enemy.path.length || !enemy.pathTarget || enemy.pathTarget[0] !== goal[0] || enemy.pathTarget[1] !== goal[1]) {
         enemy.path = buildChasePath(start, goal, enemy)
-        enemy.pathTarget = enemy.path.length ? goal : null
-    }
-    if (!enemy.path.length) {
-        // цель недостижима по полу (за стеной) — потеряли героя
-        enemy.noticed = 0
-        startPatrolWander(enemy)
-        return
+        if (enemy.path.length) {
+            enemy.pathFail = undefined
+            enemy.pathTarget = goal
+            enemy._heroCellMoves = 0
+        } else if (retry) {
+            enemy.noticed = 0
+            enemy.pathFail = undefined
+            startPatrolWander(enemy)
+            return
+        } else {
+            enemy.pathFail = status.time
+            return
+        }
     }
     stepAlongPath(enemy)
 }
@@ -1278,11 +1342,228 @@ function onPathEnd(enemy) {
             enemy.noticed = 0
             startPatrolWander(enemy)
         }
+    } else if (enemy.state === ENEMY_STATE.FLEE) {
+        // E-10: добежал (фаза flee) — теперь подкрадывание; дошёл до точки захода —
+        // ищем новую точку (fleeTick перестраивает путь по текущей фазе)
+        enemy.fleePhase = "sneak"
     } else if (enemy.state === ENEMY_STATE.PATROL_WANDER) {
         startPatrolWander(enemy)
     } else if (enemy.state === ENEMY_STATE.PATROL_LOOP) {
         startPatrolLoop(enemy)
     }
+}
+
+// ---------- E-10: раненые враги — бегство и подкрадывание ----------
+// Враг с ХП ≤ 25% от ХП на спавне (не босс) переключается в FLEE и живёт циклом:
+// фаза "flee" — убегает от героя (BFS к клетке с большей flow-дистанцией от него);
+// фаза "sneak" — подкрадывается «со спины»/«сбоку»: цель — клетка вокруг героя,
+// максимально противоположная вектору подхода, с штрафом SNEAK_HOT за «горячие»
+// клетки — линию огня «герой → другой враг» (ось, до соседа и 2 клетки перелёта)
+// и сектор перед героем по его взгляду. Дойдя, атакует как обычно (проверка атаки
+// каждый тик), после атаки checkEndAnim возвращает CHASE — раненый снова в FLEE:
+// получается «hit-and-run». Дальнобойные (rangedKeepDist > 0) не подкрадываются —
+// только отходят, когда герой ближе дистанции стрельбы, и снова стреляют, когда
+// дистанция удержана. Боссы (class.boss) не ранятся этим никогда — всегда напролом.
+const WOUNDED_HP = 0.25        // порог «раненый» — доля ХП от ХП на спавне
+const FLEE_MAX_DEPTH = 64      // предел BFS бегства (клеток)
+const SNEAK_SCAN = 6           // окно поиска точки подкрадывания вокруг героя (клетки)
+const SNEAK_MIN_D = 2          // ближе героя не подкрадываемся (клетки, чебышёв)
+const SNEAK_MAX_D = 5
+const SNEAK_HOT = 4            // штраф клетки в зоне возможной атаки героя
+// 0 вверх, 1 вниз, 2 влево, 3 вправо — та же конвенция, что у setMovePose/status.hero.direction
+const DIRV = [[0, -1], [0, 1], [-1, 0], [1, 0]]
+// ранен ли враг; _maxHp снимается лениво на первом тике (ХП на спавне, до первого урона)
+function isWounded(enemy) {
+    if (enemy.class.boss) return false
+    if (enemy._maxHp === undefined) enemy._maxHp = enemy.stats.hp
+    return enemy.stats.hp > 0 && enemy.stats.hp <= enemy._maxHp * WOUNDED_HP
+}
+// дистанция удержания огня (клетки): максимум range среди ДОСТУПНЫХ дальнобойных атак;
+// 0 — милишник (подкрадывается). Доступность — по наличию attacksCd (как в hasRangedAttack)
+function rangedKeepDist(enemy) {
+    if (enemy._keepDist === undefined) {
+        let r = 0
+        const attacks = enemy.class.attacks
+        for (let i = 0; i < attacks.length; i++) {
+            if (enemy.stats.attacksCd[i] === undefined) continue
+            const a = data.attacks[attacks[i]]
+            if ((a.range || a.type === "magic") && a.range > r) r = a.range
+        }
+        enemy._keepDist = r
+    }
+    return enemy._keepDist
+}
+// «горячие» клетки вокруг героя: линия огня на других живых врагов + сектор взгляда
+function sneakHotCells(enemy, pivot) {
+    const hot = new Set()
+    // сектор перед героем: 3 клетки по направлению взгляда
+    const hd = status.hero.direction
+    if (hd !== undefined) {
+        const dv = DIRV[hd] || DIRV[1]
+        for (let k = 1; k <= 3; k++) {
+            hot.add((pivot[0] + dv[0] * k) + "," + (pivot[1] + dv[1] * k))
+        }
+    }
+    // линия огня «герой → другой враг»: ось от героя к соседу до него + 2 клетки перелёта
+    const gE = world.queries.genemy && world.queries.genemy.entities
+    if (gE) {
+        const snap = gE.slice()
+        for (let i = 0; i < snap.length; i++) {
+            const o = DATA.bag[snap[i]]
+            if (!o || o === enemy || o.type !== "enemy" || o.lying !== undefined) continue
+            const c = enemyCellOf(o)
+            const vx = c[0] - pivot[0]
+            const vy = c[1] - pivot[1]
+            if (!vx && !vy) continue
+            const isX = Math.abs(vx) >= Math.abs(vy)
+            const sx = isX ? Math.sign(vx) : 0
+            const sy = isX ? 0 : Math.sign(vy)
+            const dist = isX ? Math.abs(vx) : Math.abs(vy)
+            for (let k = 1; k <= dist + 2; k++) {
+                hot.add((pivot[0] + sx * k) + "," + (pivot[1] + sy * k))
+            }
+        }
+    }
+    return hot
+}
+// точка подкрадывания: клетка вокруг героя (кольцо 2..5, чебышёв), максимально
+// противоположная вектору «герой → враг» (за спиной/сбоку), с штрафом за горячие клетки
+function buildSneakPath(enemy, pivot) {
+    if (!ensureFlowField()) return []
+    const n = nav
+    const w = navW
+    const ec = enemyCellOf(enemy)
+    const wob = enemy._wob !== undefined ? enemy._wob : (enemy._wob = Math.random() * 1000)
+    const hot = sneakHotCells(enemy, pivot)
+    // единичный вектор «герой → я»: чем ближе dot к −1, тем сильнее точка «за спиной»
+    const ux0 = ec[0] - pivot[0]
+    const uy0 = ec[1] - pivot[1]
+    const ulen = Math.hypot(ux0, uy0) || 1
+    const ux = ux0 / ulen
+    const uy = uy0 / ulen
+    let best = null
+    let bestS = -Infinity
+    for (let dy = -SNEAK_SCAN; dy <= SNEAK_SCAN; dy++) {
+        for (let dx = -SNEAK_SCAN; dx <= SNEAK_SCAN; dx++) {
+            const cheb = Math.max(Math.abs(dx), Math.abs(dy))
+            if (cheb < SNEAK_MIN_D || cheb > SNEAK_MAX_D) continue
+            const x = pivot[0] + dx
+            const y = pivot[1] + dy
+            if (x < 0 || y < 0 || x >= w || y >= navH) continue
+            const ni = y * w + x
+            if (n[ni] !== 1) continue
+            if (flowDist[ni] < 1) continue // сама клетка героя или недостижимый регион
+            const len = Math.hypot(dx, dy) || 1
+            const dot = (dx / len) * ux + (dy / len) * uy
+            const s = -dot + Math.sin(wob + x * 13.7 + y * 7.9) * 0.3
+                - (hot.has(x + "," + y) ? SNEAK_HOT : 0)
+            if (s > bestS) { bestS = s; best = [x, y] }
+        }
+    }
+    if (!best) return []
+    return bfsPath(ec, best)
+}
+// путь бегства: BFS от врага по navMatrix, цель — достигнутая клетка с БОЛЬШЕЙ
+// flow-дистанцией от героя (строго дальше текущей), ближе и «постабильнее» — лучше
+let fleeSeen = null
+let fleeParent = null
+let fleeQ = null
+function buildFleePath(enemy, pivot) {
+    if (!ensureFlowField()) return []
+    const n = nav
+    const w = navW
+    const h = navH
+    const size = w * h
+    if (!fleeSeen || fleeSeen.length !== size) {
+        fleeSeen = new Int32Array(size)
+        fleeParent = new Int32Array(size)
+        fleeQ = new Int32Array(size)
+    }
+    fleeSeen.fill(-1)
+    const ec = enemyCellOf(enemy)
+    const si = ec[1] * w + ec[0]
+    const startFlow = flowDist[si]
+    if (startFlow < 0) return [] // враг вне региона героя (за порталом) — бежать по полю некуда
+    let head = 0
+    let tail = 0
+    const wob = enemy._wob !== undefined ? enemy._wob : (enemy._wob = Math.random() * 1000)
+    fleeSeen[si] = 0
+    fleeParent[si] = -1
+    fleeQ[tail++] = si
+    let best = -1
+    let bestS = -Infinity
+    while (head < tail) {
+        const cur = fleeQ[head++]
+        const depth = fleeSeen[cur]
+        if (depth >= FLEE_MAX_DEPTH) continue
+        const cx = cur % w
+        const cy = (cur / w) | 0
+        const fd = flowDist[cur]
+        if (fd > startFlow) {
+            const s = fd - depth * 0.05 + Math.sin(wob + cx * 3.1 + cy * 7.7) * 0.4
+            if (s > bestS) { bestS = s; best = cur }
+        }
+        for (let k = 0; k < 4; k++) {
+            const nx = cx + DX[k]
+            const ny = cy + DY[k]
+            if (nx < 0 || ny < 0 || nx >= w || ny >= h) continue
+            const ni = ny * w + nx
+            if (n[ni] !== 1 || fleeSeen[ni] !== -1) continue
+            fleeSeen[ni] = depth + 1
+            fleeParent[ni] = cur
+            fleeQ[tail++] = ni
+        }
+    }
+    if (best < 0) return [] // дальше от героя идти некуда (угол) — зажат
+    const path = []
+    let cur = best
+    while (cur !== si && cur >= 0) {
+        path.push([cur % w, (cur / w) | 0])
+        cur = fleeParent[cur]
+    }
+    path.reverse()
+    return path
+}
+// тик раненого: атака проверяется каждый тик (п.1 ТЗ — огрызается и на отходе),
+// движение — по фазе flee/sneak; героя нет — обычный патруль
+function fleeTick(enemy, sees) {
+    if (enemyOnTrail(enemy) && status.time % 5 === 0) return
+    if (enemy.cold) {
+        enemy.cold--
+        return
+    }
+    if (enemy.stop === 1) return
+    enemyTryAttack(enemy)
+    if (enemy.state === ENEMY_STATE.ATTACK) return
+    let pivot
+    if (sees || enemy.called) {
+        pivot = [Math.trunc(status.hero.x / 32), Math.trunc(status.hero.y / 32)]
+        enemy.lastSeen = pivot
+    } else if (enemy.lastSeen) {
+        pivot = enemy.lastSeen
+    } else {
+        // героя давно не видно — раненый возвращается к обычному патрулю
+        enemy.noticed = 0
+        startPatrolWander(enemy)
+        return
+    }
+    if (!enemy.path || !enemy.path.length) {
+        if (enemy.fleeFail !== undefined && status.time - enemy.fleeFail < PATH_RETRY_TICKS) return
+        let p = enemy.fleePhase === "sneak" ? buildSneakPath(enemy, pivot) : buildFleePath(enemy, pivot)
+        if (!p.length && enemy.fleePhase === "flee") {
+            // бежать некуда (тупик/угол) — попробуем подкрадывание
+            enemy.fleePhase = "sneak"
+            p = buildSneakPath(enemy, pivot)
+        }
+        if (!p.length) {
+            // и зайти не вышло — зажат в угол: стоит и огрызается (атака выше по тику)
+            enemy.fleeFail = status.time
+            return
+        }
+        enemy.fleeFail = undefined
+        enemy.path = p
+    }
+    stepAlongPath(enemy)
 }
 
 // ---------- V28: расталкивание врагов ----------
@@ -1458,12 +1739,17 @@ export function enemyTick(enemy) {
     }
     // ATTACK: анимация атаки идёт; переход — в animPlay checkEndAnim
     if (enemy.state === ENEMY_STATE.ATTACK) return
-    // способность «тень» (stats.shadow): периодический нырок к герою
-    tickShadow(enemy)
+    // способность «тень» (stats.shadow): периодический нырок к герою.
+    // Раненый в FLEE не ныряет К герою — противоречит бегству
+    enemy.state !== ENEMY_STATE.FLEE && tickShadow(enemy)
     const sees = enemySeesHero(enemy)
     if (!sees && !enemy.called) enemy.noticed = 0
-    // обнаружение
-    if ((sees || enemy.called) && enemy.state !== ENEMY_STATE.CHASE) enemyNoticeHero(enemy)
+    // обнаружение. E-10: раненого в FLEE не «переобнаруживаем» — иначе каждый тик
+    // получался notice → setEnemyState(CHASE) с постройкой пути, и тут же раненый
+    // блок возвращал FLEE с обнулённым путём: путь перестраивался и не жил ни тика,
+    // подкрадывание разваливалось. Заметит снова — сам: вылеченный раненый выходит
+    // в CHASE через ветку «вылечен», а потеряв героя, раненый уходит в патруль
+    if ((sees || enemy.called) && enemy.state !== ENEMY_STATE.CHASE && enemy.state !== ENEMY_STATE.FLEE) enemyNoticeHero(enemy)
     // атака — только преследующий враг (CHASE). CHASE недостижимого героя невозможен
     // (enemyChase не переводит в CHASE при пустом пути), поэтому враг не бьёт сквозь
     // стены и не машет в пустоту: цель всегда достижима и в зоне реального попадания
@@ -1482,7 +1768,42 @@ export function enemyTick(enemy) {
         // попадание отнимает управление движением/атакой на charm секунд
         charmTryTrigger(enemy, sees)
     }
+    // E-10: раненые враги (≤25% ХП спавна, не боссы) — бегство/подкрадывание.
+    // Дальнобойные только отходят, удерживая дистанцию стрельбы (rangedKeepDist);
+    // у милишников цикл flee→sneak до конца боя. Вне боевой тревоги (не замечен,
+    // не позван, не в FLEE) раненый живёт как обычный — убегать от героя, которого
+    // не видел, смысла нет
+    if (isWounded(enemy) && (enemy.noticed || enemy.called || enemy.state === ENEMY_STATE.FLEE)) {
+        const kd = rangedKeepDist(enemy)
+        const hc = [Math.trunc(status.hero.x / 32), Math.trunc(status.hero.y / 32)]
+        const ec = enemyCellOf(enemy)
+        const tooClose = kd === 0 || Math.max(Math.abs(ec[0] - hc[0]), Math.abs(ec[1] - hc[1])) < kd
+        if (enemy.state === ENEMY_STATE.FLEE) {
+            if (kd > 0 && !tooClose) {
+                // дальнобойный отошёл на комфортную дистанцию — снова обычная стрельба
+                enemy.fleePhase = undefined
+                enemy.path = []
+                enemy.pathTarget = null
+                setEnemyState(enemy, ENEMY_STATE.CHASE)
+            }
+        } else {
+            enemy.fleePhase = "flee"
+            enemy.path = []
+            enemy.pathTarget = null
+            setEnemyState(enemy, ENEMY_STATE.FLEE)
+        }
+    } else if (enemy.state === ENEMY_STATE.FLEE) {
+        // раненый вылечен (воскрешение мумии) — обычное поведение
+        enemy.fleePhase = undefined
+        enemy.path = []
+        enemy.pathTarget = null
+        setEnemyState(enemy, enemySeesHero(enemy) || enemy.called ? ENEMY_STATE.CHASE : ENEMY_STATE.IDLE)
+    }
     // движение
+    if (enemy.state === ENEMY_STATE.FLEE) {
+        fleeTick(enemy, sees)
+        return
+    }
     if (enemy.state === ENEMY_STATE.CHASE) {
         // V79: окно неуязвимости (invulnActive) — Циклоп стоит на месте; атаки выше
         // уже отработали (enemyTryAttack до этой точки), с конца окна движение идёт само
