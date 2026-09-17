@@ -789,3 +789,20 @@ createElementNS/textHtml/clipPath в игровых файлах = 0. ГРАБЛ
 Проверено headless: журнал 26 строк со скроллом без наложений; библиотека 3 режима;
 тултип с переносом; миникарта по клику уголка; секторы 360/90/45/270/0; полосы/
 шкафчик/карта/боевой цикл — регресс чист. Осталось R4.5 (drag/события/геймпад) и R5.
+
+## ОДИННАДЦАТАЯ ВОЛНА — R4.5, ЭТАП R4 ЗАКРЫТ (2026-09-17, коммит ee7de00)
+Drag-машина (draggableShim/canvas pointermove+up/hitTestUI/elementFromPoint-патч)
+и геймпад-клик существовали с R2 — R4.5 свёлся к поиску реального бага: геймпад
+передаёт status.mouseX/Y в viewBox в функции, ждущие клиентские координаты
+(hitTestUI сравнивает с getBounds) → при окне ≠1920 промах ×1/0.8. Фикс:
+dragViewToClient на границе dragState. verify_r45: мышиный drag снятия оружия
+(кукла слот 11 → ячейка 13: doll[11]=null, inv[0]=weapon, attack.img=null),
+dblclick-экипировка (два тапа <350мс — детектор в wirePixiEvents меряет промежуток,
+CDP-клики с паузой 250мс НЕ проходят), геймпад-drag gamepadDragStart/Move/End в
+viewBox, геймпад-клик точным путём gameLoop — карта открылась, 0 ошибок.
+R4 ВЫПОЛНЕН ПОЛНОСТЬЮ. Для R5: аудит DOM-поднабора игры в RENDER_MIGRATION.md
+(animVal 313, setAttribute 135, getAttribute 92, пулы 72, getElementById 64...)
+— это ТЗ «тонкого элемента»; createElementNS/textHtml/clipPath в игровых файлах
+реальных вызовов больше не имеют. Грабля R4.5: state-зависимые шаги теста
+(gamepad-drag со слота 11 после НЕУДАВШЕГОСЯ dblclick стартует с пустого слота —
+start-miss был корректным поведением).

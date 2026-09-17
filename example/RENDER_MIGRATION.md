@@ -163,7 +163,7 @@ dropSafe, spiderBossFight) получили нативный путь без е�
 - Отложено на R4: mapRender (панель карты — UI-слой), экраны/панели в screenPic
   (лобби/comix/endGame/HUD), растущий rect полосы юза.
 
-### R4. UI нативно (тексты, полосы, иконки, миникарта, drag) — ЧАСТИЧНО ВЫПОЛНЕН (2026-09-17)
+### R4. UI нативно (тексты, полосы, иконки, миникарта, drag) — ВЫПОЛНЕН ПОЛНОСТЬЮ (2026-09-17)
 Сделано (коммиты 6dd0c23 / 4fbeb4e / 2316c99 / 29148d5):
 - **R4.1 карта**: панель «Карта» нативно — все прямоугольники (комнаты/коридоры/стены/
   двери) ОДНИМ PIXI.Graphics (createNativeGraphics + фасад nativeGraphics), объекты
@@ -186,9 +186,13 @@ dropSafe, spiderBossFight) получили нативный путь без е�
   шимом не реализовывался (в SVG работал) — строки журнала накладывались при скролле.
   Игровые файлы больше НЕ содержат createElementNS/textHtml/clipPath (только бэкенд-
   эмуляции и комментарии) — R5 сносит их вместе с шимом.
-Осталось: R4.5 drag предметов/события onclick-hover (кроме мигрированных точечно)/
-elementFromPoint → hitTestUI/геймпад-клик; settings/skillTree/topMenu/inventory/doll/
-belt тяжёлых конструкций не содержат (тонкие фабрики переживут R5 как есть).
+- **R4.5 drag/события/геймпад** (ee7de00): pointer-drag машина (draggableShim +
+  canvas pointermove/up + hitTestUI + elementFromPoint-патч) существовала с R2;
+  найден и закрыт баг геймпад-пути — status.mouseX/Y в viewBox передавались в
+  функции, ждущие клиентские (hitTestUI/getBounds) → промах ×1/0.8 при окне ≠1;
+  фикс: dragViewToClient на границе dragState. Верификация verify_r45: мышиный
+  drag снятия/двойной клик экипировки/геймпад-drag в viewBox/геймпад-клик точным
+  путём gameLoop (createSVGPoint→CTM→elementFromPoint→dispatchEvent) — 0 ошибок.
 
 ### R4 (план исходный). UI нативно (тексты, полосы, иконки, миникарта, drag)
 - Полосы ХП/опыта/босса (clipPath-маски) → прямой redraw Graphics; journal/library/
@@ -198,13 +202,25 @@ belt тяжёлых конструкций не содержат (тонкие �
   переезжает в публичный API); elementFromPoint → hitTestUI; drag.js → нативный pointer-drag.
 - Критерий: панели, тултипы, drag предметов, геймпад-клик, минимапа.
 
-### R5. Снос шима
-- Удалить: ShimEl, applyAttr-роутер, style-прокси, animVal, clipPath-маски,
-  glow-запекалку, createElementNS monkey-patch, svg.js, пулы шимов.
-- Остатся: app/слои/камера/текстуры (движок), фабрики, ecsBridge/renderSync.
-- Финальный аудит: grep по scripts/ вне бэкенда — 0 вхождений setAttribute,
-  createElementNS, appendChild, style-записей на рендер-объектах.
-- Документы: SESSION_HANDOFF.md, ENGINE.md, GAME.md — новый контракт рендера.
+### R5. Снос шима — СЛЕДУЮЩАЯ СЕССИЯ (аудит готов, 2026-09-17)
+Реальных вызовов createElementNS/textHtml/clipPath в игровых файлах БОЛЬШЕ НЕТ
+(после R4.4 остались только комментарии) — monkey-patch и клип-машинерия удаляемы.
+Остальной DOM-поднабор, который игра реально зовёт (аудит по scripts/ вне
+pixiBackend/svg.js; движок engine.js исключён):
+  animVal 313 (x/y/width/height/href) · setAttribute 135 · getAttribute 92 ·
+  remove() 84 · пулы releaseSprite/_slot 72 · getElementById 64 · id-геттер 52 ·
+  style. 32 (filter/outline/display) · addEventListener 25 (document-mousemove
+  ползунков, wheel) · textContent 23 · parentNode/isConnected 21 · append 15 ·
+  removeEventListener 10 · firstChild 6 (del.js) · insertBefore 5 (тени) ·
+  getScreenCTM 3 · getComputedTextLength 3 (fitText) · onclick= 2 · removeChild 3.
+ЭТО и есть ТЗ «тонкого элемента» R5: переписать ShimEl → El с ровно этим
+поднабором над нативными узлами (animVal — геттеры над attrs; style — мини-прокси
+filter/outline/display; пулы и glow-запекалка ПОКА оставить как утилиты), затем
+удалять: applyAttr-ветки умерших атрибутов, clipPath-машинерию, createElementNS
+monkey-patch, svg.js-обёртки мёртвых фабрик (circle/path/textHtml уже не зовутся).
+Этапы: (1) El-класс паритет-замена (игра не меняется), (2) удаление мёртвых
+веток/патчей, (3) финальный grep-аудит + доки ENGINE/GAME. Каждый этап — коммит
+с полным протоколом (синтакс → headless полный цикл → скриншоты панелей → пуш).
 
 ## 4. Протокол проверки каждого этапа (единый)
 1. `node --input-type=module --check` каждого правленого модуля (node --check молчит на CJS!).
