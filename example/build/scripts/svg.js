@@ -65,6 +65,12 @@ function worldImage(place,x,y,w,h,src,obj={}) {
 function picById(key) {
     return backend.worldById(key)
 }
+// R4: нативная графика — один PIXI.Graphics для набора статичных фигур
+// (панель карты: комнаты/коридоры/стены/двери). Фигуры рисует вызывающий
+// через handle.node.rect(x,y,w,h).fill(color); remove() уничтожает Graphics
+function nativeGraphics(place) {
+    return backend.createNativeGraphics(place)
+}
 function path(place,obj,fill='rgba(0, 0, 0, 0.65)') {
     return backend.createPath(place,obj,fill)
 }
@@ -81,4 +87,4 @@ function gamepadDragMove (x,y) { backend.dragState().move(x,y) }
 function gamepadDragEnd () { backend.dragState().end() }
 function isDragging () { return backend.dragState().isDragging() }
 
-export {svg,svgArr,circle,rect,text,image,textHtml,path,worldImage,picById,gamepadDragStart,gamepadDragMove,gamepadDragEnd,isDragging,spritePos,moveSprite,releaseSprite,rectPos,getCTM}
+export {svg,svgArr,circle,rect,text,image,textHtml,path,worldImage,picById,nativeGraphics,gamepadDragStart,gamepadDragMove,gamepadDragEnd,isDragging,spritePos,moveSprite,releaseSprite,rectPos,getCTM}

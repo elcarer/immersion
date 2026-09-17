@@ -1419,6 +1419,15 @@ function appendWorld(layer, ws, toBottom) {
     ws.parent = layer
     ws._layer = layer
 }
+// R4: нативная графика (Panels/карта — набор статичных фигур одним Graphics).
+// Тот же лёгкий хэндл WorldSprite (kind="image"): glow-копии сами пропускают
+// не-Sprite (makeShadowCopy), remove() уничтожает Graphics
+function createNativeGraphics(place) {
+    const g = new PIXI.Graphics()
+    const ws = new WorldSprite(g, place)
+    place.node.addChild(g)
+    return ws
+}
 // поиск мирового узла по id-ключу («15OI», «3RI») — O(1) вместо сканов screenPic
 function worldById(key) {
     return shimById.get(String(key)) || null
@@ -2138,7 +2147,7 @@ export {
     setupBackend, createLayers, windowSize, layers,
     createImage, createAnimImage, acquirePooled, releaseSprite,
     createRect, createCircle, createTextEl, createTextHtml, createPath, createGroup,
-    createWorldImage, worldById,
+    createWorldImage, createNativeGraphics, worldById,
     spritePos, moveSprite, rectPos, getCTMExport, applyPixelated, cameraView,
     preloadGameTextures, backendHooks, dragState,
     installGameTicks, gameTickSystem, applyStillTexture,
