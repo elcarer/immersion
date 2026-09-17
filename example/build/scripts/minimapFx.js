@@ -1,4 +1,4 @@
-import { svgArr,rect,circle,image,nativePoly } from "../scripts/svg.js"
+import { svgArr,rect,circle,image,nativePoly,uiRightEdge,onUiResize } from "../scripts/svg.js"
 import { status } from "../scripts/start.js"
 import { playback,strike } from "../scripts/sound.js"
 import { dataGeneric } from "../scripts/sceneGenerate.js"
@@ -37,6 +37,10 @@ const MM_SHIFT_X = -5
 const MM_SHIFT_Y = 5
 const MM_X = 1920 - MM_SIZE - 12 + MM_SHIFT_X // 1703 — от него считается вся сетка и кружок
 const MM_Y = 12 + MM_SHIFT_Y                  // 17
+//E-12 (репорт юзера): миникарта и кнопка прибиты К ПРАВОМУ КРАЮ ЭКРАНА, а не к
+//дизайн-1920: окно шире 16:9 канвас шире 16:9-зоны UI, и без поправки элементы
+//«сдвигаются влево» от края. mmDx — поправка в дизайн-координатах (0 при окне ≤ 16:9)
+const mmDx = () => uiRightEdge() - 1920
 //V41: рамка окна — нарисованный арт ./images/UI/panels/minimap.png (224×224, ТОЛЬКО ободок
 //~5px по краю, внутренность прозрачная) вместо генерённого rect-контура. Кладём 1:1 вокруг
 //зоны карты 200×200: 12px запаса на рамку с каждой стороны. Внутренность арта прозрачна —
@@ -116,12 +120,14 @@ function mmFingerprint () {
 function minimapBtn () {
     minimapBtnDel()
     closeMinimap()
+    //геометрия строится в каноне 1920, поправка края экрана — позицией узла (mmDx)
     const bx = 1920 - BTN_LEG
     //R4.4: нативный Graphics-полигон с federated-событиями на узле вместо
     //createElementNS("polygon"); eventMode static в фабрике = бывший pointer-events:all.
     //Стилевой курсор НЕ переопределяем: курсор в игре один (body url cur.png)
     const poly = nativePoly(svgArr[2], [[bx, 0], [1920, 0], [1920, BTN_LEG]], "rgba(30,22,17,0.65)", "rgb(204,153,102)", BTN_STROKE, {"id": "minimapBtn"})
     poly.setAttribute("opacity", "0.7")
+    poly.setAttribute("x", mmDx())
     poly.node.on("pointerover", () => {
         //V30a: подсветка заметнее — полная непрозрачность + двойное свечение
         poly.setAttribute("opacity", "1")
@@ -150,14 +156,23 @@ function openMinimap () {
     miniOpen = true
     //V41: подложка — тёмный rect ПОД артом рамки, на 6px шире зоны карты (заходит под ободок,
     //щели не остаётся); без func оба узла сами получают pointer-events:none (svg.js)
-    winNodes.push(rect(svgArr[2], MM_IMG_X + 6, MM_IMG_Y + 6, MM_FRAME - 12, MM_FRAME - 12, "none", "0px", "rgba(16,12,10,0.85)", {"id":"minimapWinBack","rx":"5px"}))
+    const back = rect(svgArr[2], MM_IMG_X + 6, MM_IMG_Y + 6, MM_FRAME - 12, MM_FRAME - 12, "none", "0px", "rgba(16,12,10,0.85)", {"id":"minimapWinBack","rx":"5px"})
+    back.__mmX = MM_IMG_X + 6
+    back.setAttribute("x", back.__mmX + mmDx())
+    winNodes.push(back)
     //ВНИМАНИЕ: image() дописывает к obj.id суффикс "I" (svg.js) — как у кружка ниже, id вешаем руками
     const frameEl = image(svgArr[2], MM_IMG_X, MM_IMG_Y, MM_FRAME, MM_FRAME, "./images/UI/panels/minimap.png")
     frameEl.setAttribute("id", "minimapWin")
+    frameEl.__mmX = MM_IMG_X
+    frameEl.setAttribute("x", frameEl.__mmX + mmDx())
     winNodes.push(frameEl)
     //ВНИМАНИЕ: хелпер circle() НЕ ставит obj.id (игнорирует поле) — вешаем вручную
     dotEl = circle(svgArr[2], -100, -100, 4, "#1c150f", "1px", MM_HERO_FILL)
     dotEl.setAttribute("id", "minimapHero")
+    //E-12: после закрытия dedup mmPlaceDot держал координаты прошлого кружка —
+    //переоткрытие на той же клетке героя оставляло НОВЫЙ кружок на (−100,−100)
+    dotX = -1
+    dotY = -1
     //мгновенная отрисовка даже под паузой панелей: следующий тик мог бы не наступить
     if (status.start === 1 && status.matrixLevel) {
         status.matrixLevel !== floorRef && mmPrepare()
@@ -207,7 +222,7 @@ function mmRebuild (hx, hy) {
             if (on && runStart < 0) runStart = rx
             if (!on && runStart >= 0) {
                 runNodes.push(rect(svgArr[2],
-                    MM_X + MM_PAD + (runStart - x0) * MM_CELL,
+                    MM_X + mmDx() + MM_PAD + (runStart - x0) * MM_CELL,
                     MM_Y + MM_PAD + (ry - y0) * MM_CELL,
                     (rx - runStart) * MM_CELL,
                     MM_CELL, "none", "0px", MM_RUN_FILL))
@@ -222,11 +237,12 @@ function mmRebuild (hx, hy) {
 function mmPlaceDot () {
     if (!dotEl || !renderAnchor) return
     const scale = MM_CELL / 32
-    let cx = MM_X + MM_PAD + (status.hero.x + 16 - (renderAnchor.x - MM_N) * 32) * scale
+    const edge = MM_X + mmDx()
+    let cx = edge + MM_PAD + (status.hero.x + 16 - (renderAnchor.x - MM_N) * 32) * scale
     let cy = MM_Y + MM_PAD + (status.hero.y + 16 - (renderAnchor.y - MM_N) * 32) * scale
-    cx < MM_X + MM_PAD + 3 && (cx = MM_X + MM_PAD + 3)
+    cx < edge + MM_PAD + 3 && (cx = edge + MM_PAD + 3)
     cy < MM_Y + MM_PAD + 3 && (cy = MM_Y + MM_PAD + 3)
-    cx > MM_X + MM_PAD + MM_INNER - 3 && (cx = MM_X + MM_PAD + MM_INNER - 3)
+    cx > edge + MM_PAD + MM_INNER - 3 && (cx = edge + MM_PAD + MM_INNER - 3)
     cy > MM_Y + MM_PAD + MM_INNER - 3 && (cy = MM_Y + MM_PAD + MM_INNER - 3)
     cx = Math.round(cx)
     cy = Math.round(cy)
@@ -256,6 +272,25 @@ function minimapTick () {
     }
     mmPlaceDot()
 }
+//E-12: ресайз окна — кнопка (живёт весь забег) и открытое окно карты доезжают до
+//правого края экрана. Сетка и кружок пересобираются (их координаты считаются от края),
+//рамка/подложка двигаются атрибутом x от канона, записанного при открытии (__mmX)
+function mmResize () {
+    const dx = mmDx()
+    for (let i = 0; i < btnNodes.length; i++) {
+        const n = btnNodes[i]
+        n && n.setAttribute && n.setAttribute("x", dx)
+    }
+    if (!miniOpen) return
+    for (let i = 0; i < winNodes.length; i++) {
+        const n = winNodes[i]
+        n && n.setAttribute && n.__mmX !== undefined && n.setAttribute("x", n.__mmX + dx)
+    }
+    renderAnchor && mmRebuild(renderAnchor.x, renderAnchor.y)
+    mmPlaceDot()
+}
+onUiResize(mmResize)
+
 //для тестов: снимок открытости (те же правила, что видит рендер)
 function minimapDebug () {
     const res = {"openRooms":[], "corridorOpen":0, "runs":runNodes.length, "prepared":!!ownerRec}

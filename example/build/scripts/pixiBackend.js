@@ -243,11 +243,30 @@ function applyCamera() {
     uiCTM = { a: sUi, b: 0, c: 0, d: sUi, e: 0, f: 0 }
 }
 
+// E-12 (репорт юзера): правый край ЭКРАНА в дизайн-координатах UI-слоя. Канвас —
+// на всё окно (resizeTo: window), а масштаб UI считается от 16:9-клампнутой
+// ширины: при окне шире 16:9 дизайн-право (1920) не доходит до края экрана, и
+// прибитые к нему элементы (миникарта, её кнопка, полоса ХП босса) «сдвигаются
+// влево». Право-прибитые элементы позиционируются от этого края, dpi ресайза
+// пересчитывается через onUiResize
+function uiRightEdge() {
+    const sUi = windowSize.wt / uiVB.width
+    return window.innerWidth / sUi
+}
+
+// подписка игры на ресайз окна (после пересчёта windowSize/камеры): право-прибитые
+// панели доезжают до края экрана
+const uiResizeCbs = []
+function onUiResize(fn) { uiResizeCbs.push(fn) }
+
 function onWindowResize() {
     recalcWindowSize()
     applyCamera()
     applyPixelated()
     for (const l of layers) l && l._onResize && l._onResize()
+    for (const f of uiResizeCbs) {
+        try { f() } catch (e) { console.error("[pixiBackend] uiResize cb:", e) }
+    }
 }
 
 // ---------- Парсинг стилевых строк ----------
@@ -1411,13 +1430,27 @@ function createWorldBar(place, x, y, w, h, src, obj = {}) {
     const mask = new PIXI.Graphics()
     place.node.addChild(mask)
     ws.node.mask = mask
-    ws._bar = { mask, x: num(x), y: num(y), w: num(w), h: num(h) }
-    ws.setBarProgress = (col, anchor) => {
+    ws._bar = { mask, x: num(x), y: num(y), w: num(w), h: num(h), col: 0, anchor: "left" }
+    const applyMask = () => {
         const b = ws._bar
         b.mask.clear()
-        if (col > 0) {
-            b.mask.rect(anchor === "right" ? b.x + b.w - col : b.x, b.y, col, b.h).fill(0xffffff)
+        if (b.col > 0) {
+            b.mask.rect(b.anchor === "right" ? b.x + b.w - b.col : b.x, b.y, b.col, b.h).fill(0xffffff)
         }
+    }
+    ws.setBarProgress = (col, anchor) => {
+        const b = ws._bar
+        anchor && (b.anchor = anchor)
+        b.col = num(col)
+        applyMask()
+    }
+    // E-12: перенос всей полосы (спрайт + окно маски) — ресайз-прибивка полосы босса
+    ws.setBarOrigin = (x, y) => {
+        const b = ws._bar
+        b.x = num(x); b.y = num(y)
+        ws.setAttribute("x", b.x)
+        ws.setAttribute("y", b.y)
+        applyMask()
     }
     return ws
 }
@@ -2195,6 +2228,7 @@ export {
     spritePos, moveSprite, rectPos, getCTMExport, applyPixelated, cameraView,
     preloadGameTextures, backendHooks, dragState,
     installGameTicks, gameTickSystem, applyStillTexture,
+    uiRightEdge, onUiResize,
 }
 function getCTMExport() {
     return layers[2] ? layers[2].getScreenCTM() : null

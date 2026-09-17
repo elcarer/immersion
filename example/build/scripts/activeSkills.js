@@ -248,21 +248,57 @@ function useSkill(skill) {
         status.info.meteor = screenPic[screenPic.length-1]
     }
     if(skill.skill.title === "skill.1.9.title") {
-        skill.cooldown = skill.skill.cooldown
-        status.info.grimore === 1 && (skill.cooldown -= 60)
-        let emptyRoomsArr = []
-        let lengthRoom = dataGeneric.scenes[status.levelFloor].roomsArr.length
-        for(let i = 0; i < lengthRoom; i++) {
-            if(dataGeneric.scenes[status.levelFloor].roomsArr[i][3] === 1) {
-                emptyRoomsArr.push(dataGeneric.scenes[status.levelFloor].roomsArr[i])
-            } else if (status.info.magicShield === 1) {
-                emptyRoomsArr.push(dataGeneric.scenes[status.levelFloor].roomsArr[i])
+        //E-11 (ТЗ юзера): телепорт по взгляду вместо случайной комнаты. Проверяются
+        //клетки 1..5 по направлению взгляда героя (0 вверх, 1 вниз, 2 влево, 3 вправо),
+        //начиная от его клетки; цель — ПЕРВАЯ свободная клетка в ДРУГОЙ комнате (не в
+        //той, где стоит герой). Обычный телепорт — только открытая комната; улучшенный
+        //«со щитом» (skill.1.13, флаг magicShield) — и закрытая. «Свободна»: пол по
+        //матрице этажа, без твёрдых объектов (правила collisionCheckObject: ловушка 14
+        //и рычаг 19 проходимы) и живых врагов. Кандидатов нет — телепорт НЕ применяется:
+        //кулдаун не тратится, ранний return из useSkill (без «Вечного цитрина»),
+        //следующая попытка — с следующим проигрышем анимации wait (триггер checkEndAnim)
+        const DIRV = [[0, -1], [0, 1], [-1, 0], [1, 0]]
+        const m = status.matrixLevel
+        const lv = dataGeneric.scenes[status.levelFloor]
+        const hx = Math.trunc(status.hero.x / 32), hy = Math.trunc(status.hero.y / 32)
+        const dv = DIRV[status.hero.direction] || DIRV[1]
+        //комната клетки → номер в roomsArr (−1 — коридор/вне комнат)
+        const roomAt = (cx, cy) => {
+            for (let k = 0; k < lv.roomsArr.length; k++) {
+                const f = lv.floor[lv.roomsArr[k][0]]
+                if (cx >= f[0] && cx < f[0] + f[2] && cy >= f[1] && cy < f[1] + f[3]) return k
             }
+            return -1
         }
-        let randomRoom = emptyRoomsArr[Math.floor(Math.random() * emptyRoomsArr.length)]
-        let roomFloore = dataGeneric.scenes[status.levelFloor].floor[randomRoom[0]]
-        status.hero.x = roomFloore[5] * 32 + 16
-        status.hero.y = (roomFloore[6] + 1) * 32 + 16
+        const heroRoom = roomAt(hx, hy)
+        let target = null
+        for (let step = 1; step <= 5 && !target; step++) {
+            const cx = hx + dv[0] * step, cy = hy + dv[1] * step
+            if (!m[cy] || m[cy][cx] !== 1) continue
+            const rk = roomAt(cx, cy)
+            if (rk < 0 || rk === heroRoom) continue
+            if (lv.roomsArr[rk][3] !== 1 && status.info.magicShield !== 1) continue
+            let blocked = false
+            //твёрдые объекты этажа (габариты — в клетках o[3]×o[4], как в collision.js)
+            for (let i = 0; i < lv.objects.length && !blocked; i++) {
+                const o = lv.objects[i]
+                if (o[2] === 14 || o[2] === 19) continue
+                blocked = cx >= o[0] && cx < o[0] + o[3] && cy >= o[1] && cy < o[1] + o[4]
+            }
+            //живые враги
+            for (let i = 0; i < objectValues.length && !blocked; i++) {
+                const o = objectValues[i]
+                if (!o || o.type !== "enemy" || o.lying !== undefined) continue
+                blocked = o.rect.x.animVal.value < (cx + 1) * 32 &&
+                    o.rect.x.animVal.value + o.rect.width.animVal.value > cx * 32 &&
+                    o.rect.y.animVal.value < (cy + 1) * 32 &&
+                    o.rect.y.animVal.value + o.rect.height.animVal.value > cy * 32
+            }
+            if (!blocked) target = [cx, cy]
+        }
+        if (!target) return
+        status.hero.x = target[0] * 32 + 16
+        status.hero.y = target[1] * 32 + 16
         spritePos(status.hero.obj.img, status.hero.x, status.hero.y)
         //V31: окно камеры подставляет setWorldViewBox (1920/zoom × 1080/zoom), x/y прежние
         setWorldViewBox(status.hero.x - 960, status.hero.y - 540)
@@ -271,6 +307,8 @@ function useSkill(skill) {
             playEffect(status.hero.obj,data.effects[15])
             status.info.magicShieldDuration = 300
         }
+        skill.cooldown = skill.skill.cooldown
+        status.info.grimore === 1 && (skill.cooldown -= 60)
     }
     if(skill.skill.title === "skill.2.1.title") {
         if(status.info.reflect === 1) {
