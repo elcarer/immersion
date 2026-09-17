@@ -1,4 +1,4 @@
-import { svgArr,image,path,text } from "../scripts/svg.js"
+import { svgArr,image,worldBar,path,text } from "../scripts/svg.js"
 import { screenPic,objectValues } from "../scripts/del.js"
 
 let bossTemp
@@ -6,7 +6,7 @@ let bossHPMax
 //V16: clipPath полосы босса создаётся ОДИН раз в hpBar() — раньше changeBossHP на
 //каждый тик урона удалял старый clipPath и создавал новый (remove + 2 createElementNS
 //+ 4 setAttribute + appendChild на каждый удар — постоянный DOM-мусор в бою с боссом).
-let bossClipRect = null
+let bossBarImg = null
 let bossTextEl = null
 //V90 (репорт юзера): после убийства босса полоса ХП оставалась в правом верхнем углу до
 //конца этажа. Референсы трёх узлов полосы — для снятия в момент смерти владельца.
@@ -17,35 +17,17 @@ function hpBar(boss) {
     let bg = image(svgArr[2],1458,30,407,64,"./images/UI/panels/hpBar.png")
     screenPic.push(bg)
     bossBarEls.push(bg)
-    let barImg = image(svgArr[2],1507,50,315,24,"./images/UI/panels/hpBarCol2.png",{"id":"hpBossBar"})
-    screenPic.push(barImg)
-    bossBarEls.push(barImg)
+    //R4: нативная полоса (спрайт + маска), clipPath не нужен; полоса сразу полная
+    bossBarImg = worldBar(svgArr[2],1507,50,315,24,"./images/UI/panels/hpBarCol2.png",{"id":"hpBossBar"})
+    bossBarImg.setBarProgress(315, "left")
+    screenPic.push(bossBarImg)
+    bossBarEls.push(bossBarImg)
     bossTextEl = text(svgArr[2],1664,69,"0pt","50pt","none","2px",`#FFCC66`,bossTemp.stats.hp+"/"+bossHPMax,{"id":"hpBossText","size":24,"font":"baseFont4","anchor":"middle"})
     screenPic.push(bossTextEl)
     bossBarEls.push(bossTextEl)
-    //постоянный clipPath полосы (id "hpBossBar" — как было у пересоздаваемого узла)
-    let oldClip = document.getElementById("hpBossBar")
-    if (oldClip) oldClip.remove()
-    let clipPath = document.createElementNS("http://www.w3.org/2000/svg", "clipPath")
-    clipPath.setAttribute("id", "hpBossBar")
-    bossClipRect = document.createElementNS("http://www.w3.org/2000/svg", "rect")
-    bossClipRect.setAttribute("x", 1507)
-    bossClipRect.setAttribute("y", 50)
-    bossClipRect.setAttribute("height", 24)
-    //V17: ширина ОБЯЗАТЕЛЬНА при создании: rect без width = 0px обрезки — полоса
-    //не отображалась до первого удара (её делал видимой только changeBossHP).
-    bossClipRect.setAttribute("width", 315)
-    clipPath.appendChild(bossClipRect)
-    let defs = svgArr[2].querySelector('defs')
-    if (!defs) {
-        defs = document.createElementNS("http://www.w3.org/2000/svg", "defs")
-        svgArr[2].appendChild(defs)
-    }
-    defs.appendChild(clipPath)
-    barImg.setAttribute("clip-path", "url(#hpBossBar)")
 }
 function changeBossHP(img,text) {
-    if (!bossTemp || !bossClipRect || !bossTextEl) return
+    if (!bossTemp || !bossBarImg || !bossTextEl) return
     bossTemp.stats.hp < 0 && (bossTemp.stats.hp = 0)
     let lengthCol = Math.trunc(bossTemp.stats.hp*315 / bossHPMax)
     let label = bossTemp.stats.hp+"/"+bossHPMax
@@ -65,8 +47,8 @@ function changeBossHP(img,text) {
         max > 0 && (lengthCol = Math.trunc(hp*315 / max))
         label = hp+"/"+max
     }
-    //V16: меняем только ширину rect'а и текст — никакого пересоздания узлов
-    bossClipRect.setAttribute("width", lengthCol)
+    //V16/R4: меняем только окно маски и текст — никакого пересоздания узлов
+    bossBarImg.setBarProgress(lengthCol, "left")
     bossTextEl.textContent = label
 }
 //V90: снять полосу босса (смерть владельца). Узлы отцепляются от DOM; из screenPic их
@@ -78,8 +60,7 @@ function hideBossBar() {
         bossBarEls[i].remove()
     }
     bossBarEls = []
-    bossClipRect && bossClipRect.parentNode && bossClipRect.parentNode.remove()
-    bossClipRect = null
+    bossBarImg = null
     bossTextEl = null
     bossTemp = null
     bossHPMax = 0

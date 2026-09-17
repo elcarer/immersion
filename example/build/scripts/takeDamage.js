@@ -1,7 +1,7 @@
 import { status } from "../scripts/start.js"
 import { T } from "../scripts/localization.js"
 import { screenPic,objectValues } from "../scripts/del.js"
-import { svgArr,image,text,releaseSprite } from "../scripts/svg.js"
+import { svgArr,image,worldBar,text,releaseSprite } from "../scripts/svg.js"
 import { endGame } from "../scripts/endGame.js"
 import { floatText } from "../scripts/floatText.js"
 import { playEffect, relicReflect } from "../scripts/damage.js"
@@ -150,8 +150,9 @@ function checkFood() {
 function checkHP() {
     screenPic.push(image(svgArr[2],958,987,407,64,"./images/UI/panels/hpBar.png"))
     screenPic.push(image(svgArr[2],554,987,407,64,"./images/UI/panels/hpBar.png"))
-    screenPic.push(image(svgArr[2],1007,1007,315,24,"./images/UI/panels/hpBarCol2.png",{"id":"hpBar"}))
-    screenPic.push(image(svgArr[2],598,1007,315,24,"./images/UI/panels/hpBarCol1.png",{"id":"expBar"}))
+    //R4: полосы нативные (спрайт + маска) — changeHP правит окно маски напрямую
+    screenPic.push(worldBar(svgArr[2],1007,1007,315,24,"./images/UI/panels/hpBarCol2.png",{"id":"hpBar"}))
+    screenPic.push(worldBar(svgArr[2],598,1007,315,24,"./images/UI/panels/hpBarCol1.png",{"id":"expBar"}))
     screenPic.push(text(svgArr[2],1164,1026,"0pt","50pt","none","2px",`#FFCC66`,status.info.hp+"/"+status.info.stats[2].dops[0].value2.slice(0,-1),{"id":"hpText","size":24,"font":"baseFont4","anchor":"middle"}))
     screenPic.push(text(svgArr[2],760,1026,"0pt","50pt","none","2px",`#FFCC66`,status.info.exp+"/"+Math.trunc(((1 + 20/(status.info.lvl))**((status.info.lvl)/20) - 1) / (Math.exp(1) - 1) * 100),{"id":"expText","size":24,"font":"baseFont4","anchor":"middle"}))
     changeHP(document.getElementById("expBarI"),document.getElementById("expText"),"exp")
@@ -173,34 +174,10 @@ function changeHP(img,text,type) {
     let lengthCol
     type==="hp"&&(lengthCol = Math.trunc(status.info.hp*315 / parseInt(status.info.stats[2].dops[0].value2.slice(0,-1))))
     type==="exp"&&(lengthCol = Math.trunc(status.info.exp*315 / Math.trunc(((1 + 20/(status.info.lvl))**((status.info.lvl)/20) - 1) / (Math.exp(1) - 1) * 100)))
-        let svg = svgArr[2];
-        // Удаляем старый clipPath, если он существует
-        let oldClip = document.getElementById(type);
-        if (oldClip) oldClip.remove();
-        // Создаём новый clipPath
-        let clipPath = document.createElementNS("http://www.w3.org/2000/svg", "clipPath");
-        clipPath.setAttribute("id", type);
-        // Получаем координаты и размеры изображения
-        let x = parseFloat(img.getAttribute('x'));
-        let y = parseFloat(img.getAttribute('y'));
-        let height = parseFloat(img.getAttribute('height'));
-        // Создаём прямоугольник обрезки
-        let rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
-        rect.setAttribute("x", type==="hp"?x:x-lengthCol+315);
-        rect.setAttribute("y", y);
-        rect.setAttribute("width", lengthCol);
-        rect.setAttribute("height", height);
-        clipPath.appendChild(rect);
-        // Добавляем clipPath в defs SVG (создаём defs, если его нет)
-        let defs = svg.querySelector('defs');
-        if (!defs) {
-            defs = document.createElementNS("http://www.w3.org/2000/svg", "defs");
-            svg.appendChild(defs);
-        }
-        defs.appendChild(clipPath);
-        // Применяем обрезку к изображению
-        img.setAttribute("clip-path", "url(#"+type+")")
-        type==="hp"?
+    //R4: окно маски полосы правится напрямую (ХП заполняется слева, опыт — справа);
+    //никаких clipPath-пересозданий в defs на каждое изменение
+    img.setBarProgress && img.setBarProgress(lengthCol, type==="hp" ? "left" : "right")
+    type==="hp"?
         text.textContent = status.info.hp+"/"+status.info.stats[2].dops[0].value2.slice(0,-1):
         text.textContent = status.info.exp+"/"+Math.trunc(((1 + 20/(status.info.lvl))**((status.info.lvl)/20) - 1) / (Math.exp(1) - 1) * 100)
 }

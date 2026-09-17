@@ -71,6 +71,11 @@ function picById(key) {
 function nativeGraphics(place) {
     return backend.createNativeGraphics(place)
 }
+// R4: нативная полоса (ХП/опыт/босс/загрузка) — спрайт заливки + маска-Graphics;
+// прогресс: handle.setBarProgress(colPx, "left"|"right") вместо clipPath-пересозданий
+function worldBar(place,x,y,w,h,src,obj={}) {
+    return backend.createWorldBar(place,x,y,w,h,src,obj)
+}
 function path(place,obj,fill='rgba(0, 0, 0, 0.65)') {
     return backend.createPath(place,obj,fill)
 }
@@ -87,4 +92,4 @@ function gamepadDragMove (x,y) { backend.dragState().move(x,y) }
 function gamepadDragEnd () { backend.dragState().end() }
 function isDragging () { return backend.dragState().isDragging() }
 
-export {svg,svgArr,circle,rect,text,image,textHtml,path,worldImage,picById,nativeGraphics,gamepadDragStart,gamepadDragMove,gamepadDragEnd,isDragging,spritePos,moveSprite,releaseSprite,rectPos,getCTM}
+export {svg,svgArr,circle,rect,text,image,textHtml,path,worldImage,worldBar,picById,nativeGraphics,gamepadDragStart,gamepadDragMove,gamepadDragEnd,isDragging,spritePos,moveSprite,releaseSprite,rectPos,getCTM}

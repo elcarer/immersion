@@ -1382,6 +1382,13 @@ class WorldSprite {
         // слой-шим хранит только ShimEl-детей — WorldSprite живёт в raw-дереве,
         // так что отсоединение = вынуть из raw-контейнера и уничтожить
         removeShadowCopies(this)
+        if (this._bar) {
+            // полоса (R4): маска-Graphics живёт в слое как sibling — уходит вместе с ней
+            const m = this._bar.mask
+            this.node.mask = null
+            if (m.parent) m.parent.removeChild(m)
+            m.destroy()
+        }
         if (this.node.parent) this.node.parent.removeChild(this.node)
         this.node.destroy()
         if (this.attrs.id !== undefined && this.attrs.id !== null) {
@@ -1418,6 +1425,26 @@ function appendWorld(layer, ws, toBottom) {
     layer.node.addChildAt(ws.node, toBottom ? 0 : layer.node.children.length)
     ws.parent = layer
     ws._layer = layer
+}
+// R4: нативная полоса (ХП/опыт/босс/загрузка) — спрайт заливки + маска-Graphics.
+// Рост/убыль заливки = ОКНО маски (картинка не сжимается, как в SVG-клипе):
+// anchor "left" — заполнение слева (ХП/босс/загрузка), "right" — справа (опыт).
+// setBarProgress(0) прячет заливку целиком. Маска — sibling в том же слое,
+// координаты совпадают с координатами спрайта
+function createWorldBar(place, x, y, w, h, src, obj = {}) {
+    const ws = createWorldImage(place, x, y, w, h, src, obj)
+    const mask = new PIXI.Graphics()
+    place.node.addChild(mask)
+    ws.node.mask = mask
+    ws._bar = { mask, x: num(x), y: num(y), w: num(w), h: num(h) }
+    ws.setBarProgress = (col, anchor) => {
+        const b = ws._bar
+        b.mask.clear()
+        if (col > 0) {
+            b.mask.rect(anchor === "right" ? b.x + b.w - col : b.x, b.y, col, b.h).fill(0xffffff)
+        }
+    }
+    return ws
 }
 // R4: нативная графика (Panels/карта — набор статичных фигур одним Graphics).
 // Тот же лёгкий хэндл WorldSprite (kind="image"): glow-копии сами пропускают
@@ -2147,7 +2174,7 @@ export {
     setupBackend, createLayers, windowSize, layers,
     createImage, createAnimImage, acquirePooled, releaseSprite,
     createRect, createCircle, createTextEl, createTextHtml, createPath, createGroup,
-    createWorldImage, createNativeGraphics, worldById,
+    createWorldImage, createWorldBar, createNativeGraphics, worldById,
     spritePos, moveSprite, rectPos, getCTMExport, applyPixelated, cameraView,
     preloadGameTextures, backendHooks, dragState,
     installGameTicks, gameTickSystem, applyStillTexture,

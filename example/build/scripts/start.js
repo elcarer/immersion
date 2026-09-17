@@ -1,4 +1,4 @@
-﻿import { svgArr,image,text,rect } from "../scripts/svg.js"
+﻿import { svgArr,image,worldBar,text,rect } from "../scripts/svg.js"
 import cacheResources from "../scripts/cacheResources.js"
 import { screenPic,del } from "../scripts/del.js"
 import { gameLoop } from "../scripts/gameLoop.js"
@@ -79,29 +79,15 @@ function start() {
     screenPic.push(image(svgArr[0],bgX,bgY,407,64,"./images/UI/panels/hpBar.png"))
     const fillX = bgX + 49
     const fillY = bgY + 20
-    screenPic.push(image(svgArr[0],fillX,fillY,315,24,"./images/UI/panels/hpBarCol1.png"))
-    //постоянное clip-окно заливки: ширина 0 → 315 по мере загрузки; svgArr[0] целиком
-    //сносит del() при onComplete — отдельная чистка clipPath не нужна
-    let loadClip = document.createElementNS("http://www.w3.org/2000/svg", "clipPath")
-    loadClip.setAttribute("id", "loadBarClip")
-    let loadClipRect = document.createElementNS("http://www.w3.org/2000/svg", "rect")
-    loadClipRect.setAttribute("x", fillX)
-    loadClipRect.setAttribute("y", fillY)
-    loadClipRect.setAttribute("width", 0)
-    loadClipRect.setAttribute("height", 24)
-    loadClip.appendChild(loadClipRect)
-    let defs = svgArr[0].querySelector('defs')
-    if (!defs) {
-        defs = document.createElementNS("http://www.w3.org/2000/svg", "defs")
-        svgArr[0].appendChild(defs)
-    }
-    defs.appendChild(loadClip)
-    screenPic[screenPic.length - 1].setAttribute("clip-path", "url(#loadBarClip)")
+    //R4: нативная полоса загрузки — окно маски 0 → 315 по мере загрузки (картинка
+    //не сжимается, как в SVG-клипе); svgArr[0] целиком сносит del() при onComplete
+    const loadFill = worldBar(svgArr[0],fillX,fillY,315,24,"./images/UI/panels/hpBarCol1.png")
+    screenPic.push(loadFill)
     cacheResources({
         basePath: './images/',
         fromFile: './images/resources.json',
         onProgress: (cur, max) => {
-            loadClipRect.setAttribute("width", Math.trunc((cur/max)*315))
+            loadFill.setBarProgress(Math.trunc((cur/max)*315), "left")
         },
         onComplete: (success) => {
              del()
