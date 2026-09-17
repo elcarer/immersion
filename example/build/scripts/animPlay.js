@@ -87,7 +87,12 @@ function animPlay() {
                 d.img._shift = d._frameW*d.currentStill
                 if (d.img._fx !== newX) {
                     d.img._fx = newX
-                    d.img.setAttribute('x', newX)
+                    // R2: мимо DOM-контракта. Кадр уже в компоненте animStill
+                    // (акцессор currentStill выше по циклу), узел применит
+                    // ecsRenderSync раз в кадр. attrs/кэш поддерживаем для
+                    // читателей img.x.animVal (encounters/useObject/valkyrie)
+                    d.img.attrs.x = newX
+                    d.img._lx = newX
                 }
             }
         }

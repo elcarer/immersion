@@ -1873,6 +1873,21 @@ function spritePos(img, x, y) {
     if (!img) return
     if (img.kind === "anim") {
         const cr = img._clipRect
+        // R2: боевая сущность — нативная запись МИМО DOM-контракта: логическое
+        // состояние (rect/img attrs и кэши — их читают rectPos/img.x.animVal) и
+        // компоненты обновляются синхронно, узел не трогается (позицию/кадр
+        // применяет ecsRenderSync один раз за кадр)
+        const eid = cr._ecs
+        if (eid !== undefined && eid !== null) {
+            cr._rx = x; cr._ry = y
+            cr.attrs.x = x; cr.attrs.y = y
+            COMPONENTS.posX[eid] = x
+            COMPONENTS.posY[eid] = y
+            const ix = x - (img._shift || 0)
+            img.attrs.x = ix; img.attrs.y = y
+            img._lx = ix; img._ly = y
+            return
+        }
         if (cr._rx !== x) { cr._rx = x; cr.setAttribute("x", x) }
         if (cr._ry !== y) { cr._ry = y; cr.setAttribute("y", y) }
         const ix = x - (img._shift || 0)

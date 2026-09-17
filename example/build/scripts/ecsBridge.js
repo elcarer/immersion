@@ -159,14 +159,16 @@ export function ecsRenderSync() {
         const id = ents[i]
         const sprite = DATA.sprite[id]
         if (!sprite || !sprite.node) continue
-        // UI-сущности (спрайты убитых врагов на экране очков — их кладёт endGame
-        // в svgArr[2] с ЭКРАННЫМИ координатами) камерой слоя 1 не кульлятся:
-        // их (150..1800, 280..600) «вне окна камеры» гасило каждый кадр
-        if (sprite._layer === layers[2]) continue
+        const node = sprite.node
+        // R2: UI-сущности (спрайты убитых врагов на экране очков — их кладёт endGame
+        // в svgArr[2] с ЭКРАННЫМИ координатами) не кульлятся камерой слоя 1, но
+        // позицию/кадр получают из компонентов как все (раньше их кадры вёл
+        // applyPosition-путь, который у боевых сущностей больше не трогает узел)
+        const isUi = sprite._layer === layers[2]
         const pad = COMPONENTS.cullPad[id]
         const x = COMPONENTS.posX[id], y = COMPONENTS.posY[id]
-        const node = sprite.node
-        if (x < left - pad || x > right + pad || y < top - pad || y > bottom + pad) {
+        if (!isUi &&
+            (x < left - pad || x > right + pad || y < top - pad || y > bottom + pad)) {
             node.visible = false
             continue
         }

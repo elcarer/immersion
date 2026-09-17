@@ -105,7 +105,18 @@ setAttribute-пути, а не являются функцией компоне�
 - Критерий приёмки: golden-скриншоты попиксельно (допуск ≤2px на тексте), риппл-тест
   чистый, полный цикл игры в headless без warns/404.
 
-### R2. Игровые системы пишут компоненты напрямую
+### R2. Игровые системы пишут компоненты напрямую — ✅ ВЫПОЛНЕН (2026-09-17)
+Фактически сделано (меньше правок при том же результате): spritePos/moveSprite для
+аним-сущностей с _ecs переписаны НАТИВНО в бэкенде (attrs/кэши + COMPONENTS.posX/posY
+синхронно, ноль setAttribute, ноль касаний узла) — все 10 вызывающих файлов
+(heroMove×16, moveBullet×12, checkBuffs, enemyAI, damage, valkyrie, charmFx, dashFx,
+dropSafe, spiderBossFight) получили нативный путь без единой правки; animPlay пишет
+кадр акцессором и поддерживает attrs.x/_lx напрямую (без applyAttr); ecsRenderSync
+теперь ведёт и UI-сущности (экран результатов: кадр+позиция из компонентов, без
+куллинга) — юнит-проба подтвердила кадр 2 → texture.frame.x=144 (подокно листа) и
+позицию 305→узел. Href/times/width/height при смене анимации (syncHeroAnim/attack —
+редкие события) остаются на applyAttr до R4. Проверка: полный цикл (этаж/бой/урон/
+труп/смерть/результаты/новая игра) без ошибок, синк компонент↔узел 1:1, FPS 143.
 - animPlay, heroMove, enemyMove, moveBullet/moveMagicBullet, floatText, groundShadow,
   enemyHpBar, hpBar — нативный API (setEntityPos/setEntityFrame/setEntityAlpha) вместо
   setAttribute/moveSprite; rect остаётся логикой (rectPos читается как раньше).
