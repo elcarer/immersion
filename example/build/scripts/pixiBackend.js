@@ -2050,6 +2050,14 @@ function dragClientToView(cx, cy) {
     const ctm = layers[2].getScreenCTM()
     return { x: (cx - ctm.e) / ctm.a, y: (cy - ctm.f) / ctm.d }
 }
+// viewBox → клиентские: геймпад-путь (gamepadDragStart/Move в gameLoop) передаёт
+// status.mouseX/Y в координатах viewBox, а beginDragShim/moveDragShim/hitTestUI
+// работают в клиентских (getBounds, pointer-события) — без перевода drag геймпадом
+// промахивался при масштабе окна ≠ 1 (репродукция: окно 1536×864, курсор уходил ×1.25)
+function dragViewToClient(cx, cy) {
+    const ctm = layers[2].getScreenCTM()
+    return { x: cx * ctm.a + ctm.e, y: cy * ctm.d + ctm.f }
+}
 function beginDragShim(shim, funcDrag, item, clientX, clientY) {
     applyDropShadow(shim, "filter: drop-shadow(0 0 6px rgba(255, 255, 204, 0.8))")
     dragSelected = shim
@@ -2410,14 +2418,16 @@ function cameraView() {
 function dragState() {
     return {
         start: (shim, cx, cy) => { /* через draggableShim */ },
-        move: (cx, cy) => moveDragShim(cx, cy),
+        // геймпад передаёт viewBox-координаты (status.mouseX/Y) — переводим в клиентские
+        move: (cx, cy) => { const p = dragViewToClient(cx, cy); moveDragShim(p.x, p.y) },
         end: () => endDragShim(dragSelected),
         isDragging: () => dragSelected !== null,
         startAt: (cx, cy) => {
-            const el = hitTestUI(cx, cy)
+            const p = dragViewToClient(cx, cy)
+            const el = hitTestUI(p.x, p.y)
             if (el) {
                 const data = dragMap.get(el)
-                if (data) { beginDragShim(el, data.funcDrag, data.item, cx, cy); return true }
+                if (data) { beginDragShim(el, data.funcDrag, data.item, p.x, p.y); return true }
             }
             return false
         },
