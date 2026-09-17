@@ -1240,7 +1240,12 @@ function attachShim(parent, shim, index) {
     shim.parent = parent
     shim._gen = (shim._gen || 0) + 1 // переиспользованные узлы защищены от graveyard-очистки
     shim._layer = parent.kind === "layer" ? parent : parent._layer
-    if (index >= parent.children.length) parent.children.push(shim)
+    // признак чистого append вычисляется ДО вставки: после push index всегда меньше
+    // новой длины, и ветка «в конец raw-дерева» ниже была мёртвой для новых узлов —
+    // они садились по соседу-шиму, ПОД WorldSprite'ы, добавленные в raw-дерево позже
+    // (текст ХП/опыта оказывался под нативной заливкой полос из R4.2)
+    const isAppend = index >= parent.children.length
+    if (isAppend) parent.children.push(shim)
     else parent.children.splice(index, 0, shim)
     if (shim.node && parent.node) {
         // индекс в Pixi-дереве считается по СОСЕДЯМ-ШИМАМ С УЗЛАМИ, а не по индексу
@@ -1252,11 +1257,11 @@ function attachShim(parent, shim, index) {
             // prepend (SVG: в начало = на самый нижний слой) — checkZOrder героя
             // опускает стены/накладки под себя именно prepend'ом
             rawIdx = 0
-        } else if (index >= parent.children.length) {
-            // R3: чистый append (в т.ч. пере-append существующего шима в checkZOrder):
+        } else if (isAppend) {
+            // чистый append (в т.ч. пере-append существующего шима в checkZOrder):
             // в SVG appendChild ставит элемент ПОСЛЕДНИМ ребёнком слоя — выше и шимов,
-            // и нативных WorldSprite'ов, и копий свечения. Прежний поиск соседа-шима
-            // сажал новый узел ПОД мировые спрайты, добавленные в raw-дерево позже
+            // и нативных WorldSprite'ов, и копий свечения. Поиск соседа-шима сажал
+            // новый узел ПОД мировые спрайты, добавленные в raw-дерево позже
             rawIdx = parent.node.children.length
         } else {
             rawIdx = parent.node.children.length
