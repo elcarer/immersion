@@ -213,7 +213,7 @@ function drawStartScreen(animate) {
     document.title = T("app.title")
     //1) фон — появляется сразу
     screenPic.push(image(svgArr[0],0,0,1920,1080,"./images/UI/start.png"))
-    screenPic.push(text(svgArr[1],10,1060,"0pt","50pt","none","3px","#FFFF66","build 2.00",{"id":"title","size":24,"font":"baseFont4","anchor":"start"}))
+    screenPic.push(text(svgArr[1],10,1060,"0pt","50pt","none","3px","#FFFF66","build 2.10",{"id":"title","size":24,"font":"baseFont4","anchor":"start"}))
     //2) логотип-название — картинка по языку
     const logo = image(svgArr[1],1920/2-LOGO_W/2,110,LOGO_W,LOGO_H,"./images/UI/" + (getLang() === "ru" ? "logoRus.png" : "logoIng.png"))
     screenPic.push(logo)

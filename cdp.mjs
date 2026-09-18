@@ -16,7 +16,14 @@ async function getTargetWs() {
 export async function connect() {
     const wsUrl = await getTargetWs()
     const ws = new WebSocket(wsUrl)
-    await new Promise((res, rej) => { ws.onopen = res; ws.onerror = () => rej(new Error("ws error")) })
+    //E-аудит 2026-09-18: если хэндшейк не прошёл (target закрылся между /json/list и
+    //handshake), onerror может не прийти — промис висел вечно и подвешивал весь сьют.
+    //Таймаут 15с роняет connect() с понятной ошибкой
+    await new Promise((res, rej) => {
+        const timer = setTimeout(() => rej(new Error("ws connect timeout (15s): " + wsUrl)), 15000)
+        ws.onopen = () => { clearTimeout(timer); res() }
+        ws.onerror = () => { clearTimeout(timer); rej(new Error("ws error")) }
+    })
     let id = 0
     const pending = new Map()
     const events = []
@@ -25,9 +32,19 @@ export async function connect() {
         if (m.id && pending.has(m.id)) { pending.get(m.id)(m); pending.delete(m.id) }
         else if (m.method) events.push(m)
     }
-    const send = (method, params = {}) => new Promise((res, rej) => {
+    const send = (method, params = {}, timeoutMs = 45000) => new Promise((res, rej) => {
         const i = ++id
-        pending.set(i, m => m.error ? rej(new Error(method + ": " + JSON.stringify(m.error))) : res(m.result))
+        //E-аудит 2026-09-18: тихо умерший ws (half-open) оставлял send висеть навсегда —
+        //сьют зависал на часы. Каждый вызов ограничен таймаутом (по умолчанию 45с;
+        //заведомо долгие — например Page.reload тяжёлой страницы — передают свой больше)
+        const timer = setTimeout(() => {
+            pending.delete(i)
+            rej(new Error(method + ": send timeout (" + timeoutMs + "мс) — ws мертв или цель не отвечает"))
+        }, timeoutMs)
+        pending.set(i, m => {
+            clearTimeout(timer)
+            m.error ? rej(new Error(method + ": " + JSON.stringify(m.error))) : res(m.result)
+        })
         ws.send(JSON.stringify({ id: i, method, params }))
     })
     return { ws, send, events, close: () => ws.close() }

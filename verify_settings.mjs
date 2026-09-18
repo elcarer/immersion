@@ -46,6 +46,19 @@ const clickBtn = async (t) => {
   return true
 }
 // шим-поиск: точка pointFull / полоса soundBar / галочка shadowsCheck в слое 2
+//E-аудит 2026-09-18: раньше масштаб был жёстким ×0.8 (под окно 1536×864) — на другом
+//размере окна headless (сейчас 1520×713) все клики уходили мимо: ползунки/чекбокс
+//«не работали», панель не закрывалась. Пересчитываем по ФАКТИЧЕСКОМУ окну страницы
+//(размер берём из браузера): viewBox 1920×1080 вписан в канвас по меньшей стороне
+//и отцентрирован
+let fitCache = null
+const fit = async () => {
+  if (!fitCache) fitCache = JSON.parse(await ev(`JSON.stringify({ w: innerWidth, h: innerHeight })`))
+  const sx = fitCache.w / 1920, sy = fitCache.h / 1080
+  const sc = Math.min(sx, sy)
+  return { s: sc, ox: (fitCache.w - 1920 * sc) / 2, oy: (fitCache.h - 1080 * sc) / 2 }
+}
+const toClient = async (gx, gy) => { const f = await fit(); return [Math.round(gx * f.s + f.ox), Math.round(gy * f.s + f.oy)] }
 const knobProbe = () => ev(`(() => {
   const out = {}
   const walk = (s) => { for (const c of (s.children||[])) {
@@ -80,35 +93,58 @@ console.log("before:", await knobProbe())
 // — drag ползунка музыки вправо-влево (sliderDrag-контракт) —
 // knob music: attrs.x = 975 + vol*220/0.4; клиентские = viewBox×0.8 (окно 1536×864)
 const k0 = JSON.parse(await knobProbe())
-const kx = (k0.music.x) * 0.8, ky = (k0.music.y + 14) * 0.8
-await dragTo(kx, ky, kx + 60, ky)
+const [kx, ky] = await toClient(k0.music.x, k0.music.y + 14)
+await dragTo(kx, ky, kx + Math.round(60 * (await fit()).s), ky)
 console.log("after drag right:", await knobProbe())
 const k1 = JSON.parse(await knobProbe())
-await dragTo(k1.music.x * 0.8, k1.music.y * 0.8 + 12, k1.music.x * 0.8 - 50, k1.music.y * 0.8 + 12)
+{ const [ax, ay] = await toClient(k1.music.x, k1.music.y + 12); const [bx] = await toClient(k1.music.x - 50, 0); await dragTo(ax, ay, bx, ay) }
 console.log("after drag left:", await knobProbe())
 
 // — клик по полосе эффектов (func + getMousePosition/getScreenCTM) —
 // полоса эффектов: viewBox (975..1195, 452..466) → клиентские
-await clickAt(1120 * 0.8, 459 * 0.8)
+{ const [cx, cy] = await toClient(1120, 459); await clickAt(cx, cy) }
 console.log("after fx bar click:", await knobProbe())
 
 // — «Звук выкл.»: baseVal-запись x на обоих ползунках (975) —
 const btns = await ev(`JSON.stringify(window.__BACKEND.dumpUI().filter(u => u.href && u.href.includes("buttonUp")).map(u => ({ x: Math.round((u.b.minX + u.b.maxX) / 2), y: Math.round((u.b.minY + u.b.maxY) / 2) })))`, true)
-const off = JSON.parse(btns).find(b => b.y < 380 * 0.8)
+const f380 = await fit()
+const off = JSON.parse(btns).find(b => b.y < f380.oy + 380 * f380.s)
 if (off) await clickAt(off.x, off.y)
 console.log("after sound off:", await knobProbe())
 
 // — чекбокс теней: display галочки меняется, noShadows flips —
+//E-аудит 2026-09-18: координаты были зашиты под раскладку R5.1; после V95 (новые
+//чекбоксы «Рамка/Свечение») панель перестроена — ищем чекбокс динамически: безымянный
+//узел на одной высоте с меткой «Отключение теней», левее метки
 const st0 = JSON.parse(await knobProbe())
-await clickAt(700 * 0.8 + 17 * 0.8, 522 * 0.8 + 17 * 0.8)
+{
+  const posObj = JSON.parse(await ev(`(async () => {
+    const d = window.__BACKEND.dumpUI().filter(u => u.b)
+    const label = d.find(u => u.text === "Отключение теней")
+    if (!label) return "null"
+    const ly = Math.round((label.b.minY + label.b.maxY) / 2)
+    const cand = d.filter(u => !u.text && !u.href &&
+      Math.abs(Math.round((u.b.minY + u.b.maxY) / 2) - ly) < 12 &&
+      (u.b.minX + u.b.maxX) / 2 < label.b.minX)
+    cand.sort((a, b) => (b.b.maxX - b.b.minX) - (a.b.maxX - a.b.minX))
+    const c = cand[0]
+    return JSON.stringify(c ? { x: Math.round((c.b.minX + c.b.maxX) / 2), y: ly } : null)
+  })()`, true))
+  if (!posObj) throw new Error("чекбокс «Отключение теней» не найден в dumpUI")
+  await clickAt(posObj.x, posObj.y)
+}
 const st1 = JSON.parse(await knobProbe())
 console.log("shadows toggle:", st0.vol.noShadows, "→", st1.vol.noShadows, "| checkmark:", st0.check, "→", st1.check)
 await shot("r51_settings")
 
 // — закрыть настройки и вернуть громкости (сохраняются в localStorage!) —
-await clickAt(960 * 0.8 + 250 * 0.8, 846 * 0.8)
+//E-аудит 2026-09-18: координата кнопки закрытия была зашита; clickButton(3) —
+//официальный toggle-путь самой игры (та же логика у кнопки и Esc)
+await ev(`import("./scripts/topMenu.js").then(m => m.clickButton(3))`, true)
 await S(300)
 await ev(`(() => { const st = window.__ST.status.settings; st.musicVolume = 0.2; st.soundVolume = 0.2; st.noShadows = ${st0.vol.noShadows};
   return import("./scripts/settings.js").then(m => {}) })()`, true)
 const fin = await ev(`JSON.stringify({ errs: window.__errs, panels: window.__ST.status.panels })`, true)
 console.log("final:", fin)
+await conn.close()
+process.exit(0)
