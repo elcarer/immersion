@@ -6,6 +6,8 @@ import { svgArr,image, text } from "../scripts/svg.js"
 import { playback,strike,ctx_sound,playTrack,TRACK } from "../scripts/sound.js"
 import { metaItems } from "../scripts/metaItems.js"
 import { newGame } from "../scripts/newGame.js"
+//E-22: Пробел дублирует кнопку «Далее» на этом экране и на экране предметов
+import { armSpaceNext, clearSpaceNext } from "../scripts/spaceNext.js"
 import { journalAdd, J_DEATH } from "../scripts/journal.js"
 //V52: достижение «Перебор» — класс гибели в мете
 import { achDeath } from "../scripts/achievements.js"
@@ -35,6 +37,8 @@ let loseRun
 let nextRun
 function endScreen(lose,next) {
     del()
+    //E-22: прошлый экран мог оставить взведённый Пробел — снимаем до сборки нового
+    clearSpaceNext()
     status.hero.obj && (status.hero.obj.type = "corpse")
     loseRun = lose
     nextRun = next
@@ -183,7 +187,10 @@ function rollNumbers(lose,next) {
         rollAccrued = 0
         //V59: спрайт кнопки — пустой emptyButton.png вместо next.png с запечённым текстом;
         //надпись «Далее» — локализованный текст поверх (раньше текст был запечён в спрайте)
-        screenPic.push(image(svgArr[2],1920/2-341/2,960,341,96,"./images/UI/panels/buttons/button.png",{"glow":1,"func":()=>{if(!lose && next){newGame(nextRun)} else {metaItems(lose,next)}}}))
+        //E-22: эффект кнопки дублируется Пробелом (spaceNext.js) — то же замыкание
+        const nextAction = () => {if(!lose && next){newGame(nextRun)} else {metaItems(lose,next)}}
+        screenPic.push(image(svgArr[2],1920/2-341/2,960,341,96,"./images/UI/panels/buttons/button.png",{"glow":1,"func":nextAction}))
+        armSpaceNext(nextAction)
         screenPic.push(text(svgArr[2],1920/2,1025,"0pt","50pt","black","2px",`rgb(204, 153, 102)`,T("lobby.next"),{"id":"delItemText","size":48,"font":"baseFont4","anchor":"middle"}))
         playback(strike[2].vol,0,0,status.settings.soundVolume)
     }

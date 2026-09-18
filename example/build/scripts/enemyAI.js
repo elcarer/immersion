@@ -934,6 +934,7 @@ function cancelShadowFx(enemy) {
     fx.pool && releaseSprite(fx.pool)
     const p = rectPos(enemy.rect)
     enemy.img.setAttribute("y", p[1])
+    enemy.img._hidden = 0
     enemy.shadowFx = null
 }
 function stepShadowFx(enemy) {
@@ -942,17 +943,18 @@ function stepShadowFx(enemy) {
     fx.t++
     const k = Math.min(1, fx.t / fx.dur)
     if (fx.phase === 0) {
-        // погружение: спрайт уезжает вниз, нижняя часть отрезается окном кадра
-        enemy.img.setAttribute("y", fx.baseY + Math.round(fx.frameH * k))
+        // E-22: у ECS-сущностей узел каждый кадр позиционирует ecsRenderSync из
+        // компонентов — прежняя хореография «уезжает img.y вниз» спрайт не двигала
+        // (враг 0.7с стоял на месте и затем мигал на новой клетке). Погружение
+        // честно прячем флагом _hidden (renderSync гасит видимость): лужа под
+        // врагом — враг «ушёл под пол»
+        enemy.img._hidden = 1
         if (k >= 1) {
             releaseSprite(fx.pool)
             fx.pool = null
             // единственная перестановка логики: spritePos честно двигает окно кадра (rect)
             spritePos(enemy.img, fx.toX, fx.toY)
-            // СРАЗУ прячем спрайт ПОД окном (y = toY + высота, ниже линии пола):
-            // иначе до первого тика всплытия он «вспыхнул» бы целиком над лужей
-            enemy.img.setAttribute("y", fx.toY + fx.frameH)
-            // путь построен к старой клетке — сброс, CHASE пересчитает с нового места
+            // спрайт остаётся скрытым до конца всплытия (второй фазы)
             enemy.path = []
             enemy.pathTarget = null
             enemy.lastSeen = null
@@ -963,12 +965,10 @@ function stepShadowFx(enemy) {
         }
         return
     }
-    // всплытие: спрайт поднимается СНИЗУ ВВЕРХ, из-под пола — зеркально погружению.
-    // y идёт от toY+высота (невидим ПОД окном кадра) к toY: из-под маски сначала
-    // показывается голова у линии пола, дальше тело «вырастает» вверх к нормальной позе
-    enemy.img.setAttribute("y", fx.toY + Math.round(fx.frameH * (1 - k)))
+    // всплытие: спрайт скрыт, у целевой клетки растёт вторая лужа; в конце фазы —
+    // показ (renderSync вернёт видимость, как только _hidden будет снят)
     if (k >= 1) {
-        enemy.img.setAttribute("y", fx.toY)
+        enemy.img._hidden = 0
         releaseSprite(fx.pool)
         enemy.shadowFx = null
         checkZOrder(enemy)
@@ -1399,7 +1399,9 @@ function onPathEnd(enemy) {
     } else if (enemy.state === ENEMY_STATE.FLEE) {
         // E-10: добежал (фаза flee) — теперь подкрадывание; дошёл до точки захода —
         // ищем новую точку (fleeTick перестраивает путь по текущей фазе)
-        enemy.fleePhase = "sneak"
+        //E-22: дальнобойные подкрадывание не берут (ТЗ E-10 «только отходят») —
+        //держат фазу бегства, иначе byPathEnd уводил их к герою
+        enemy.fleePhase = rangedKeepDist(enemy) > 0 ? "flee" : "sneak"
     } else if (enemy.state === ENEMY_STATE.PATROL_WANDER) {
         startPatrolWander(enemy)
     } else if (enemy.state === ENEMY_STATE.PATROL_LOOP) {
@@ -1433,17 +1435,25 @@ function isWounded(enemy) {
     return enemy.stats.hp > 0 && enemy.stats.hp <= enemy._maxHp * WOUNDED_HP
 }
 // дистанция удержания огня (клетки): максимум range среди ДОСТУПНЫХ дальнобойных атак;
-// 0 — милишник (подкрадывается). Доступность — по наличию attacksCd (как в hasRangedAttack)
+// 0 — милишник (подкрадывается). Доступность — по наличию attacksCd (как в hasRangedAttack).
+// _keepMetric — метрика той же атаки: снаряды летят по осям и бьют зоной (чебышёв),
+// магия летит к цели и меряется манхэттеном (enemyAim) — метрика удержания обязана
+// совпадать с метрикой реальной досягаемости, иначе раненый мечется на границе
 function rangedKeepDist(enemy) {
     if (enemy._keepDist === undefined) {
         let r = 0
+        let magic = false
         const attacks = enemy.class.attacks
         for (let i = 0; i < attacks.length; i++) {
             if (enemy.stats.attacksCd[i] === undefined) continue
             const a = data.attacks[attacks[i]]
-            if ((a.range || a.type === "magic") && a.range > r) r = a.range
+            if ((a.range || a.type === "magic") && a.range > r) {
+                r = a.range
+                magic = a.type === "magic"
+            }
         }
         enemy._keepDist = r
+        enemy._keepMetric = magic ? "m" : "c"
     }
     return enemy._keepDist
 }
@@ -1844,16 +1854,30 @@ export function enemyTick(enemy) {
         const kd = rangedKeepDist(enemy)
         const hc = [Math.trunc(status.hero.x / 32), Math.trunc(status.hero.y / 32)]
         const ec = enemyCellOf(enemy)
-        const tooClose = kd === 0 || Math.max(Math.abs(ec[0] - hc[0]), Math.abs(ec[1] - hc[1])) < kd
+        const dx = Math.abs(ec[0] - hc[0]), dy = Math.abs(ec[1] - hc[1])
+        const tooClose = kd !== 0 && (enemy._keepMetric === "m" ? dx + dy : Math.max(dx, dy)) < kd
+        //E-22 (репорт «стреляющие крутятся на месте, не зная: бежать или атаковать»):
+        //раненый дальнобойный НЕ убегает, пока его атака реально достаёт героя
+        //(aimMiss === 0 — та же проверка, что у решения об атаке): пусть стреляет.
+        //Бегство — только когда герой прижал ВНУТРЬ дистанции удержания, а достать
+        //не может (за укрытием/на границе). Метрика дистанции — та же, что у
+        //досягаемости атаки (_keepMetric), иначе на диагоналях вечные флипы
+        const ePos = rectPos(enemy.rect)
+        const reaches = kd > 0 && aimMiss(enemy, ePos[0], ePos[1]) === 0
         if (enemy.state === ENEMY_STATE.FLEE) {
-            if (kd > 0 && !tooClose) {
-                // дальнобойный отошёл на комфортную дистанцию — снова обычная стрельба
+            if (kd > 0 && (!tooClose || reaches)) {
+                // отошёл на комфортную дистанцию ИЛИ герой снова в зоне поражения —
+                // обычная стрельба
                 enemy.fleePhase = undefined
                 enemy.path = []
                 enemy.pathTarget = null
                 setEnemyState(enemy, ENEMY_STATE.CHASE)
             }
-        } else {
+        } else if (kd === 0 || (tooClose && !reaches)) {
+            //E-22: в бегство уходит МИЛИШНИК всегда (hit-and-run, как в E-10);
+            //дальнобойный — только когда прижат и бить не может. Прежде дальнобойный
+            //в CHASE флопал в FLEE безусловно, а в FLEE на дистанции — обратно в
+            //CHASE: флип каждый тик, враг дёргался между бегством и атакой
             enemy.fleePhase = "flee"
             enemy.path = []
             enemy.pathTarget = null

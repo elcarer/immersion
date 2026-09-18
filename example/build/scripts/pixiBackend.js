@@ -2226,6 +2226,7 @@ function acquirePooled(place, w, h, src, obj) {
         // реанимация слота: новые атрибуты, чистые слушатели/стили (как acquirePooled в SVG)
         const shim = e.img
         shim._dead = 0
+        shim._hidden = 0
         shim._onclick = null; shim._over = null; shim._out = null; shim._down = null; shim._up = null
         shim._listeners = null
         shim._interactive = 0

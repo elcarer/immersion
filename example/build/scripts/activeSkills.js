@@ -20,6 +20,10 @@ import { hasRelic, abilCopyBonus } from "../scripts/relics.js"
 import { grantDashShield } from "../scripts/valkyrie.js"
 //E-19: подсказка на иконках активных способностей (та же, что в дереве способностей)
 import { tip,tipDel } from "../scripts/tip.js"
+//E-22: телепорт — снап камеры по фактическим половинам окна зума; открытие посадки
+//через checkNewRoom (комнаты/коридор вокруг точки высадки рисуются сразу)
+import { worldViewW, worldViewH } from "../scripts/zoomFx.js"
+import { checkNewRoom } from "../scripts/heroMove.js"
 
 let activeSkillsTemp = []
 //V16: кэш узлов секторов кулдауна — раньше activeSkillsCD делал getElementById(i+"P")
@@ -256,15 +260,18 @@ function useSkill(skill) {
         status.info.meteor = screenPic[screenPic.length-1]
     }
     if(skill.skill.title === "skill.1.9.title") {
-        //E-11 (ТЗ юзера): телепорт по взгляду вместо случайной комнаты. Проверяются
-        //клетки 1..5 по направлению взгляда героя (0 вверх, 1 вниз, 2 влево, 3 вправо),
-        //начиная от его клетки; цель — ПЕРВАЯ свободная клетка в ДРУГОЙ комнате (не в
-        //той, где стоит герой). Обычный телепорт — только открытая комната; улучшенный
-        //«со щитом» (skill.1.13, флаг magicShield) — и закрытая. «Свободна»: пол по
-        //матрице этажа, без твёрдых объектов (правила collisionCheckObject: ловушка 14
-        //и рычаг 19 проходимы) и живых врагов. Кандидатов нет — телепорт НЕ применяется:
-        //кулдаун не тратится, ранний return из useSkill (без «Вечного цитрина»),
-        //следующая попытка — с следующим проигрышем анимации wait (триггер checkEndAnim)
+        //E-11 (ТЗ юзера): телепорт по взгляду вместо случайной комнаты. E-22 (репорт):
+        //дальность 2..6 клеток по направлению взгляда героя (0 вверх, 1 вниз, 2 влево,
+        //3 вправо); цель — ПЕРВАЯ свободная клетка ДРУГОЙ локации. Локация — комната
+        //(номер в roomsArr) или коридор (сегмент floor [2]===1): «в/из коридора» теперь
+        //работает как «в/из комнаты». Комната — открытая (либо закрытая — только «со
+        //щитом», skill.1.13/флаг magicShield); коридор — только ОТКРЫТАЯ клетка ([7]===1:
+        //отрисована, двери сегмента открыты — посадка в закрытую дверь/темноту исключена).
+        //«Свободна»: пол по матрице этажа, без твёрдых объектов (правила
+        //collisionCheckObject: ловушка 14 и рычаг 19 проходимы) и живых врагов.
+        //Кандидатов нет — телепорт НЕ применяется: кулдаун не тратится, ранний return
+        //из useSkill (без «Вечного цитрина»), следующая попытка — с следующим
+        //проигрышем анимации wait (триггер checkEndAnim)
         const DIRV = [[0, -1], [0, 1], [-1, 0], [1, 0]]
         const m = status.matrixLevel
         const lv = dataGeneric.scenes[status.levelFloor]
@@ -278,14 +285,32 @@ function useSkill(skill) {
             }
             return -1
         }
-        const heroRoom = roomAt(hx, hy)
+        //сегмент коридора клетки → индекс записи floor ([2]===1), иначе −1
+        const corridorAt = (cx, cy) => {
+            for (let i = 0; i < lv.floor.length; i++) {
+                const f = lv.floor[i]
+                if (f[2] === 1 && f[0] === cx && f[1] === cy) return i
+            }
+            return -1
+        }
+        //идентификатор локации клетки: комната или сегмент коридора
+        const locOf = (cx, cy) => {
+            const rk = roomAt(cx, cy)
+            return rk >= 0 ? "r" + rk : "c" + corridorAt(cx, cy)
+        }
+        const heroLoc = locOf(hx, hy)
         let target = null
-        for (let step = 1; step <= 5 && !target; step++) {
+        for (let step = 2; step <= 6 && !target; step++) {
             const cx = hx + dv[0] * step, cy = hy + dv[1] * step
             if (!m[cy] || m[cy][cx] !== 1) continue
             const rk = roomAt(cx, cy)
-            if (rk < 0 || rk === heroRoom) continue
-            if (lv.roomsArr[rk][3] !== 1 && status.info.magicShield !== 1) continue
+            if (locOf(cx, cy) === heroLoc) continue
+            if (rk >= 0) {
+                if (lv.roomsArr[rk][3] !== 1 && status.info.magicShield !== 1) continue
+            } else {
+                const ci = corridorAt(cx, cy)
+                if (ci < 0 || lv.floor[ci][7] !== 1) continue
+            }
             let blocked = false
             //твёрдые объекты этажа (габариты — в клетках o[3]×o[4], как в collision.js)
             for (let i = 0; i < lv.objects.length && !blocked; i++) {
@@ -313,8 +338,15 @@ function useSkill(skill) {
         status.hero.x = target[0] * 32 - 4
         status.hero.y = target[1] * 32 - 28
         spritePos(status.hero.obj.img, status.hero.x, status.hero.y)
-        //V31: окно камеры подставляет setWorldViewBox (1920/zoom × 1080/zoom), x/y прежние
-        setWorldViewBox(status.hero.x - 960, status.hero.y - 540)
+        //E-22 (репорт «камера медленно доезжает»): прежний снап вычитал 960/540 —
+        //половину 1920×1080; при зуме по умолчанию 2 окно камеры всего 960×540, герой
+        //оставался в правом нижнем квадранте, и экран довозила медленная прокрутка
+        //scroll() в heroMove. Центрируем по фактическим половинам окна (как
+        //teleportHero в portalFx.js) — герой в центре экрана в тот же тик
+        setWorldViewBox(status.hero.x - worldViewW() / 2, status.hero.y - worldViewH() / 2)
+        //E-22: посадка в коридор/край комнаты — комнаты и коридор вокруг точки высадки
+        //открываются (рисуются) сразу, не дожидаясь ближайшей смены клетки в heroMove
+        checkNewRoom(dataGeneric, status.levelFloor, status.hero.x, status.hero.y)
         playEffect(status.hero.obj,data.effects[14])
         if (status.info.magicShield === 1) {
             playEffect(status.hero.obj,data.effects[15])

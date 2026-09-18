@@ -167,8 +167,12 @@ export function ecsRenderSync() {
         const isUi = sprite._layer === layers[2]
         const pad = COMPONENTS.cullPad[id]
         const x = COMPONENTS.posX[id], y = COMPONENTS.posY[id]
-        if (!isUi &&
-            (x < left - pad || x > right + pad || y < top - pad || y > bottom + pad)) {
+        // E-22: игровой флаг «спрятать боевую сущность» (хореография нырка Тёмного
+        // воина: узел ECS-спрайта каждый кадр позиционируется отсюда, поэтому
+        // прежние img.y/visibility-прятки игра писала вхолостую — враг «стоял»).
+        // Гасим видимость здесь — единственное место, которому узел подчиняется
+        if (!isUi && (sprite._hidden === 1 ||
+            x < left - pad || x > right + pad || y < top - pad || y > bottom + pad)) {
             node.visible = false
             continue
         }

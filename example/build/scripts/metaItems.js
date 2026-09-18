@@ -5,11 +5,15 @@ import { svgArr,image,text,rect } from "../scripts/svg.js"
 import { tip,tipDel,rarityColor,itemFrameOn,itemGlowOn } from "../scripts/tip.js"
 import { cellPickArr } from "../scripts/doll.js"
 import { lobby } from "../scripts/lobby.js"
+//E-22: Пробел дублирует кнопку «Далее» на экране взятия предметов
+import { armSpaceNext, clearSpaceNext } from "../scripts/spaceNext.js"
 
 let invNumText
 let change
 function metaItems(lose,next) {
     del()
+    //E-22: экран очков мог оставить взведённый Пробел — снимаем до сборки своего
+    clearSpaceNext()
     status.meta.killedEnemes = [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0] //V35: 21 враг — у монстров 3-го этажа свои id 14-20
     //V66b (репорт юзера): сброс зачёта «Объектов» Библиотеки УДАЛЁН — meta.libraryObjects,
     //как meta.library (враги) и meta.achievements, живёт МЕЖДУ забегами; первое использование
@@ -56,11 +60,12 @@ function metaItems(lose,next) {
     }
     //V59: спрайт кнопки — пустой emptyButton.png вместо next.png с запечённым текстом;
     //надпись «Далее» — локализованный текст поверх (раньше текст был запечён в спрайте)
-    screenPic.push(image(svgArr[2],1920/2-341/2,960,341,96,"./images/UI/panels/buttons/button.png",{"glow":1,"func":
-    ()=>{
+    //E-22: эффект кнопки дублируется Пробелом (spaceNext.js) — то же замыкание
+    const miNext = () => {
         if(next === false) {status.inventory.doll = [,,,,,,,,,,,,,];status.inventory.inv = [false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false]}
         lobby(lose,next)}
-    }))
+    screenPic.push(image(svgArr[2],1920/2-341/2,960,341,96,"./images/UI/panels/buttons/button.png",{"glow":1,"func":miNext}))
+    armSpaceNext(miNext)
     screenPic.push(text(svgArr[2],1920/2,1025,"0pt","50pt","black","2px",`rgb(204, 153, 102)`,T("lobby.next"),{"id":"delItemText","size":48,"font":"baseFont4","anchor":"middle"}))
     screenPic.push(image(svgArr[2],1650,63,32,36,"./images/dungeon/drop/item1.png"))
     screenPic.push(text(svgArr[2],1710,95,"0pt","50pt","black","2px",`rgb(204, 153, 102)`,change,{"id":"delItemText","size":42,"font":"baseFont4","anchor":"middle"}))

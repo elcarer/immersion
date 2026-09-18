@@ -516,4 +516,4 @@ function acidTick(hero) {
         }
     }
 }
-export {heroMove,createCorridor,checkZOrder,pressedKeys}
+export {heroMove,createCorridor,checkZOrder,pressedKeys,checkNewRoom}
