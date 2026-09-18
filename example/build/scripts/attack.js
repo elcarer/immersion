@@ -16,6 +16,18 @@ function checkAttack() {
     // страдают — их кулдауны тикают в отдельном activeSkillsCD, автокасты — в
     // checkEndAnim/valkyrieTick.
     if (status.info.charm) return
+    // E-19 (репорт): без оружия на кукле герой не атакует вовсе. unEquip снимает
+    // base-атаки из stack/current, но гейт страхует любой рассинхрон (данные анимаций
+    // героя мутируются equip'ом и остаются с последним оружием)
+    let hasWeapon = false
+    for (let k = 11; k <= 12; k++) {
+        const w = status.inventory.doll[k]
+        w && w.attack !== undefined && (hasWeapon = true)
+    }
+    if (!hasWeapon) {
+        status.attack.current.length = 0
+        return
+    }
     let lengthCurrent = status.attack.current.length
     for (let i = 0; i < lengthCurrent; i++) {
         let enemy = checkEnemy(status.attack.current[i])

@@ -118,6 +118,10 @@ const stomp = await ev(`(async function(){
   // координаты споры — уже центр клетки: герой встаёт ТОЧНО на них
   m.moveSprite(hero.obj.img, s.x - hero.x, s.y - hero.y)
   hero.x = s.x; hero.y = s.y
+  //E-19-флак: герой с начальным оружием авто-стреляет по проросшим рядом мини
+  //(снаряды летят, hp мини падает 100→96…) — на время ожидания прорастания стек пуст
+  st.attack.stack.length = 0
+  st.attack.current.length = 0
   const z = await import("./scripts/zoomFx.js")
   z.setWorldViewBox(hero.x - 960, hero.y - 540)
   return { before: d.count, tx: s.x, ty: s.y }

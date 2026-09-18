@@ -28,7 +28,10 @@ import { lvlFlashTick } from "../scripts/lvlFlashFx.js"
 import { rollNumbers,loseRun,nextRun } from "../scripts/endGame.js"
 import { settings } from "../scripts/settings.js"
 import { playback,strike } from "../scripts/sound.js"
-import { itemTipTick } from "../scripts/tip.js"
+import { itemTipTick,tipDel } from "../scripts/tip.js"
+//бэкенд-drag при захвате предмета гасит тулип через хук (цикл pixiBackend→tip.js недопустим)
+import { backendHooks } from "../scripts/pixiBackend.js"
+backendHooks.tipDel = tipDel
 import { minimapTick } from "../scripts/minimapFx.js"
 //V47: окно врага при наведении на поле — тик зовётся КАЖДЫЙ тик безусловно (до блока паузы),
 //guard внутри модуля сам гасит окно при панелях/паузе/выходе из забега

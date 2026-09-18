@@ -18,6 +18,8 @@ import { setCdRateBonus } from "../scripts/sets.js"
 import { hasRelic, abilCopyBonus } from "../scripts/relics.js"
 //V67: общий щит неуязвимости (как после рывка Валькирии)
 import { grantDashShield } from "../scripts/valkyrie.js"
+//E-19: подсказка на иконках активных способностей (та же, что в дереве способностей)
+import { tip,tipDel } from "../scripts/tip.js"
 
 let activeSkillsTemp = []
 //V16: кэш узлов секторов кулдауна — раньше activeSkillsCD делал getElementById(i+"P")
@@ -33,7 +35,13 @@ function activeSkills() {
         //V83: чужая активная способность (portalFx.grantForeignSkill) может стать шестой —
         //ряд продолжается ВТОРОЙ СТРОКОЙ над первой (прежде i=5 рисовал x=1920 — за экраном)
         let xIcon = 1370 + (i >= 5 ? i - 5 : i) * 110
-        activeSkillsTemp.push(image(svgArr[2],xIcon,970 - yUp,96,96,status.info.activeSkills[i].skill.img,{}))
+        //E-19: подсказка при наведении — как в дереве способностей (skillTree tip);
+        //особенно важна для чужих способностей, полученных через портал с головоломкой.
+        //skill захватываем в константу: массив activeSkills может переиндексироваться
+        //к моменту наведения (смена этажа перерисовывает ряд)
+        const sk = status.info.activeSkills[i].skill
+        activeSkillsTemp.push(image(svgArr[2],xIcon,970 - yUp,96,96,sk.img,
+            {"funcShow":e => tip(e,sk),"funcShowOut":tipDel}))
         //R4.4: нативный сектор (Graphics + маска-окно 96×96) вместо path()+clipPath;
         //геометрия d-string — та же (getSectorPath переехал в pixiBackend)
         let sector = nativeSector(svgArr[2], xIcon + 48, 970 + 48 - yUp, 64, 96, {"id": i})

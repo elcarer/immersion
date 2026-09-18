@@ -73,6 +73,8 @@ let bossRef = null   // объект Циклопа из objectValues (для М
 let blobCd = 0       // тики до следующего Сгустка
 let blobs = []       // {img, ox, oy, x, y, r, ang, dir, hit, bx1, by1, bx2, by2}
 let finaleArmed = false
+//id отложенного спавна выхода (voidBossFinale) — отменяется в resetVoidBoss
+let finaleTimer = null
 
 //V85: Медуза пустоты (data.enemes[18][1]) — её осколки ищутся по class.id во всех
 //системах (полоса ХП, тик деления, последний осколок)
@@ -537,8 +539,10 @@ function voidBossFinale(source) {
     //выход появится после анимации смерти
     bossDrop(source || bossRef)
     //даём доиграть анимацию смерти (~1.2с), затем в комнате появляется объект выхода.
-    //Если в этом окне погиб герой (start сменился/герой труп) — выход не спавнится
-    setTimeout(() => {
+    //Таймер отменяется при смене сцены (resetVoidBoss из del.js) — не тикаем в пустоту;
+    //гвард на старте оставлен как страховка (смерть героя в этом окне)
+    finaleTimer = setTimeout(() => {
+        finaleTimer = null
         status.start === 1 && status.hero.obj && status.hero.obj.type === "hero" && spawnVoidExit()
     }, 1200)
 }
@@ -593,6 +597,8 @@ function resetVoidBoss() {
     blobCd = 0
     blobs.length = 0
     finaleArmed = false
+    //отложенный выход мёртвого этажа больше не спавнится
+    if (finaleTimer !== null) { clearTimeout(finaleTimer); finaleTimer = null }
     //V91: споры — как Сгустки: узлы убирает разбор сцены в del.js, здесь только ссылки
     sporeBossRef = null
     sporeCd = 0

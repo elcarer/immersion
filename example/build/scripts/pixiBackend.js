@@ -548,6 +548,10 @@ class El {
     }
     remove() {
         if (this.parent) this.parent.removeChild(this)
+        // тени-копии — siblings в родителе: после открепления узла они остались бы
+        // ВИДЕТЬСЯ на старом месте «призраками» до чистки graveyard'а (репорт E-19:
+        // предметы «копировались» при частых перетаскиваниях — это висели их свечения)
+        removeShadowCopies(this)
         // ВАЖНО: только ОТКРЕПЛЯЕМ (семантика SVG remove): пулы (floatText и др.)
         // переиспользуют узел ПОСЛЕ remove — уничтожение здесь ломало бы рендер
         // («renderPipeId of null» на переподключении уничтоженного узла).
@@ -849,14 +853,20 @@ function applyAttr(shim, name, value) {
     }
 }
 
-// filter-строка: drop-shadow (glow-запекалка) + brightness → tint. Репорт-класс дыры
+// filter-строка: drop-shadow (glow-запекалка) + brightness/tint → tint. Репорт-класс дыры
 // эмуляции: силуэты неубитых врагов в Библиотеке/окне противника задаются через
 // filter: brightness(0) (img.style.filter = ...) и молча не применялись — карточки
-// рисовались цветными. Отсутствие brightness в строке = сброс tint в белый
+// рисовались цветными. Отсутствие обеих функций в строке = сброс tint в белый.
+// tint(r,g,b) — внутренний синтаксис для ЦВЕТНОГО тона (CSS sepia/saturate/hue-rotate
+// честно не эмулировать): ярость врагов (enemyAI RAGE_FILTER) краснит спрайт им
 function applyFilterString(shim, filterStr) {
     applyDropShadow(shim, filterStr)
+    if (!shim.node || shim.node.tint === undefined) return
     const brightMatch = filterStr && /brightness\(([-\d.]+)\)/.exec(filterStr)
-    if (shim.node && shim.node.tint !== undefined) {
+    const tintMatch = filterStr && /tint\((\d+)[,\s]+(\d+)[,\s]+(\d+)\)/.exec(filterStr)
+    if (tintMatch) {
+        shim.node.tint = (+tintMatch[1] << 16) | (+tintMatch[2] << 8) | +tintMatch[3]
+    } else {
         const b = brightMatch ? Math.min(1, Math.max(0, parseFloat(brightMatch[1]))) : 1
         const c = Math.round(b * 255)
         shim.node.tint = (c << 16) | (c << 8) | c
@@ -927,6 +937,9 @@ function applyPosition(shim) {
         if (shim._trCx !== undefined) shim.node.position.set(shim._trCx, shim._trCy)
         else shim.node.position.set(num(shim.attrs.x), num(shim.attrs.y))
         syncEcsPos(shim)
+        // тени-копии — siblings со своей позицией: без синхронизации свечение
+        // (напр. drag-glow перетаскиваемого предмета) оставалось на старом месте
+        syncShadowCopies(shim)
     }
 }
 
@@ -1907,12 +1920,34 @@ function dragViewToClient(cx, cy) {
     const ctm = layers[2].getScreenCTM()
     return { x: cx * ctm.a + ctm.e, y: cy * ctm.d + ctm.f }
 }
+// рамка редкости (V94) — rect ТОЙ ЖЕ ячейки, что перетаскиваемый спрайт: та же x/y,
+// 128×128, без заливки. Жёлтую подсветку слота (rectCellShow, rgb(200, 248, 9)) не берём —
+// она указывает целевой слот и остаётся на месте во время drag.
+// E-19 (решение пользователя): рамка на время drag не ЕДЕТ со спрайтом, а ПРОПАДАЕТ
+// (вместе со свечением редкости), взамен горит drag-glow
+function findRarityFrame(shim) {
+    const x = +shim.attrs.x, y = +shim.attrs.y
+    const ch = layers[2].children
+    for (let i = ch.length - 1; i >= 0; i--) {
+        const c = ch[i]
+        if (c === shim || c._dead || c.kind !== "rect") continue
+        if (+c.attrs.x !== x || +c.attrs.y !== y) continue
+        if (+c.attrs.width !== 128 || +c.attrs.height !== 128) continue
+        if (c.attrs.fill !== "none" || c.attrs.stroke === "rgb(200, 248, 9)") continue
+        return c
+    }
+    return null
+}
 function beginDragShim(shim, funcDrag, item, clientX, clientY) {
-    applyDropShadow(shim, "filter: drop-shadow(0 0 6px rgba(255, 255, 204, 0.8))")
     dragSelected = shim
     const pos = dragClientToView(clientX, clientY)
     const ox = +shim.attrs.x || 0, oy = +shim.attrs.y || 0
-    dragData = { funcDrag, item, origX: ox, origY: oy, lifted: false, offX: pos.x - ox, offY: pos.y - oy }
+    // prevShadow — свечение редкости ячейки (blur-опция): на время drag заменяется
+    // drag-glow, endDrag вернёт его на месте (успешный дроп перерисует панели сам)
+    dragData = { funcDrag, item, origX: ox, origY: oy, lifted: false, offX: pos.x - ox, offY: pos.y - oy,
+        prevShadow: shim._shadowStyleRaw || "", frame: findRarityFrame(shim) }
+    if (dragData.frame && !dragData.frame._dead && dragData.frame.node) dragData.frame.node.visible = false
+    applyDropShadow(shim, "filter: drop-shadow(0 0 6px rgba(255, 255, 204, 0.8))")
     if (backendHooks.tipDel) backendHooks.tipDel()
 }
 function moveDragShim(cx, cy) {
@@ -1931,11 +1966,16 @@ function endDragShim(shim, clientX, clientY) {
     const data = dragData
     dragSelected = null
     dragData = null
-    applyDropShadow(el, "")
     el._styleRaw = "none"
     // реальные клиентские координаты отпускания (как у mouseup в SVG): часть вызовов
     // funcDrag читает evt.clientX/clientY
     data.funcDrag({ target: el, clientX: clientX || 0, clientY: clientY || 0 }, data.item, data.origX, data.origY)
+    // рамка редкости возвращается (при успехе панель перерисована и рамка уже отсоединена —
+    // _dead-гвард пропускает мёртвый узел)
+    if (data.frame && !data.frame._dead && data.frame.node) data.frame.node.visible = true
+    // свечение редкости восстанавливается вместо жёлтого drag-glow (у отсоединённого
+    // спрайта тени не монтируем — перерисовка создаст узлы заново)
+    if (!el._dead) applyDropShadow(el, data.prevShadow)
 }
 // контейнер перетаскиваемых данных для фасада
 const backendHooks = { tipDel: null }
@@ -2035,6 +2075,7 @@ function setupBackend(engineApi) {
         worldContainer, texCache, frameCache,
         shimById, spritePool, SHEETS,
         spritePos, moveSprite, rectPos,
+        dragState,
         windowSize: () => windowSize,
         framesInfo() {
             const out = []
@@ -2175,7 +2216,9 @@ function acquirePooled(place, w, h, src, obj) {
         shim._listeners = null
         shim._interactive = 0
         shim.node.eventMode = "none"
-        applyDropShadow(shim, "")
+        // полный сброс стиля: тень + tint (ярость краснит спрайт через style.filter —
+        // переиспользованный слот не должен остаться красным)
+        applyFilterString(shim, "")
         shim._styleRaw = undefined
         const cr = shim._clipRect
         cr._dead = 0

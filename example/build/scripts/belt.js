@@ -10,7 +10,9 @@ function beltCreate() {
     for (let i = 0; i < lengthBeltCell; i++) {
         beltTemp.push(image(svgArr[2],50 + i * 110,970,96,96,"./images/UI/panels/portBack.png",{"id":i+"B"}))
         !status.info.beltCellArr[i] && (status.info.beltCellArr[i] = 0)
-        status.info.beltCellArr[i] && beltTemp.push(image(svgArr[2],50 + i * 110,970,96,96,"./images/consume/food/"+Math.round(status.info.beltCellArr[i]*20)+".png",{"id":i+"BT"}))
+        //спрайты еды на диске — 1..14: экстремальный билд с 10+ «живучестями» дал бы 15+,
+        //клампим на последний существующий
+        status.info.beltCellArr[i] && beltTemp.push(image(svgArr[2],50 + i * 110,970,96,96,"./images/consume/food/"+Math.min(14,Math.round(status.info.beltCellArr[i]*20))+".png",{"id":i+"BT"}))
     }
 }
 function beltChange() {

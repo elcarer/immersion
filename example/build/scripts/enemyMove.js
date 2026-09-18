@@ -32,7 +32,10 @@ function enemyMove() {
             //V78: pet тикается и вне кадра — иначе отставший за экран питомец навсегда
             //замер бы на месте и не догнал бы героя; у врагов гейт остался (условие 1:1:
             //очарованный враг (type стал "pet", сидит в genemy) вне кадра тоже тикается)
-            if (o.type !== "pet" && (pos[0] < vb.x || pos[0] > vb.x + vb.width || pos[1] < vb.y || pos[1] > vb.y + vb.height)) continue
+            //E-18: боссы — тоже вне гейта: погоня после урона магией сквозь стены живёт
+            //и за экраном (иначе раненый из-за кадра босс «стоял» до подхода героя)
+            const offscreen = pos[0] < vb.x || pos[0] > vb.x + vb.width || pos[1] < vb.y || pos[1] > vb.y + vb.height
+            if (offscreen && o.type !== "pet" && !(o.class && o.class.boss === 1)) continue
             enemyTick(o)
         }
     }

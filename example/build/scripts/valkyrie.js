@@ -20,8 +20,10 @@ import { playback, strike } from "../scripts/sound.js"
 
 const DIR_OPPOSITE = { 0: 1, 1: 0, 2: 3, 3: 2 }
 //V57: жёлтое свечение героини на duration «Крыльев» — тот же приём, что у «ярости»
-//Вождя гоблинов (enemyAI RAGE_FILTER), но hue-rotate в плюс: сепия (~40°) → жёлтый (~60°)
-const WINGS_FILTER = "sepia(0.4) saturate(3) hue-rotate(20deg)"
+//Вождя гоблинов (enemyAI RAGE_FILTER): цветной tint через style.filter (pixiBackend).
+//До миграции R5 строка была CSS-овой (sepia+saturate+hue-rotate(20deg), сепия ~40° →
+//жёлтый ~60°) и после переезда на Pixi молча не применялась
+const WINGS_FILTER = "tint(255,224,96)"
 //направления героя (0-верх,1-низ,2-лево,3-право) → ori для collision() (0-верх,1-ПРАВО,2-низ,3-ЛЕВО)
 const DIR_TO_COLLISION = { 0: 0, 1: 2, 2: 3, 3: 1 }
 //счётчик id для декоративных спрайтов валькирии (след рывка/щит) — НЕ трогает status.oVcount,

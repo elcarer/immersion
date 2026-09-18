@@ -733,34 +733,34 @@ let data = {"heroes":[
     {"name":"attack.14.name","base":1,"type":"magic","pool":1,"cooldown":1,"range":8,"img":"./images/attacks/staff/icon.png", "anims":[
         {"img":"./images/attacks/octo/all.png","bullet":"all","bulletSpeed":2,"effect":0,"times":4,"speed":5,"w":128,"h":32,"x":0,"y":0}
     ]},
-    {"name":"attack.15.name","base":1,"type":"magic","cooldown":1.5,"range":5,"img":"./images/attacks/web/icon.png", "anims":[
+    {"name":"attack.15.name","base":1,"type":"magic","cooldown":1.5,"range":5,"anims":[
         {"img":"./images/attacks/web/all.png","bullet":"all","bulletSpeed":2,"effect":0,"times":4,"speed":5,"w":128,"h":32,"x":0,"y":0}
     ]},
-    {"name":"attack.16.name","base":1,"type":"magic","cooldown":1.5,"range":5,"img":"./images/attacks/web/icon.png", "anims":[
+    {"name":"attack.16.name","base":1,"type":"magic","cooldown":1.5,"range":5,"anims":[
         {"img":"./images/attacks/fireball/all.png","bullet":"all","bulletSpeed":3,"effect":0,"times":4,"speed":7,"w":128,"h":32,"x":0,"y":0}
     ]},
-    {"name":"attack.17.name","base":1,"cooldown":1.6,"range":9,"img":"./images/attacks/poison/icon.png", "anims":[
+    {"name":"attack.17.name","base":1,"cooldown":1.6,"range":9,"anims":[
         {"img":"./images/attacks/poison/back.png","bullet":"top","effect":0,"bulletSpeed":3,"poisonMove":1,"times":4,"speed":10,"w":384,"h":64,"x":0,"y":-48},
         {"img":"./images/attacks/poison/front.png","bullet":"down","effect":0,"bulletSpeed":3,"poisonMove":1,"times":4,"speed":10,"w":384,"h":64,"x":0,"y":48},
         {"img":"./images/attacks/poison/left.png","bullet":"left","effect":0,"bulletSpeed":3,"poisonMove":1,"times":4,"speed":10,"w":256,"h":96,"x":-48,"y":0},
         {"img":"./images/attacks/poison/right.png","bullet":"right","effect":0,"bulletSpeed":3,"poisonMove":1,"times":4,"speed":10,"w":256,"h":96,"x":48,"y":0},
     ]},
-    {"name":"attack.18.name","base":1,"type":"magic","cooldown":1.5,"range":5,"img":"./images/attacks/web/icon.png", "anims":[
+    {"name":"attack.18.name","base":1,"type":"magic","cooldown":1.5,"range":5,"anims":[
         {"img":"./images/attacks/cold/all.png","once":1,"times":4,"speed":7,"w":640,"h":160,"x":0,"y":0}
     ]},
-    {"name":"attack.19.name","base":1,"cooldown":0.7,"img":"./images/attacks/sword/icon.png", "anims":[
+    {"name":"attack.19.name","base":1,"cooldown":0.7,"anims":[
     {"img":"./images/attacks/swordHound/back.png","once":1,"times":4,"speed":15,"w":128,"h":48,"x":0,"y":-48},
     {"img":"./images/attacks/swordHound/front.png","once":1,"times":4,"speed":15,"w":128,"h":48,"x":0,"y":48},
     {"img":"./images/attacks/swordHound/left.png","once":1,"times":4,"speed":15,"w":192,"h":32,"x":-48,"y":0},
     {"img":"./images/attacks/swordHound/right.png","once":1,"times":4,"speed":15,"w":192,"h":32,"x":48,"y":0},
     ]},
-    {"name":"attack.20.name","base":1,"cooldown":1.2,"img":"./images/attacks/boss3attack/icon.png", "anims":[
+    {"name":"attack.20.name","base":1,"cooldown":1.2,"anims":[
         {"img":"./images/attacks/boss3attack/back.png","once":1,"times":4,"speed":15,"w":512,"h":312,"x":0,"y":-128},
         {"img":"./images/attacks/boss3attack/front.png","once":1,"times":4,"speed":15,"w":512,"h":312,"x":0,"y":128},
         {"img":"./images/attacks/boss3attack/left.png","once":1,"times":4,"speed":15,"w":1248,"h":128,"x":-128,"y":0},
         {"img":"./images/attacks/boss3attack/right.png","once":1,"times":4,"speed":15,"w":1248,"h":128,"x":128,"y":0},
     ]},
-    {"name":"attack.21.name","base":1,"cooldown":1.6,"range":9,"img":"./images/attacks/void/icon.png", "anims":[
+    {"name":"attack.21.name","base":1,"cooldown":1.6,"range":9,"anims":[
         {"img":"./images/attacks/void/all.png","bullet":"top","effect":0,"bulletSpeed":3,"times":4,"speed":10,"w":384,"h":96,"x":0,"y":-48},
         {"img":"./images/attacks/void/all.png","bullet":"down","effect":0,"bulletSpeed":3,"times":4,"speed":10,"w":384,"h":96,"x":0,"y":48},
         {"img":"./images/attacks/void/all.png","bullet":"left","effect":0,"bulletSpeed":3,"times":4,"speed":10,"w":384,"h":96,"x":-48,"y":0},
@@ -769,13 +769,13 @@ let data = {"heroes":[
     //V85: уменьшенные копии «Звезды пустоты» (21) для осколков Медузы пустоты
     //(segmentation): 22 — мини-осколки (×0.5), 23 — микро-осколки (×0.25);
     //урон/кулдаун/дальность те же — меньше только визуал (решение пользователя)
-    {"name":"attack.22.name","base":1,"cooldown":1.6,"range":9,"img":"./images/attacks/void/icon.png", "anims":[
+    {"name":"attack.22.name","base":1,"cooldown":1.6,"range":9,"anims":[
         {"img":"./images/attacks/void/all.png","bullet":"top","effect":0,"bulletSpeed":4,"times":4,"speed":10,"w":192,"h":48,"x":0,"y":-24},
         {"img":"./images/attacks/void/all.png","bullet":"down","effect":0,"bulletSpeed":4,"times":4,"speed":10,"w":192,"h":48,"x":0,"y":24},
         {"img":"./images/attacks/void/all.png","bullet":"left","effect":0,"bulletSpeed":4,"times":4,"speed":10,"w":192,"h":48,"x":-24,"y":0},
         {"img":"./images/attacks/void/all.png","bullet":"right","effect":0,"bulletSpeed":4,"times":4,"speed":10,"w":192,"h":48,"x":24,"y":0},
     ]},
-    {"name":"attack.23.name","base":1,"cooldown":1.6,"range":9,"img":"./images/attacks/void/icon.png", "anims":[
+    {"name":"attack.23.name","base":1,"cooldown":1.6,"range":9,"anims":[
         {"img":"./images/attacks/void/all.png","bullet":"top","effect":0,"bulletSpeed":5,"times":4,"speed":10,"w":96,"h":24,"x":0,"y":-12},
         {"img":"./images/attacks/void/all.png","bullet":"down","effect":0,"bulletSpeed":5,"times":4,"speed":10,"w":96,"h":24,"x":0,"y":12},
         {"img":"./images/attacks/void/all.png","bullet":"left","effect":0,"bulletSpeed":5,"times":4,"speed":10,"w":96,"h":24,"x":-12,"y":0},
@@ -784,7 +784,7 @@ let data = {"heroes":[
     //E-15: мини-копия «Звезды пустоты» для мини-грибов Гриба пустоты — спрайт ×0.2 от 21
     //(по принципу осколков Медузы: 22 ×0.5, 23 ×0.25; 76/384 = 19/96 — кадр 19×19 ровный);
     //урон считается по stats.dmg стрелка, перенаправление — в spawnSporeMini (voidBoss.js)
-    {"name":"attack.24.name","base":1,"cooldown":1.6,"range":9,"img":"./images/attacks/void/icon.png", "anims":[
+    {"name":"attack.24.name","base":1,"cooldown":1.6,"range":9,"anims":[
         {"img":"./images/attacks/void/all.png","bullet":"top","effect":0,"bulletSpeed":5,"times":4,"speed":10,"w":76,"h":19,"x":0,"y":-10},
         {"img":"./images/attacks/void/all.png","bullet":"down","effect":0,"bulletSpeed":5,"times":4,"speed":10,"w":76,"h":19,"x":0,"y":10},
         {"img":"./images/attacks/void/all.png","bullet":"left","effect":0,"bulletSpeed":5,"times":4,"speed":10,"w":76,"h":19,"x":-10,"y":0},

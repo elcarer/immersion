@@ -208,7 +208,18 @@ function ensureNavMatrix() {
             n[f[1] * w + f[0]] = 1
         }
     }
-    // закрытые двери — блокеры (могут перекрывать больше одной клетки, если тайл шире 32px)
+    // закрытые двери — блокеры
+    closeDoorsOnMatrix(n, w, h)
+    navMatrixRef = matrix
+    navVersionRef = ver
+    navW = w
+    navH = h
+    nav = n
+    return n
+}
+// закрытые двери — блокеры в ЛЮБОЙ карте ИИ (могут перекрывать больше одной клетки,
+// если тайл шире 32px); общие для navMatrix и boss-карты (E-18)
+function closeDoorsOnMatrix(n, w, h) {
     for (let i = 0; i < doorPics.length; i++) {
         const p = doorPics[i]
         if (!p || typeof p.getAttribute !== "function") continue
@@ -226,12 +237,6 @@ function ensureNavMatrix() {
             }
         }
     }
-    navMatrixRef = matrix
-    navVersionRef = ver
-    navW = w
-    navH = h
-    nav = n
-    return n
 }
 
 // ---------- flow-field: один общий BFS от клетки героя по всему открытому этажу ----------
@@ -400,15 +405,10 @@ function flankTargetFor(heroCell, mx, my, wob) {
 }
 let bfsSeen = null
 let bfsQ = null
-// BFS по navMatrix (E-9b: открытые комнаты/коридоры минус закрытые двери) от from до to:
-// массив узлов ПОСЛЕ стартовой клетки, последний узел = to; unreachable/кривые входы → [].
-// Стартовая клетка допускается на «сыром» полу (matrix===1) даже вне nav — враг мог быть
-// выдавлен расталкиванием в клетку закрытой двери, пути оттуда всё равно должны строиться.
-function bfsPath(from, to) {
-    const n = ensureNavMatrix()
-    if (!n) return []
-    const w = navW
-    const h = navH
+// общий BFS-раннер по матрице проходимости: массив узлов ПОСЛЕ стартовой клетки,
+// последний узел = to; unreachable/кривые входы → []. bfsPath и bfsPathBoss (E-18)
+// никогда не перемешаны в стеке — общий scratch-буфер безопасен
+function bfsRun(n, w, h, from, to) {
     if (from[0] === to[0] && from[1] === to[1]) return []
     if (from[0] < 0 || from[1] < 0 || from[0] >= w || from[1] >= h) return []
     if (to[0] < 0 || to[1] < 0 || to[0] >= w || to[1] >= h) return []
@@ -449,6 +449,52 @@ function bfsPath(from, to) {
     }
     path.reverse()
     return path
+}
+// BFS по navMatrix (E-9b: открытые комнаты/коридоры минус закрытые двери) от from до to.
+// Стартовая клетка допускается на «сыром» полу (matrix===1) даже вне nav — враг мог быть
+// выдавлен расталкиванием в клетку закрытой двери, пути оттуда всё равно должны строиться.
+function bfsPath(from, to) {
+    const n = ensureNavMatrix()
+    if (!n) return []
+    return bfsRun(n, navW, navH, from, to)
+}
+
+// ---------- boss-карта: весь пол этажа (E-18) ----------
+// Обычные враги ходят только по открытому (navMatrix, E-9b), но магия героя бьёт сквозь
+// стены: босс в неоткрытой комнате получал урон и молча стоял — путь по navMatrix пуст
+// (клетка героя вне поля). Боссам (class.boss) при пустом nav-пути путь строится по
+// ВСЕМУ полу этажа (matrixLevel===1). Двери для босса НЕ блокер (он не умеет их
+// открывать — иначе в сценарии «магия за закрытой дверью» упирался бы в неё навсегда):
+// идёт через проём. Открытие комнат/дверей не влияет — карта от пола не зависит.
+let bossNavRef = null
+let bossNavVer = -1
+let bossNav = null
+let bossW = 0
+let bossH = 0
+function ensureBossMatrix() {
+    const matrix = status.matrixLevel
+    if (!matrix || !matrix[0]) return null
+    const ver = status.navVersion || 0
+    if (bossNav && bossNavRef === matrix && bossNavVer === ver) return bossNav
+    const h = matrix.length
+    const w = matrix[0].length
+    const n = new Uint8Array(w * h)
+    for (let y = 0; y < h; y++) {
+        const row = matrix[y]
+        if (!row) continue
+        for (let x = 0; x < w; x++) row[x] === 1 && (n[y * w + x] = 1)
+    }
+    bossNavRef = matrix
+    bossNavVer = ver
+    bossW = w
+    bossH = h
+    bossNav = n
+    return n
+}
+function bfsPathBoss(from, to) {
+    const n = ensureBossMatrix()
+    if (!n) return []
+    return bfsRun(n, bossW, bossH, from, to)
 }
 
 //V28: путь по flow-field с per-enemy выбором среди РАВНОЦЕННЫХ ветвей.
@@ -540,8 +586,12 @@ export function enemyChase(enemy) {
         if (enemy.state !== ENEMY_STATE.CHASE) setEnemyState(enemy, ENEMY_STATE.CHASE)
         return
     }
-    // герой недостижим по полу (за стеной) — в CHASE не переходим
-    const path = buildChasePath(enemyCell, heroCell, enemy)
+    // герой недостижим по открытому полу (за стеной) — обычный враг остаётся на месте.
+    // E-18: боссу путь строится по ВСЕМУ этажу (bfsPathBoss): магия бьёт сквозь стены,
+    // и раненый из неоткрытой комнаты босс иначе стоял вечно; повторный урон (и открытие
+    // дверей/комнат) пересчитывает путь — погоня возобновляется сама
+    let path = buildChasePath(enemyCell, heroCell, enemy)
+    if (!path.length && enemy.class && enemy.class.boss === 1) path = bfsPathBoss(enemyCell, heroCell)
     if (!path.length) return
     enemy.lastSeen = heroCell
     enemy.path = path
@@ -706,13 +756,14 @@ export function enemyStun(enemy) {
 
 // ---------- ярость (stats.rage, напр. «Goba Lider») ----------
 // Каждые stats.rage секунд враг на stats.rage/2 секунд «впадает в ярость»:
-// спрайт окрашивается красным тоном (CSS-фильтр на img — переживает смену поз,
-// пул спрайтов сбрасывает фильтр при переиспользовании), скорость передвижения
-// растёт в 1.5 раза с округлением ВВЕРХ (speed 7 → Math.ceil(10.5) = 11).
+// спрайт краснеет (tint + красная тень — style.filter применяет pixiBackend;
+// до миграции R5 была CSS-строка sepia/saturate/hue-rotate, которую бэкенд молча
+// не применял — красное свечение не отображалось), скорость передвижения растёт
+// в 1.5 раза с округлением ВВЕРХ (speed 7 → Math.ceil(10.5) = 11).
 // Цикл не зависит от состояния (тикает и в STUN/ATTACK — как кулдауны атак);
 // первое впадение в ярость — через rage секунд после появления врага, дальше
 // каждые rage секунд. У врагов без поля rage механика полностью отключена.
-const RAGE_FILTER = "sepia(0.4) saturate(3) hue-rotate(-45deg)"
+const RAGE_FILTER = "tint(255,86,64) drop-shadow(0 0 7px rgba(255,40,32,0.9))"
 function rageFrames(seconds) {
     return Math.max(1, Math.trunc(seconds * 1000 / 16))
 }

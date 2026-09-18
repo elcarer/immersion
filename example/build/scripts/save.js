@@ -42,11 +42,12 @@ function normMeta(meta) {
         meta.diedClasses.push(...new Array(4 - meta.diedClasses.length).fill(0))
     }
     //V68: пул уникальных реликвий (какие kind уже выпадали) — у старых сохранений поля нет,
-    //создаём/добиваем до 6 слотов (шесть видов реликвий, /items/5/0-5.png)
+    //создаём/добиваем до 7 слотов (семь реликвий = RELICS в relics.js, kind 0..6:
+    //жемчуг добавлен в V68 (kind 4), алмаз в E-16 (kind 6))
     if (!Array.isArray(meta.obtainedRelics)) {
-        meta.obtainedRelics = new Array(6).fill(0)
-    } else if (meta.obtainedRelics.length < 6) {
-        meta.obtainedRelics.push(...new Array(6 - meta.obtainedRelics.length).fill(0))
+        meta.obtainedRelics = new Array(7).fill(0)
+    } else if (meta.obtainedRelics.length < 7) {
+        meta.obtainedRelics.push(...new Array(7 - meta.obtainedRelics.length).fill(0))
     }
     //V53: уровень мета-апгрейда «Идентификация легенд» (сеты) — у старых сохранений поля нет
     if (typeof meta.identLegends !== "number") {
