@@ -129,7 +129,7 @@ const PAIRS = [
     ["skill.1.7.desc", "Каменный шип уменьшает максимальный урон задетых врагов на 1.", "The stone spike reduces the maximum damage of affected enemies by 1."],
     ["skill.1.8.desc", "Повышает везучесть (шанс найти сокровища) на 1.", "Increases Luck (chance to find treasure) by 1."],
     ["skill.1.8.desc2", "Повышает везучесть (шанс найти сокровища) на 2.", "Increases Luck (chance to find treasure) by 2."],
-    ["skill.1.9.desc", "Активируется стоянием на месте: переносит вас на свободную клетку в 1–5 клетках по взгляду в другой открытой комнате. Если такой клетки нет, телепорт не срабатывает.", "Activated by standing still: teleports you to a free cell 1–5 cells in your facing direction, inside a different open room. If no such cell exists, the teleport does not trigger."],
+    ["skill.1.9.desc", "Активируется стоянием на месте: переносит вас на первую свободную клетку в 2–6 клетках по взгляду в другой локации — открытой комнате или коридоре. Если такой клетки нет, телепорт не срабатывает и кулдаун не тратится.", "Activated by standing still: teleports you to the first free cell 2–6 cells in your facing direction, inside a different location — an open room or corridor. If no such cell exists, the teleport does not trigger and no cooldown is spent."],
     ["skill.1.10.desc", "Перезарядка каменного шипа уменьшается на 2 секунды.", "Stone spike cooldown is reduced by 2 seconds."],
     ["skill.1.11.desc", "При убийстве врага огнём 5% шанс получить еду.", "5% chance to get food when killing an enemy with fire."],
     ["skill.1.11.desc2", "При убийстве врага огнём 10% шанс получить еду.", "10% chance to get food when killing an enemy with fire."],
@@ -802,6 +802,7 @@ const PAIRS = [
     ["lib.effect", "Эффект: {0}", "Effect: {0}"],
     // ---------- итоги этажа (endGame) ----------
     ["eg.level", "УРОВЕНЬ ЗАВЕРШЁН", "LEVEL COMPLETE"],
+    ["eg.lose", "ЗАБЕГ ОКОНЧЕН", "RUN OVER"],
     ["eg.enemies", "ВРАГИ", "ENEMIES"],
     ["eg.gold", "ЗОЛОТО", "GOLD"],
     ["eg.total", "Всего очков получено:", "Total points earned:"],

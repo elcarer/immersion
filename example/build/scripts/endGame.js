@@ -53,7 +53,9 @@ function endScreen(lose,next) {
     playTrack(TRACK.none)
     ctx_sound.suspend()
     screenPic.push(image(svgArr[2],520,50,919,73,"./images/UI/panels/endTop.png"))
-    screenPic.push(text(svgArr[2],1920/2,106,"0pt","50pt","black","2px",`rgb(204, 153, 102)`,T("eg.level"),{"id":"delItemText","size":60,"font":"baseFont4","anchor":"middle"}))
+    //E-23 (репорт пробега): при смерти героя заголовок «УРОВЕНЬ ЗАВЕРШЁН» лгал —
+    //забег прерван смертью. Отдельный заголовок для проигрыша
+    screenPic.push(text(svgArr[2],1920/2,106,"0pt","50pt","black","2px",`rgb(204, 153, 102)`,T(lose ? "eg.lose" : "eg.level"),{"id":"delItemText","size":60,"font":"baseFont4","anchor":"middle"}))
     screenPic.push(image(svgArr[2],35,160,919,796,"./images/UI/panels/panel.png"))
     screenPic.push(text(svgArr[2],485,216,"0pt","50pt","black","2px",`rgb(204, 153, 102)`,T("eg.enemies"),{"id":"delItemText","size":60,"font":"baseFont4","anchor":"middle"}))
     screenPic.push(image(svgArr[2],965,160,919,796,"./images/UI/panels/panel.png"))
