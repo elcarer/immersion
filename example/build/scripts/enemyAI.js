@@ -1609,8 +1609,18 @@ function fleeTick(enemy, sees) {
             enemy.fleePhase = "sneak"
             p = buildSneakPath(enemy, pivot)
         }
+        if (!p.length && enemy.fleePhase === "sneak") {
+            //E-21 (репорт «раненые просто стоят, не окружают»): обратный fallback —
+            //если sneak-точка недостижима (герой за узким коридором/в другом регионе),
+            //раненый застревал в фазе sneak НАВСЕГДА: обратного перехода в бегство не
+            //было, ретрай каждые PATH_RETRY_TICKS строил только sneak и снова пусто.
+            //Теперь каждый ретрай пробует ОБЕ фазы — вечного стояния больше нет
+            enemy.fleePhase = "flee"
+            p = buildFleePath(enemy, pivot)
+        }
         if (!p.length) {
-            // и зайти не вышло — зажат в угол: стоит и огрызается (атака выше по тику)
+            // и бегство, и подкрадывание не строятся — зажат в угол: стоит и огрызается
+            //(атака проверяется выше по тику); ретрай обеих фаз — через PATH_RETRY_TICKS
             enemy.fleeFail = status.time
             return
         }
@@ -1645,7 +1655,10 @@ export function separateEnemiesTick() {
         const o = DATA.bag[snap0[i]]
         if (!o || o.type !== "enemy") continue              // питомцы/пули/трупы — нет
         if (o.lying !== undefined || o.shadowFx || o.dashFly) continue   // DOWN-мумии, фазы тени, летящий рывок
-        if (o.state === ENEMY_STATE.STUN || o.state === ENEMY_STATE.ATTACK) continue
+        //E-21 (репорт: «убегающий враг не может пробиться через врагов, бегущих на героя»):
+        //FLEE вне расталкивания целиком — на убегающего не действует теснение набегающей
+        //толпы (и он сам никого не толкает): пробегает её без «топтания на месте»
+        if (o.state === ENEMY_STATE.STUN || o.state === ENEMY_STATE.ATTACK || o.state === ENEMY_STATE.FLEE) continue
         //V58: флаг class.boss вместо проверки имени
         if (o.class.boss) continue
         const p = rectPos(o.rect)

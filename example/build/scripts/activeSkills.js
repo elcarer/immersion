@@ -305,8 +305,13 @@ function useSkill(skill) {
             if (!blocked) target = [cx, cy]
         }
         if (!target) return
-        status.hero.x = target[0] * 32 + 16
-        status.hero.y = target[1] * 32 + 16
+        //E-21 (репорт «застрял в нижней стене другой комнаты»): посадка «хитбокс строго
+        //внутрь клетки» — та же формула, что teleportHero в portalFx.js. Прежняя
+        //x=c*32+16,y=c*32+16 клала хитбокс героя (x+13..x+27, y+37..y+51) на клетки
+        //СПРАВА и СНИЗУ цели: телепорт по взгляду вверх сажал хитбокс в нижнюю стену
+        //комнаты-цели (сам герой при этом стоял на проверенной свободной клетке)
+        status.hero.x = target[0] * 32 - 4
+        status.hero.y = target[1] * 32 - 28
         spritePos(status.hero.obj.img, status.hero.x, status.hero.y)
         //V31: окно камеры подставляет setWorldViewBox (1920/zoom × 1080/zoom), x/y прежние
         setWorldViewBox(status.hero.x - 960, status.hero.y - 540)
