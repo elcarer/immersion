@@ -1939,6 +1939,13 @@ function findRarityFrame(shim) {
     return null
 }
 function beginDragShim(shim, funcDrag, item, clientX, clientY) {
+    // E-20 (репорт: «предметы копируются при частых перетаскиваниях»): мёртвый шим не
+    // захватываем — его панель уже перерисована, funcDrag со старым id кладёт предмет
+    // во вторую ячейку, не очистив настоящую
+    if (shim._dead) return
+    // незавершённый жест (pointerup потерян за окном) — завершаем
+    // «где висит», как это делает gamepadDragEnd, иначе прежний спрайт замирает в воздухе
+    if (dragSelected) endDragShim(dragSelected)
     dragSelected = shim
     const pos = dragClientToView(clientX, clientY)
     const ox = +shim.attrs.x || 0, oy = +shim.attrs.y || 0
@@ -1952,6 +1959,10 @@ function beginDragShim(shim, funcDrag, item, clientX, clientY) {
 }
 function moveDragShim(cx, cy) {
     if (!dragSelected) return
+    // E-20: панель перестроилась под жестом (даблклик надел предмет и перерисовал слои) —
+    // мёртвый шим не тягаем и жест гасим: его невидимое движение за курсором + последующий
+    // funcDrag со старым id ячейки и порождали копии предметов
+    if (dragSelected._dead) { dragSelected = null; dragData = null; return }
     if (dragData && !dragData.lifted) {
         layers[2].append(dragSelected)
         dragData.lifted = true
@@ -1966,6 +1977,9 @@ function endDragShim(shim, clientX, clientY) {
     const data = dragData
     dragSelected = null
     dragData = null
+    // E-20: funcDrag на мёртвом шиме = запись предмета по СТАРОМУ id ячейки — копия;
+    // панель уже отрисована из состояния, жест просто гасим
+    if (el._dead) return
     el._styleRaw = "none"
     // реальные клиентские координаты отпускания (как у mouseup в SVG): часть вызовов
     // funcDrag читает evt.clientX/clientY

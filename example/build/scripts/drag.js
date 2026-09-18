@@ -306,6 +306,9 @@ function equip(item) {
     }
 }
 function unEquip(item) {
+    //E-20: страховка половинных путей (changeItem2 = null в обмене со слотом) — раньше
+    //unEquip(null) ронял funcDrag исключением посреди записи состояния
+    if (!item) return
     if (item.attack !== undefined) {
         let check = false
         let lengthDoll = status.inventory.doll.length

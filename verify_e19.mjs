@@ -2,9 +2,11 @@
 // (1) красное свечение ярости босса (RAGE_FILTER → tint+тень в pixiBackend; прежняя
 //     CSS-строка sepia/saturate/hue-rotate бэкендом молча не применялась),
 // (2) тулип предмета гаснет при захвате drag'ом (backendHooks.tipDel),
-// (3) рамка редкости едет вместе со спрайтом при drag (и возвращается при провале),
+// (3) рамка/свечение редкости прячутся на время drag, drag-glow следует за спрайтом,
 // (4) босс строит путь к герою по ВСЕМУ этажу (boss-карта) — урон магией сквозь стены
 //     больше не оставляет его стоять в неоткрытой комнате; обычные враги — как раньше (E-9b).
+// E-19: гейт атаки без оружия; HUD-tip активных способностей.
+// E-20: даблклик-гонка реальной мышью больше не копирует предметы (dead-гварды drag-машины).
 // Чистки: атаки 15–24 без мёртвого img; belt clamp на food/14.png; normMeta добивает
 // obtainedRelics до 7 слотов.
 import { connect } from "./cdp.mjs"
@@ -457,6 +459,82 @@ console.log("normRelics:", JSON.stringify(norm))
 const normOk = norm.len === 7 && JSON.stringify(norm.head) === "[1,1,1]"
 console.log(`normMeta: ${normOk ? "OK" : "FAIL"}`)
 if (!normOk) { console.log("FAIL: normMeta"); process.exit(1) }
+
+//===== 8. E-20: даблклик-гонка РЕАЛЬНОЙ мышью — предмет не копируется =====
+// pointerdown: fire("mousedown") → beginDragShim, затем fire("dblclick") → doubleClickItem —
+// предмет надевается, reRenderPanels убивает шим ПОД ЖЕСТОМ; прежний код продолжал тягать
+// мёртвый шим и funcDrag'ом со старым id ячейки клал КОПИЮ в ячейку под курсором.
+// Фикс: dead-гварды в beginDragShim/moveDragShim/endDragShim + hard-end незавершённого жеста.
+{
+  const prep = await ev(`(async function(){
+    const st = window.__ST.status
+    const IG = await import("./scripts/itemGenerate.js")
+    const I = await import("./scripts/inventory.js")
+    const D = await import("./scripts/doll.js")
+    I.inventoryDel(1); D.dollDel(1); D.doll(); I.inventory()
+    let w = null
+    for (let i = 0; i < 200 && !w; i++) {
+      const c = IG.itemGenerate(2)
+      if (c.attack !== undefined) w = c
+      else { const idx = st.inventory.inv.indexOf(c); if (idx !== -1) st.inventory.inv[idx] = null }
+    }
+    if (!w) return JSON.stringify({ err: "no weapon" })
+    w._tag = "W"
+    I.inventoryDel(1); D.dollDel(1); D.doll(); I.inventory()
+    const k = st.inventory.inv.indexOf(w)
+    const invC = i => [940 + (i % 6) * 130 + 64, 261 + ((i / 6) | 0) * 130 + 64]
+    return JSON.stringify({ k, c: invC(k), doll11: !!st.inventory.doll[11] })
+  })()`, true).then(s => JSON.parse(s))
+  console.log("e20 prep:", JSON.stringify(prep))
+  if (prep.err) { console.log("FAIL: e20 prep"); process.exit(1) }
+  const whereW = () => ev(`(function(){
+    const st = window.__ST.status
+    return JSON.stringify([...st.inventory.doll.map((o,i) => o && o._tag === "W" ? "doll"+i : null),
+      ...st.inventory.inv.map((o,i) => o && o._tag === "W" ? "inv"+i : null)].filter(Boolean))
+  })()`).then(s => JSON.parse(s))
+  // ячейка для сброса — 8 (940+2*130, 261+130) — пустая, подальше от источника
+  const [d2x, d2y] = await toClient(940 + 2 * 130 + 64, 261 + 130 + 64)
+  // (a) даблклик-гонка: tap; press №2 в пределах 350мс, ДЕРЖИМ, тянем, отпускаем
+  {
+    const [ax, ay] = await toClient(prep.c[0], prep.c[1])
+    await send("Input.dispatchMouseEvent", { type: "mouseMoved", x: ax, y: ay, button: "none", buttons: 0, pointerType: "mouse" })
+    await send("Input.dispatchMouseEvent", { type: "mousePressed", x: ax, y: ay, button: "left", buttons: 1, clickCount: 1, pointerType: "mouse" })
+    await S(60)
+    await send("Input.dispatchMouseEvent", { type: "mouseReleased", x: ax, y: ay, button: "left", buttons: 0, clickCount: 1, pointerType: "mouse" })
+    await S(40)   // <350мс → второе нажатие = dblclick
+    await send("Input.dispatchMouseEvent", { type: "mousePressed", x: ax, y: ay, button: "left", buttons: 1, clickCount: 1, pointerType: "mouse" })
+    await S(30)
+    await send("Input.dispatchMouseEvent", { type: "mouseMoved", x: d2x, y: d2y, button: "left", buttons: 1, pointerType: "mouse" })
+    await S(60)
+    await send("Input.dispatchMouseEvent", { type: "mouseReleased", x: d2x, y: d2y, button: "left", buttons: 0, clickCount: 1, pointerType: "mouse" })
+    await S(400)
+  }
+  const wA = await whereW()
+  console.log(`e20 dblRace: ${wA.length === 1 ? "OK" : "FAIL"} предмет в ${JSON.stringify(wA)}`)
+  // (b) потерянный отпуск: press без release → press в другом месте → release
+  {
+    const spots = []
+    for (let i = 0; i < 24; i++) spots.push(JSON.parse(await ev(`JSON.stringify(!!window.__ST.status.inventory.inv[${i}])`)))
+    const src = spots.findIndex(Boolean)
+    const empty = spots.findIndex((v, i) => !v)
+    if (src !== -1 && empty !== -1) {
+      const [sx, sy] = await toClient(940 + (src % 6) * 130 + 64, 261 + ((src / 6) | 0) * 130 + 64)
+      const [ex, ey] = await toClient(940 + (empty % 6) * 130 + 64, 261 + ((empty / 6) | 0) * 130 + 64)
+      await send("Input.dispatchMouseEvent", { type: "mouseMoved", x: sx, y: sy, button: "none", buttons: 0, pointerType: "mouse" })
+      await send("Input.dispatchMouseEvent", { type: "mousePressed", x: sx, y: sy, button: "left", buttons: 1, clickCount: 1, pointerType: "mouse" })
+      await S(30)
+      await send("Input.dispatchMouseEvent", { type: "mouseMoved", x: ex, y: ey, button: "left", buttons: 1, pointerType: "mouse" })
+      await S(30)
+      await send("Input.dispatchMouseEvent", { type: "mousePressed", x: ex, y: ey, button: "left", buttons: 1, clickCount: 1, pointerType: "mouse" })
+      await S(30)
+      await send("Input.dispatchMouseEvent", { type: "mouseReleased", x: ex, y: ey, button: "left", buttons: 0, clickCount: 1, pointerType: "mouse" })
+      await S(400)
+    }
+  }
+  const wB = await whereW()
+  console.log(`e20 lostRelease: ${wB.length === 1 ? "OK" : "FAIL"} предмет в ${JSON.stringify(wB)}`)
+  if (!(wA.length === 1 && wB.length === 1)) { console.log("FAIL: E-20 копия"); process.exit(1) }
+}
 
 await S(800)
 const errs = exceptions()
