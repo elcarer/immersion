@@ -29,7 +29,10 @@ import { svgArr, image, text, rect, rectPos, uiRightEdge, releaseSprite } from "
 import { objectValues, screenPic } from "../scripts/del.js"
 import { floatText } from "../scripts/floatText.js"
 import { checkCollision, playEffect } from "../scripts/damage.js"
-import { showEnemyHpBar } from "../scripts/enemyHpBarFx.js"
+//V105: постоянный ХП-бар Волка + мгновенное гашение при уходе (hideEnemyHpBar)
+import { showEnemyHpBar, hideEnemyHpBar } from "../scripts/enemyHpBarFx.js"
+//V105: тень уходит вместе с Волком (removeWolf — он исчезает живым, без трупа)
+import { removeEntShadow } from "../scripts/groundShadow.js"
 import { journalAdd, J_RED } from "../scripts/journal.js"
 import { playback, strike } from "../scripts/sound.js"
 import { addAnim } from "../scripts/animPlay.js"
@@ -40,8 +43,11 @@ import { itemGenerate } from "../scripts/itemGenerate.js"
 import { ENEMY_STATE, animInterval, buildChasePath, petFollowTick, setEnemyPose, waitPose } from "../scripts/enemyAI.js"
 
 //параметры: гоблин data.js (id 0) с главовыми модификаторами вплоть до 4-й
-//(encounters.js: ×2 ХП, dmg +2/+4, speed/range +1; ещё ×1.5 ХП, dmg +2/+8, speed +2, range +1)
-const WOLF_STATS = {"hp":15,"dmg":[5,17],"exp":0,"speed":13,"range":8,"attacksCd":[],"noStunTime":55}
+//(encounters.js: ×2 ХП, dmg +2/+4, speed/range +1; ещё ×1.5 ХП, dmg +2/+8, speed +2, range +1).
+//V105: скорость ПОДНЯТА 13 → 30 (шаг 30/12 = 2.5px/тик против 2px/тик героя) — при равной
+//со героем скорости Волк, отстав, уже не догонял бы (шаг по пути идёт только при цели
+//дальше 2 клеток); с 2.5 он наверстывает отставание и держится «по пятам»
+const WOLF_STATS = {"hp":15,"dmg":[5,17],"exp":0,"speed":30,"range":8,"attacksCd":[],"noStunTime":55}
 //класс Волка — структура как у врагов data.js, анимации читаются из листа wolf_64.png
 //через SHEETS (пути легаси-полос ./images/enemy/wolf/...). attackNew НЕ ставится:
 //цель укуса — конкретный враг, снаряд спавнит combatTick через addAnim сам.
@@ -131,6 +137,8 @@ function spawnWolfNpc() {
 function removeWolf(wolf) {
     if (useBarFill) { useBarFill.remove(); useBarFill = null }
     useT = 0
+    removeEntShadow(wolf)
+    hideEnemyHpBar(wolf)
     const idx = objectValues.indexOf(wolf)
     idx !== -1 && objectValues.splice(idx, 1)
     releaseSprite(wolf.img)
@@ -163,7 +171,30 @@ function wolfAllyTick(wolf) {
     }
     if (status.quest.state === 1) { npcTick(wolf); return }
     if (status.quest.state !== 2) return
-    //конец once-анимации (атака/урон): animPlay заморозил сущность (stop=1) — размораживаем
+    //V105: постоянный ХП-бар — игрок всегда видит состояние Волка (каждый тик
+    //освежает lifetime бара enemyHpBarFx)
+    showEnemyHpBar(wolf)
+    //V105: замах укуса — Волк СТОИТ, анимация атаки доигрывается целиком. Раньше
+    //позу атаки сразу перебивала ходьба (followTick после гибели цели от первого
+    //укуса / stepAlongPath по пути к герою) — сами анимации атаки не были видны.
+    //Укус (снаряд атаки 11) спавнится в середине замаха — как attackNew.step=3 у врагов
+    if (wolf.attacking) {
+        wolf.attackTicks--
+        if (wolf.biteTick > 0) {
+            wolf.biteTick--
+            if (wolf.biteTick === 0 && wolf.biteFoe && wolf.biteFoe.type === "enemy" &&
+                wolf.biteFoe.stats.hp > 0) {
+                addAnim([11,wolf.biteDir],wolf.biteFoe,wolf,wolf.biteDir)
+            }
+        }
+        if (wolf.attackTicks <= 0) {
+            wolf.attacking = 0
+            wolf.stop = 0
+            setEnemyPose(wolf, waitPose(wolf))
+        }
+        return
+    }
+    //конец once-анимации (урон): animPlay заморозил сущность (stop=1) — размораживаем
     if (wolf.stop === 1) {
         wolf.stop = 0
         wolf.currentStill = 0
@@ -262,16 +293,6 @@ function followTick(wolf) {
 
 function combatTick(wolf, foe) {
     wolf.stats.attacksCd[0] > 0 && wolf.stats.attacksCd[0]--
-    //замах укуса: стоит, анимация отыгрывается (снаряд укуса уже летит)
-    if (wolf.attacking) {
-        wolf.path = []
-        wolf.attackTicks--
-        if (wolf.attackTicks <= 0) {
-            wolf.attacking = 0
-            setEnemyPose(wolf, waitPose(wolf))
-        }
-        return
-    }
     const wp = rectPos(wolf.rect)
     const fp = rectPos(foe.rect)
     const dx = (fp[0] + 16) - (wp[0] + 16)
@@ -283,11 +304,14 @@ function combatTick(wolf, foe) {
         const anim = wolfClass.anims[1].attack[dir]
         setEnemyPose(wolf, anim)
         wolf.attacking = 1
-        wolf.attackTicks = Math.ceil(anim.times * animInterval(wolf, anim)) + 1
+        const swing = Math.ceil(anim.times * animInterval(wolf, anim))
+        wolf.attackTicks = swing + 1
+        //укус — в середине замаха (как attackNew.step 3 из 4 у врагов)
+        wolf.biteDir = dir
+        wolf.biteFoe = foe
+        wolf.biteTick = Math.max(1, Math.round(swing * 3 / 4))
         wolf.stats.attacksCd[0] = BITE_CD
-        //укус — штатный снаряд атаки с target = враг: урон идёт шиной damage()
-        //(ветка волка в countDamage), звук атаки addAnim ставит сам
-        addAnim([11,dir],foe,wolf,dir)
+        wolf.path = []
         return
     }
     //подход к врагу по BFS (общий поиск пути), перестройка при смене его клетки
@@ -344,6 +368,7 @@ function questFail(wolf) {
         animInterval(wolf,wolfClass.anims[2].others[1])) + 2
     status.quest.state = 5
     questTrackerHide()
+    hideEnemyHpBar(wolf)
     playback(strike[9].vol,0,0,2*status.settings.soundVolume)
     floatText(status.hero.x - 16 + Math.trunc(Math.random() * 32),status.hero.y - 16,T("quest.failed"),"#FF3333","20px","none")
     journalAdd(T("quest.journ.fail"),J_RED)

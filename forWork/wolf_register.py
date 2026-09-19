@@ -25,8 +25,12 @@ CELL = 64
 FRAMES = 4
 ANIMS = [  # (имя, строка, подкаталог полосы, имя файла)
     ('wait', 0, 'others', 'wait.png'), ('death', 9, 'others', 'death.png'), ('damage', 10, 'others', 'damage.png'),
+    #V105: у листа волка ХОДОВЫЕ строки 3/4 зеркальны стандарту остальных врагов
+    #(проверено по арту: строка 3 смотрит ВПРАВО, строка 4 — ВЛЕВО; у гончей наоборот),
+    #поэтому walk_right = строка 3, walk_left = строка 4 (старый манифест был прав).
+    #Атака (5/6 фронт-тыл, 7/8 право-лево) — стандартная, не переставляется.
     ('walk_front', 1, 'move', 'front.png'), ('walk_back', 2, 'move', 'back.png'),
-    ('walk_left', 3, 'move', 'left.png'), ('walk_right', 4, 'move', 'right.png'),
+    ('walk_right', 3, 'move', 'right.png'), ('walk_left', 4, 'move', 'left.png'),
     ('attack_front', 5, 'attack', 'front.png'), ('attack_back', 6, 'attack', 'back.png'),
     ('attack_right', 7, 'attack', 'right.png'), ('attack_left', 8, 'attack', 'left.png'),
 ]

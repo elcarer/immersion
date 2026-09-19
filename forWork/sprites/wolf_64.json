@@ -29,12 +29,12 @@
       "frames": 4
     },
     {
-      "name": "walk_left",
+      "name": "walk_right",
       "row": 3,
       "frames": 4
     },
     {
-      "name": "walk_right",
+      "name": "walk_left",
       "row": 4,
       "frames": 4
     },

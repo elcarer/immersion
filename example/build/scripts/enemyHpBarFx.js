@@ -85,7 +85,8 @@ function enemyHpBarTick() {
         rec.left--
         const e = rec.enemy
         //враг умер/стал трупом/узлы стёрты сменой сцены — убрать немедленно
-        if (rec.left <= 0 || e.type !== "enemy" || e.stats.hp <= 0 || !rec.bg.isConnected) {
+        //V105: Волк-союзник (type "pet", wolfAlly) — его бар живёт как у врагов
+        if (rec.left <= 0 || (e.type !== "enemy" && !e.wolfAlly) || e.stats.hp <= 0 || !rec.bg.isConnected) {
             rec.bg.remove()
             rec.fill.remove()
             rec.tail.remove()
@@ -95,4 +96,15 @@ function enemyHpBarTick() {
         placeRec(rec)
     }
 }
-export { showEnemyHpBar, enemyHpBarTick }
+//V105: мгновенное гашение бара сущности — Волк уходит со сцены живым (отказ/награда)
+//или умер (questFail): бар не должен досиживать свой lifetime над пустым местом
+function hideEnemyHpBar(enemy) {
+    for (let i = list.length - 1; i >= 0; i--) {
+        if (list[i].enemy !== enemy) continue
+        list[i].bg.remove()
+        list[i].fill.remove()
+        list[i].tail.remove()
+        list.splice(i, 1)
+    }
+}
+export { showEnemyHpBar, enemyHpBarTick, hideEnemyHpBar }
