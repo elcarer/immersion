@@ -646,6 +646,27 @@ let data = {"heroes":[
             {"speed":5,"times":4,"w":512,"h":128,"img":"./images/enemy/mushroom/others/death.png","once":1},
             {"speed":5,"times":4,"w":512,"h":128,"img":"./images/enemy/mushroom/others/wait.png"}
         ]}
+    ]},
+    //V108: культист — квестовый персонаж (лист images/sheets/cultist_64.png). В пулы
+    //спавна глав не входит: в комнаты попадёт только через явный спавн квеста
+    {"id":28,"name":"enemy.28.name","stats":{"hp":12,"dmg":[3,6],"exp":6,"speed":6,"range":7,"attacksCd":[],"noStunTime":50,"desc":"enemy.28.desc"},"attacks":[3],"elite":1,"effects":{"takeDamage":1},"anims":[
+        {"move":[
+            {"speed":5,"times":4,"w":128,"h":51,"img":"./images/enemy/cultist/move/back.png"},
+            {"speed":5,"times":4,"w":128,"h":51,"img":"./images/enemy/cultist/move/front.png"},
+            {"speed":5,"times":4,"w":128,"h":51,"img":"./images/enemy/cultist/move/left.png"},
+            {"speed":5,"times":4,"w":128,"h":51,"img":"./images/enemy/cultist/move/right.png"}
+        ]},
+        {"attack":[
+            {"speed":5,"times":4,"w":128,"h":51,"img":"./images/enemy/cultist/attack/back.png","once":1,"attackNew":{"step":3,"anim":[3,0]}},
+            {"speed":5,"times":4,"w":128,"h":51,"img":"./images/enemy/cultist/attack/front.png","once":1,"attackNew":{"step":3,"anim":[3,1]}},
+            {"speed":5,"times":4,"w":128,"h":51,"img":"./images/enemy/cultist/attack/left.png","once":1,"attackNew":{"step":3,"anim":[3,2]}},
+            {"speed":5,"times":4,"w":128,"h":51,"img":"./images/enemy/cultist/attack/right.png","once":1,"attackNew":{"step":3,"anim":[3,3]}}
+        ]},
+        {"others":[
+            {"speed":10,"times":4,"w":128,"h":51,"img":"./images/enemy/cultist/others/damage.png","once":1,"stun":1},
+            {"speed":5,"times":4,"w":128,"h":51,"img":"./images/enemy/cultist/others/death.png","once":1},
+            {"speed":5,"times":4,"w":128,"h":51,"img":"./images/enemy/cultist/others/wait.png"}
+        ]}
     ]}],
 ],
 "attacks":[
