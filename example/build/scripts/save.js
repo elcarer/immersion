@@ -53,6 +53,10 @@ function normMeta(meta) {
     if (typeof meta.identLegends !== "number") {
         meta.identLegends = 0
     }
+    //V106: одноразовые (сюжетные) квесты — у старых сохранений поля нет
+    if (!meta.quests || typeof meta.quests !== "object") {
+        meta.quests = {"wolf":0}
+    }
     //V74: герои открыты сразу — покупка героев удалена. Поле openHeroes старых сейвов стираем:
     //save() пишет мету целиком, иначе удалённое поле жило бы в сохранениях вечно
     delete meta.openHeroes

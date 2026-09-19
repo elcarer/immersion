@@ -45,10 +45,10 @@ function openDialog(script) {
     dlgTemp.push(rect(svgArr[2],0,0,uiRightEdge(),uiBottomEdge(),"none","0px","none",{"func":e => {advanceDialog()}}))
     //окно текста — тоже продвигает диалог (клик по нему самый естественный)
     dlgTemp.push(rect(svgArr[2],WIN_X,WIN_Y,WIN_W,WIN_H,"2px","rgb(204, 153, 102)","rgba(16, 12, 10, 0.92)",{"rx":"6px","func":e => {advanceDialog()}}))
-    //портреты по разные стороны окна: герой слева (арт 192×288), Волк справа
-    //(кадр 0 полосы покоя листа волка — image с times=4 показывает один кадр 144×196)
+    //портреты по разные стороны окна: герой слева, Волк справа (арт 192×288 — тот же
+    //формат, что портрет героя; V106: кадр листа заменён на нормальный UI-портрет)
     dlgTemp.push(image(svgArr[2],WIN_X - PORTRAIT_W - 48,WIN_Y - PORTRAIT_H + 76,PORTRAIT_W,PORTRAIT_H,data.heroes[status.hero.class].img))
-    dlgTemp.push(image(svgArr[2],WIN_X + WIN_W + 48,WIN_Y - 120,560,196,"./images/enemy/wolf/others/wait.png",{"times":4}))
+    dlgTemp.push(image(svgArr[2],WIN_X + WIN_W + 48,WIN_Y - PORTRAIT_H + 76,PORTRAIT_W,PORTRAIT_H,"./images/UI/doll/wolf.png"))
     //имя говорящего и строка реплики (текст печатается в dlgState.textEl)
     dlgState.nameEl = text(svgArr[2],WIN_X + 24,WIN_Y + 38,"0pt","26pt","black","2px",COL_WOLF,"",{"id":"dlgName","size":24,"font":"baseFont4"})
     dlgTemp.push(dlgState.nameEl)

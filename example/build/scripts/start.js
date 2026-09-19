@@ -35,7 +35,9 @@ function defaultMeta() {
         "diedClasses":new Array(4).fill(0),
         //V68: пул уникальных реликвий — какие kind уже выпадали (1 = выпадала); живёт между
         //забегами, как libraryObjects; полная «Новая игра» сбрасывает профиль целиком
-        "obtainedRelics":new Array(6).fill(0)
+        "obtainedRelics":new Array(6).fill(0),
+        //V106: одноразовые (сюжетные) квесты — 1 = выполнен, больше не предлагается
+        "quests":{"wolf":0}
     }))
 }
 let status = {"mouseX":0,"mouseY":0,"start":0,"pause":0,"rectShadow":0,"nextFunction":{},"oVcount":0,"time":0,"inventory":{"doll":[,,,,,,,,,,,,,],"inv":[false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false]},

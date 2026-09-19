@@ -38,6 +38,8 @@ import { playback, strike } from "../scripts/sound.js"
 import { addAnim } from "../scripts/animPlay.js"
 import { openDialog } from "../scripts/dialog.js"
 import { itemGenerate } from "../scripts/itemGenerate.js"
+//V106: отметка о выполнении сюжетного квеста сохраняется сразу (meta в localStorage)
+import { save } from "../scripts/save.js"
 //следование «по пятам» и путь — штатная механика питомцев enemyAI (цикл импортов
 //легален: enemyAI зовёт wolfAllyTick только в рантайме)
 import { ENEMY_STATE, animInterval, buildChasePath, petFollowTick, setEnemyPose, waitPose } from "../scripts/enemyAI.js"
@@ -98,7 +100,9 @@ function questNewGame(next) {
         useT = 0
         useBarFill = null
         wolfRef = null
-        status.meta.page === 2 && status.levelFloor === 0 && spawnWolfNpc()
+        //V106: квест одноразовый (сюжетный) — выполненный больше не предлагается
+        status.meta.page === 2 && status.levelFloor === 0 &&
+            !(status.meta.quests && status.meta.quests.wolf) && spawnWolfNpc()
         return
     }
     //новый этаж при активном квесте сюда дойти не может (награда выдаётся на выходе
@@ -123,7 +127,7 @@ function spawnWolfNpc() {
     if (!cell) { status.quest = {"state":0}; return }
     const anim = wolfClass.anims[2].others[2]
     objectValues.push({"id":status.oVcount,"type":"pet","wolfAlly":1,"npc":1,"class":wolfClass,
-    "stats":JSON.parse(JSON.stringify(WOLF_STATS)),"attacksCdInit":1,
+    "stats":JSON.parse(JSON.stringify(WOLF_STATS)),"attacksCdInit":1,"idleT":0,
     "animCounters":60/anim.speed,"currentAnim":anim,"currentStill":0,"room":null,"cells":[],
     "state":0,"stop":0,"xCell":cell[0],"yCell":cell[1],"noStunTime":0,
     "img":image(svgArr[1],cell[0]*32,cell[1]*32,anim.w,anim.h,anim.img,{"times":anim.times,"id":status.oVcount,"frame":1})})
@@ -190,16 +194,13 @@ function wolfAllyTick(wolf) {
         if (wolf.attackTicks <= 0) {
             wolf.attacking = 0
             wolf.stop = 0
+            wolf.idleT = 0
             setEnemyPose(wolf, waitPose(wolf))
         }
         return
     }
-    //конец once-анимации (урон): animPlay заморозил сущность (stop=1) — размораживаем
-    if (wolf.stop === 1) {
-        wolf.stop = 0
-        wolf.currentStill = 0
-        setEnemyPose(wolf, waitPose(wolf))
-    }
+    //V106: конец once-анимаций обрабатывается в своих ветках (замах — выше);
+    //старый «стоп-сброс» убран: он размораживал простой и сразу ставил wait
     const foe = findFoe(wolf)
     foe ? combatTick(wolf, foe) : followTick(wolf)
 }
@@ -281,13 +282,31 @@ function findFoe(wolf) {
     return bestD <= WOLF_AGGRO ? best : null
 }
 
+//стояние как у героя (V106): при остановке кадр ходьбы ЗАМОРАЖИВАЕТСЯ (stop=1 —
+//animPlay не листает кадры, как при keyup героя), wait-анимация запускается
+//однократно только после долгого простоя — 120 тиков ≈ 2с, как checkWait героя
+const IDLE_WAIT_TICKS = 120
 function followTick(wolf) {
     //мирный режим: «по пятам» за героем штатной механикой питомцев (petFollowTick
     //строит путь, stepAlongPath в enemyAI его отыгрывает)
     petFollowTick(wolf)
-    if ((!wolf.path || !wolf.path.length) && !wolf.attacking) {
+    if (wolf.path && wolf.path.length) {
+        //пошёл: разморозка и сброс простоя
+        if (wolf.stop === 1 || wolf.idleT) { wolf.stop = 0; wolf.idleT = 0 }
+        return
+    }
+    //стоит на месте: заморозить кадр ходьбы, через 120 тиков — wait
+    const idle = wolf.idleT || 0
+    if (idle < IDLE_WAIT_TICKS) {
+        if (!idle) wolf.stop = 1
+        wolf.idleT = idle + 1
+    }
+    if (wolf.idleT === IDLE_WAIT_TICKS) {
         const wait = waitPose(wolf)
-        wolf.currentAnim !== wait && setEnemyPose(wolf, wait)
+        if (wolf.currentAnim !== wait) {
+            wolf.stop = 0
+            setEnemyPose(wolf, wait)
+        }
     }
 }
 
@@ -298,10 +317,16 @@ function combatTick(wolf, foe) {
     const dx = (fp[0] + 16) - (wp[0] + 16)
     const dy = (fp[1] + 25) - (wp[1] + 25)
     if (Math.hypot(dx,dy) <= WOLF_BITE_RANGE) {
-        if (wolf.stats.attacksCd[0] > 0) { wolf.path = []; return }
+        if (wolf.stats.attacksCd[0] > 0) {
+            //ждёт кулдаун у цели: кадр ходьбы заморожен (как при остановке)
+            wolf.path = []
+            wolf.stop = 1
+            return
+        }
         const dir = Math.abs(dx) >= Math.abs(dy) ? (dx > 0 ? 3 : 2) : (dy > 0 ? 1 : 0)
         wolf.direction = dir
         const anim = wolfClass.anims[1].attack[dir]
+        wolf.stop = 0
         setEnemyPose(wolf, anim)
         wolf.attacking = 1
         const swing = Math.ceil(anim.times * animInterval(wolf, anim))
@@ -379,12 +404,17 @@ function questFloorExit(cont) {
     openDialog({
         "lines":[{"who":"wolf","key":"dlg.wolf.3"}],
         "choices":[{"label":"dlg.choice.accept","cb":() => {
-            //случайный легендарный (сетовый) предмет — itemGenerate(4) сам кладёт его
-            //в инвентарь/пустой слот куклы (V102)
-            itemGenerate(4)
+            //случайный легендарный (сетовый) предмет сета ПО КЛАССУ героя (V106):
+            //Плут — «Великий вор», Волшебница — «Учёная волшебница», Рыцарь —
+            //«Победитель турниров», Валькирия — «Доблестный небожитель»;
+            //itemGenerate сам кладёт его в инвентарь/пустой слот куклы (V102)
+            itemGenerate(4,{"setN":[1,2,3,4][status.hero.class] || 1})
             playback(strike[3].vol,0,0,2*status.settings.soundVolume)
             questTrackerHide()
             status.quest.state = 4
+            //V106: отметка о выполнении сюжетного квеста — в мету (сохраняется)
+            status.meta.quests.wolf = 1
+            save()
             const wolf = wolfUnit()
             wolf && removeWolf(wolf)
             cont()

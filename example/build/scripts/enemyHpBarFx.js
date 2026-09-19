@@ -77,6 +77,14 @@ function placeRec(rec) {
     rec.fill.setAttribute("y", y + 1)
     rec.tail.setAttribute("x", x + 1 + rec.green)
     rec.tail.setAttribute("y", y + 1)
+    //V106: бар всегда ПОВЕРХ стен-накладок и прочих спрайтов — переставляем узлы в конец
+    //общего слоя (DOM-порядок = z-порядок внутри слоя), иначе бар зарастал стенами
+    const layer = rec.bg.parentNode
+    if (layer) {
+        layer.appendChild(rec.bg)
+        layer.appendChild(rec.fill)
+        layer.appendChild(rec.tail)
+    }
 }
 //вызов из gameLoop раз в тик: отсчёт жизни бара + привязка к позиции врага
 function enemyHpBarTick() {

@@ -78,7 +78,8 @@ function itemGenerate(rarity, filter) {
     //файл внутри папки подтипа/вида); на редкости 1-3 выбирается из ВСЕХ файлов папки
     let variant = 0
     if (rarity === 4) {
-        setN = Math.trunc(Math.random() * 4) + 1
+        //V106: фильтр {setN} — сюжетные награды: сет по классу героя (квест Волка)
+        setN = filter && filter.setN !== undefined ? filter.setN : Math.trunc(Math.random() * 4) + 1
         variant = setN - 1
         titleIdx = variant
         if (type === 11) {
