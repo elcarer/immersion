@@ -610,7 +610,7 @@ function createShellRoom(level) {
 }
 //каждый тик игры (вызов из gameLoop): фазы «напёрстков» + скольжение чаш.
 //Фаза 1 (2с): по истечении «полная» чаша становится «пустой». Фаза 2 (8с): раз в
-//interval тиков пара свободных чаш меняется клетками, интервал ускоряется ×0.78
+//interval тиков ДВЕ пары свободных чаш меняются клетками, интервал ускоряется ×0.78
 //(45 → 10 тиков); по истечении новых свопов нет — когда доедут последние, фаза 3
 //(выбор). Пауза игры тик не доставляет — таймеры стоят вместе со всей сценой
 function shellTick() {
@@ -666,21 +666,25 @@ function cupsMoving(sh) {
     }
     return false
 }
-//пара чаш (не участвующих в скольжении) меняется клетками; dur — тиков на переезд,
-//равен текущему интервалу (к концу перемешивания чаши переезжают быстрее)
+//за цикл меняются местами ДВЕ пары чаш одновременно (решение пользователя V99):
+//первая пара берётся из всех свободных чаш, вторая — из оставшихся (чаш в скольжении
+//может не хватить — вторая пара пропускается); dur — тиков на переезд, равен текущему
+//интервалу (к концу перемешивания чаши переезжают быстрее)
 function shellSwap(sh, dur) {
-    let free = []
-    for (let i = 0; i < sh.cups.length; i++) !sh.cups[i].move && free.push(sh.cups[i])
-    if (free.length < 2) return
-    let i1 = Math.trunc(Math.random() * free.length)
-    let i2 = (i1 + 1 + Math.trunc(Math.random() * (free.length - 1))) % free.length
-    let a = free[i1]
-    let b = free[i2]
-    let ax = a[0], ay = a[1]
-    a.move = {fx: ax * 32, fy: ay * 32, dur: dur, age: 0}
-    b.move = {fx: b[0] * 32, fy: b[1] * 32, dur: dur, age: 0}
-    a[0] = b[0]; a[1] = b[1]
-    b[0] = ax; b[1] = ay
+    for (let p = 0; p < 2; p++) {
+        let free = []
+        for (let i = 0; i < sh.cups.length; i++) !sh.cups[i].move && free.push(sh.cups[i])
+        if (free.length < 2) return
+        let i1 = Math.trunc(Math.random() * free.length)
+        let i2 = (i1 + 1 + Math.trunc(Math.random() * (free.length - 1))) % free.length
+        let a = free[i1]
+        let b = free[i2]
+        let ax = a[0], ay = a[1]
+        a.move = {fx: ax * 32, fy: ay * 32, dur: dur, age: 0}
+        b.move = {fx: b[0] * 32, fy: b[1] * 32, dur: dur, age: 0}
+        a[0] = b[0]; a[1] = b[1]
+        b[0] = ax; b[1] = ay
+    }
 }
 //спрайт чаши по полноте (obj[10]): свап href отрисованного спрайта — как setObjectState
 function setCupSprite(cup, full) {
