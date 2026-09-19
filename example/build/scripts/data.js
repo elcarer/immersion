@@ -626,8 +626,9 @@ let data = {"heroes":[
     //клетки комнаты (voidBoss.js); наступание героя уничтожает спору, невытоптанная
     //через 8 секунд прорастает мини-грибом (клон без тега boss, ХП/урон/опыт 1/10,
     //размер 1/5, скорость полная — решения пользователя). При смерти босса споры
-    //исчезают. Анимации — собственные /enemy/mushroom/ (лист forWork/sprites/mushroom_128)
-    {"id":27,"name":"enemy.27.name","boss":1,"stats":{"hp":1000,"dmg":[20,26],"exp":10,"speed":11,"range":11,"attacksCd":[],"noStunTime":360, "spore": 10, "desc":"enemy.27.desc"},"attacks":[21],"elite":1,"effects":{"takeDamage":1},"anims":[
+    //исчезают. Анимации — собственные /enemy/mushroom/ (лист forWork/sprites/mushroom_128).
+    //V100: интервал разброса 10с → 15с (поправка пользователя)
+    {"id":27,"name":"enemy.27.name","boss":1,"stats":{"hp":1000,"dmg":[20,26],"exp":10,"speed":11,"range":11,"attacksCd":[],"noStunTime":360, "spore": 15, "desc":"enemy.27.desc"},"attacks":[21],"elite":1,"effects":{"takeDamage":1},"anims":[
         {"move":[
             {"speed":5,"times":4,"w":512,"h":128,"img":"./images/enemy/mushroom/move/back.png"},
             {"speed":5,"times":4,"w":512,"h":128,"img":"./images/enemy/mushroom/move/front.png"},

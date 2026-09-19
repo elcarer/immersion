@@ -966,7 +966,7 @@ const PAIRS = [
     ["journ.medusaSplit", "Медуза пустоты разделяется надвое!", "The Void Medusa splits in two!"],
     //V91: третий босс 4 этажа — «Гриб пустоты»
     ["enemy.27.name", "Гриб пустоты", "Void Mushroom"],
-    ["enemy.27.desc", "Раз в 10 секунд разбрасывает 10 спор: они вылетают по дуге в случайные места комнаты. Наступи на спору, чтобы уничтожить её — через 8 секунд невытоптанная прорастает маленьким грибом (1/10 статов Гриба). При смерти Гриба споры исчезают.", "Every 10 seconds it scatters 10 spores: they fly in an arc to random spots in the room. Step on a spore to destroy it — after 8 seconds an untrampled spore sprouts into a small mushroom (1/10 of the Mushroom's stats). Spores vanish when the Mushroom dies."],
+    ["enemy.27.desc", "Раз в 15 секунд разбрасывает 10 спор: они вылетают по дуге в случайные места комнаты. Наступи на спору, чтобы уничтожить её — через 8 секунд невытоптанная прорастает маленьким грибом (1/10 статов Гриба). При смерти Гриба споры исчезают.", "Every 15 seconds it scatters 10 spores: they fly in an arc to random spots in the room. Step on a spore to destroy it — after 8 seconds an untrampled spore sprouts into a small mushroom (1/10 of the Mushroom's stats). Spores vanish when the Mushroom dies."],
     //V92: кнопка «Снять» в лобби — разом снимает все отметки сундука
     ["lobby.unmark", "Снять", "Unmark"],
     //V95: чекбоксы эффектов предметов в Настройках

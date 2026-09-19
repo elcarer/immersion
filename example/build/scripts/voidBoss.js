@@ -164,7 +164,7 @@ function spawnVoidBoss(level) {
     } else if (enemy1.stats.spore) {
         //V91: Гриб пустоты — копилка спор, Сгустков нет
         sporeBossRef = e
-        sporeCd = Math.round(enemy1.stats.spore * 1000 / 16) //10с = 625 тиков
+        sporeCd = Math.round(enemy1.stats.spore * 1000 / 16) //секунды из stats.spore (V100: 15с)
         bossRef = null
     } else {
         bossRef = null
