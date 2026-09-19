@@ -427,6 +427,25 @@ function extraHandItems(item, slot) {
     if (item.attack !== undefined && other.attack !== undefined && other.attack !== item.attack) return [{"slot":otherSlot,"item":other}]
     return []
 }
+//V102: автонадевание сгенерированного/подобранного предмета (решение пользователя):
+//если подходящий слот куклы ПУСТ и конфликтов второй руки нет (extraHandItems пуст —
+//двуручное/парное оружие автонадеванием не трогаем), предмет сразу встаёт на куклу —
+//тот же путь, что у двойного клика (equip). Иначе — обычный путь в ячейку инвентаря.
+//Замены надетых предметов НЕ делаем (просьба строго про пустую ячейку). true — предмет надет
+function tryAutoEquip(item) {
+    if (!item || !item.types) return false
+    let length = item.types.length
+    for (let i = 0; i < length; i++) {
+        let slot = item.types[i]
+        if (slot < 0 || slot > 12) continue
+        if (status.inventory.doll[slot]) continue
+        if (extraHandItems(item, slot).length > 0) continue
+        status.inventory.doll[slot] = item
+        equip(item)
+        return true
+    }
+    return false
+}
 //двойной клик по предмету: одеть из инвентаря в подходящий слот куклы (при необходимости
 //обменяв с лежащим там предметом) или снять с куклы в первую пустую ячейку инвентаря.
 //Ячейку ищем ПО ИДЕНТИЧНОСТИ ОБЪЕКТА (indexOf), а не по id иконки: иконка может быть
@@ -497,4 +516,4 @@ function doubleClickItem(item) {
         }
     }
 }
-export {drag,doubleClickItem,equip,unEquip,changeDopStat}
+export {drag,doubleClickItem,equip,unEquip,changeDopStat,tryAutoEquip}

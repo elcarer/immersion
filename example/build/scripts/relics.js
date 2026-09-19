@@ -13,6 +13,9 @@
 //meta.obtainedRelics (живёт между забегами, normMeta/defaultMeta), relicGenerate выбирает
 //только из невыпадавших; пустой пул bossDrop обходит (10% дают item4), takeItem страхуется.
 import { status } from "../scripts/start.js"
+//V102: автонадевание реликвии в пустой слот при генерации (решение пользователя); цикл
+//импортов relics → drag → takeDamage → relics допустим — все использования в рантайме
+import { tryAutoEquip } from "../scripts/drag.js"
 
 //семь реликвий (индекс = номер спрайта /items/5/N.png и поле relic у предмета)
 export const RELICS = [
@@ -68,11 +71,16 @@ function relicGenerate() {
     let item = {"title":r.title,"rarity":4,"relic":n,"types":[0,1,2,3,4,5,6,7,8,9,10,11,12],
         "type":{"desc1":"slot.relic","desc2":undefined},"img":r.img,"desc":r.desc}
     Array.isArray(arr) && (arr[n] = 1)
-    let lengthInv = status.inventory.inv.length
-    for (let i = 0; i < lengthInv; i++) {
-        if(!status.inventory.inv[i]) {
-            status.inventory.inv[i] = item
-            break
+    //V102: пустой слот (реликвия встаёт в любой из 0-12) — сразу надевается, как у
+    //itemGenerate; equip реликвии ничего не начисляет (способности read-time), поэтому
+    //здесь достаточно постановки в doll. Иначе — первая свободная ячейка инвентаря
+    if (!tryAutoEquip(item)) {
+        let lengthInv = status.inventory.inv.length
+        for (let i = 0; i < lengthInv; i++) {
+            if(!status.inventory.inv[i]) {
+                status.inventory.inv[i] = item
+                break
+            }
         }
     }
     return item

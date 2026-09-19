@@ -2,6 +2,9 @@ import { status } from "../scripts/start.js"
 //V56: фиксированные подтипы оружия/левой руки сетов (таблица в sets.js) — нужны
 //генерации rarity 4; импорт живёт на уровне модуля, цикла нет (sets.js не импортирует нас)
 import { SET_WEAPON_SUBTYPE, SET_OFFHAND_KIND } from "../scripts/sets.js"
+//V102: автонадевание в пустой подходящий слот куклы (решение пользователя); вызовы только
+//в рантайме — drag.js импортирует нас косвенно только через панели, зацикливания загрузки нет
+import { tryAutoEquip } from "../scripts/drag.js"
 let itemsParams = [
 [2,4],[1,4],[0,3],[0,2],[0,1],[2,3],[1,2],[1,3],[3,4],[0,4]
 ]
@@ -157,11 +160,16 @@ function itemGenerate(rarity, filter) {
         rarity < 4 && (item.postfix = postfixArr[rand].postfix)
     }
     setN > 0 && (item.setN = setN)
-    let lengthInv = status.inventory.inv.length
-    for (let i = 0; i < lengthInv; i++) {
-        if(!status.inventory.inv[i]) {
-            status.inventory.inv[i] = item
-            break
+    //V102: пустой подходящий слот куклы — предмет сразу надевается (решение пользователя);
+    //иначе — в первую свободную ячейку инвентаря, как раньше (покрывает и подбор кучек
+    //takeDrop, и сундуки useObject, и результат объединения на Алхимическом столе)
+    if (!tryAutoEquip(item)) {
+        let lengthInv = status.inventory.inv.length
+        for (let i = 0; i < lengthInv; i++) {
+            if(!status.inventory.inv[i]) {
+                status.inventory.inv[i] = item
+                break
+            }
         }
     }
     //V27: возвращаем сгенерированный предмет — takeDrop показывает его окошком-тулипом
