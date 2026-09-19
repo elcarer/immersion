@@ -48,7 +48,8 @@ import { takeDamage } from "../scripts/takeDamage.js"
 import { dropArr } from "../scripts/useObject.js"
 import { relicPoolLeft } from "../scripts/relics.js"
 //V69: дроп босса не застревает в стенах — перенос на свободную клетку (dropSafe.js)
-import { placeDrop } from "../scripts/dropSafe.js"
+//V103: dropFly — кучка вылетает из центра спрайта босса (подскок на месте)
+import { placeDrop,dropFly } from "../scripts/dropSafe.js"
 //V85: деление Медузы — строка в журнале; тень делившейся снимается с пола вместе с ней
 import { journalAdd, J_YELLOW } from "../scripts/journal.js"
 import { T } from "../scripts/localization.js"
@@ -558,13 +559,16 @@ function bossDrop(target) {
         {"w":32,"h":36,"img":"./images/dungeon/drop/item4.png"}
     //падает в точке смерти (центр rect погибшей сущности)
     let p = rectPos(target.rect)
+    let bx = p[0] + target.rect._w/2 - drop.w/2
+    let by = p[1] + target.rect._h/2 - drop.h/2
     screenPic.push(worldImage(svgArr[1],
-        p[0] + target.rect._w/2 - drop.w/2,
-        p[1] + target.rect._h/2 - drop.h/2,
+        bx, by,
         drop.w, drop.h, drop.img, {"id":screenPic.length-1}))
-    dropArr.push(screenPic[screenPic.length-1])
-    //V69: дроп в стене/пустоте невозможен — переносим на свободную клетку рядом
-    placeDrop(screenPic[screenPic.length-1],p[0] + target.rect._w/2 - drop.w/2,p[1] + target.rect._h/2 - drop.h/2,drop.w,drop.h)
+    //V103: полёт из центра спрайта босса (точка приземления та же — видимый подскок на месте);
+    //в dropArr кучка попадает по приземлении
+    let el = screenPic[screenPic.length-1]
+    placeDrop(el,bx,by,drop.w,drop.h)
+    dropFly(el, p[0] + target.rect._w/2, p[1] + target.rect._h/2)
 }
 
 //V67: выход с 4 этажа — интерактивный объект (тип 13, bossKill уже 1 после смерти босса),

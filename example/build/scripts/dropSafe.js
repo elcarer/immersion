@@ -12,8 +12,12 @@
 //Проходимые для персонажа объекты — тот же список, что в collision.collisionCheckObject:
 //ловушки (тип 14) и рычаг (тип 19) клетку не блокируют, любой другой объект — блокирует.
 import { status } from "../scripts/start.js"
-import { moveSprite } from "../scripts/svg.js"
+import { moveSprite,spritePos } from "../scripts/svg.js"
 import { dataGeneric } from "../scripts/sceneGenerate.js"
+//V103: полёт кучки заканчивается постановкой в dropArr (подбор возможен только после
+//приземления); dropArr живёт в useObject.js — цикл импортов useObject ↔ dropSafe,
+//все использования в рантайме (проектная практика)
+import { dropArr } from "../scripts/useObject.js"
 
 //порядок обхода соседних клеток: вверх приоритетен (решение пользователя), затем стороны
 //и верхние диагонали, потом нижние; хвост — клетки на расстоянии 2 как последний шанс
@@ -65,4 +69,49 @@ function placeDrop(img,x,y,w,h) {
     }
 }
 
-export { placeDrop, freeDropCell }
+//------ V103: полёт кучки по параболе (решение пользователя) ------
+//При появлении дроп не сразу лежит в точке спавна: сначала он в ЦЕНТРЕ спрайта-источника
+//(враг, сундук, герой…), затем по параболе летит к точке приземления. В dropArr кучка
+//попадает только по приземлении — takeDrop/encounters ходят по dropArr, летящую
+//подобрать/съесть нельзя. Паттерн полёта — тот же, что у спор Гриба пустоты
+//(voidBoss.moveSpores): сближение по прямой + «высота» 4·arc·k·(1−k); тик раз в игровой
+//цикл (gameLoop → dropFlyTick), на паузе время замирает, как у всего остального.
+//Смена сцены — del() зовёт resetFlyDrops вместе с dropArr.length = 0.
+const DROP_FLY_TICKS = 24  //полёт ~0.4с
+const DROP_ARC = 40        //базовая высота дуги, px (у каждой кучки свой случайный размах)
+let flyDrops = []          // {img, sx, sy, tx, ty, t, fly, arc}
+
+//el — уже созданный спрайт кучки в ТОЧКЕ ПРИЗЕМЛЕНИЯ (после placeDrop); cx,cy — центр
+//спрайта-источника. Спрайт переносится в (cx,cy) и летит к точке приземления. Источник
+//совпал с приземлением (сундук под собой, дроп босса в центре босса) — кучка просто
+//подпрыгивает на месте по той же дуге.
+function dropFly(el, cx, cy) {
+    let w = parseInt(el.getAttribute("width"))
+    let h = parseInt(el.getAttribute("height"))
+    let tx = el.x.animVal.value
+    let ty = el.y.animVal.value
+    spritePos(el, cx - w/2, cy - h/2)
+    flyDrops.push({"img":el,"sx":cx - w/2,"sy":cy - h/2,"tx":tx,"ty":ty,
+        "t":0,"fly":DROP_FLY_TICKS,"arc":DROP_ARC * (0.7 + Math.random() * 0.6)})
+}
+
+function dropFlyTick() {
+    for (let i = flyDrops.length - 1; i >= 0; i--) {
+        let f = flyDrops[i]
+        f.t++
+        let k = f.t / f.fly
+        let lift = 4 * f.arc * k * (1 - k)
+        spritePos(f.img, f.sx + (f.tx - f.sx) * k, f.sy + (f.ty - f.sy) * k - lift)
+        if (f.t >= f.fly) {
+            spritePos(f.img, f.tx, f.ty)
+            dropArr.push(f.img)
+            flyDrops.splice(i, 1)
+        }
+    }
+}
+
+function resetFlyDrops() {
+    flyDrops.length = 0
+}
+
+export { placeDrop, freeDropCell, dropFly, dropFlyTick, resetFlyDrops }

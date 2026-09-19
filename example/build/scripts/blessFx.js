@@ -3,9 +3,9 @@ import { T } from "../scripts/localization.js"
 import { svgArr,image,worldImage,picById,text,rect,nativeHtml,uiRightEdge,uiBottomEdge } from "../scripts/svg.js"
 import { screenPic } from "../scripts/del.js"
 //V69: доп. кучка эха не должна застревать в стенах — тот же placeDrop, что у основного дропа
-import { placeDrop } from "../scripts/dropSafe.js"
-//живая привязка: доп. кучка встаёт в общую очередь подбора (useObject.js dropArr не переназначается)
-import { dropArr } from "../scripts/useObject.js"
+//V103: dropFly — эхо-кучка вылетает из точки основной и летит по параболе
+import { placeDrop,dropFly } from "../scripts/dropSafe.js"
+//V103: постановка эхо-кучки в dropArr делает dropFly (dropSafe.js) — по приземлении
 import { playback,strike,musicDuck } from "../scripts/sound.js"
 import { journalAdd, J_GREEN } from "../scripts/journal.js"
 //V75 «Кровавый пакт»: пересчёт статов (макс. ХП ×0.8) сразу при выдаче эффекта
@@ -224,8 +224,9 @@ function blessEcho(drop,x,y) {
     let dx = side === 0 ? -32 : side === 1 ? 32 : 0
     let dy = side === 2 ? -32 : side === 3 ? 32 : 0
     screenPic.push(worldImage(svgArr[1],x + dx,y + dy,drop.w,drop.h,drop.img,{"id":screenPic.length-1}))
-    dropArr.push(screenPic[screenPic.length - 1])
-    //доп. кучка упала в стену/пустоту — переносим на свободную клетку рядом, как основной дроп
-    placeDrop(screenPic[screenPic.length - 1],x + dx,y + dy,drop.w,drop.h)
+    //V103: полёт из точки основной кучки (x,y — то, что передали точки спавна); в dropArr — по приземлении
+    let el = screenPic[screenPic.length - 1]
+    placeDrop(el,x + dx,y + dy,drop.w,drop.h)
+    dropFly(el, x, y)
 }
 export {blessActive,blessSpeedMult,blessMaxHpMult,blessEcho,spendBless,renderBlessHints,blessHintsTick,openAncient,ancientDel,ancientTemp}

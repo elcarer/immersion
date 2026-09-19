@@ -23,7 +23,8 @@ import { setCount, setAbilDamageMult, set1AttackDamageMult } from "../scripts/se
 //V67: реликвии — «Вечный изумруд» (криты отключены), «Вечный сапфир» (копия урона/брони/способности)
 import { hasRelic, sapphireDamage, sapphireArmor, abilCopyBonus } from "../scripts/relics.js"
 //V69: дроп не застревает в стенах — перенос на свободную клетку (dropSafe.js)
-import { placeDrop } from "../scripts/dropSafe.js"
+//V103: dropFly — кучка вылетает из центра спрайта источника и летит по параболе
+import { placeDrop,dropFly } from "../scripts/dropSafe.js"
 //V70: кап способностей — лишние очки уровня автоматически становятся очками характеристик
 import { abilOverflowToStats } from "../scripts/skillTree.js"
 //V75: благословения шкафчика — Громила/Заучка (+10% урона) и эхо дропа (Хлебосол/Золотое эхо)
@@ -135,12 +136,15 @@ function damage() {
                 enemyDie(hitEnemy, hitEnemy.stats.exp)
                 if(status.info.beacon === 1 && bullet.stats.name === "attack.16.name" && Math.random() < (status.info.cookChance || 0)) { //V42: 5% → 10%
                     let drop = {"w":32,"h":36,"img":"./images/dungeon/drop/food.png"}
-                    screenPic.push(worldImage(svgArr[1],hitEnemy.rect.x.animVal.value + 16,hitEnemy.rect.y.animVal.value + 55,drop.w,drop.h,drop.img,{"id":screenPic.length-1}))
-                    dropArr.push(screenPic[screenPic.length - 1])
-                    //V69: еда упала в стену/пустоту — переносим на свободную клетку рядом
-                    placeDrop(screenPic[screenPic.length - 1],hitEnemy.rect.x.animVal.value + 16,hitEnemy.rect.y.animVal.value + 55,drop.w,drop.h)
+                    let hx = hitEnemy.rect.x.animVal.value + 16
+                    let hy = hitEnemy.rect.y.animVal.value + 55
+                    screenPic.push(worldImage(svgArr[1],hx,hy,drop.w,drop.h,drop.img,{"id":screenPic.length-1}))
+                    //V103: полёт из центра спрайта врага; в dropArr — по приземлении
+                    let el = screenPic[screenPic.length - 1]
+                    placeDrop(el,hx,hy,drop.w,drop.h)
+                    dropFly(el, hitEnemy.rect.x.animVal.value + hitEnemy.rect._w/2, hitEnemy.rect.y.animVal.value + hitEnemy.rect._h/2)
                     //V75: Хлебосол — шанс доп. кучи еды рядом
-                    blessEcho(drop,hitEnemy.rect.x.animVal.value + 16,hitEnemy.rect.y.animVal.value + 55)
+                    blessEcho(drop,hx,hy)
                 }
                 if(status.info.killHeal > 0) {
                     status.info.hp += status.info.killHeal
@@ -235,12 +239,13 @@ function countMagicDamage(minDmg) {
     maxDmg < 0 && (maxDmg = 0)
     return maxDmg + minDmg
 }
-function dropKey(x,y) {
+function dropKey(x,y,w=64,h=64) {
     let drop = {"w":28,"h":32,"img":"./images/dungeon/drop/key.png"}
     screenPic.push(worldImage(svgArr[1],x + 16,y + 55,drop.w,drop.h,drop.img,{"id":screenPic.length-1}))
-    dropArr.push(screenPic[screenPic.length - 1])
-    //V69: ключ упал в стену/пустоту — переносим на свободную клетку рядом
-    placeDrop(screenPic[screenPic.length - 1],x + 16,y + 55,drop.w,drop.h)
+    //V103: полёт из центра спрайта врага (w/h передаёт вызов — размеры rect врага)
+    let el = screenPic[screenPic.length - 1]
+    placeDrop(el,x + 16,y + 55,drop.w,drop.h)
+    dropFly(el, x + w/2, y + h/2)
 }
 function checkCollision(x1, x2, w1, w2, y1, y2, h1, h2) {
     return x1 < x2 + w2 &&
@@ -473,12 +478,15 @@ function createSplash(enemy,effect,damage,other=0,range=0,selfTo=0,srcName=undef
             if(o.stats.hp <= 0 && !reanimateCheck(o)) {
                 if(status.info.beacon === 1 && other === 0 && Math.random() < (status.info.cookChance || 0)) { //V42: 5% → 10%
                     let drop = {"w":32,"h":36,"img":"./images/dungeon/drop/food.png"}
-                    screenPic.push(worldImage(svgArr[1],oPos[0] + 16,oPos[1] + 55,drop.w,drop.h,drop.img,{"id":screenPic.length-1}))
-                    dropArr.push(screenPic[screenPic.length - 1])
-                    //V69: еда упала в стену/пустоту — переносим на свободную клетку рядом
-                    placeDrop(screenPic[screenPic.length - 1],oPos[0] + 16,oPos[1] + 55,drop.w,drop.h)
+                    let hx = oPos[0] + 16
+                    let hy = oPos[1] + 55
+                    screenPic.push(worldImage(svgArr[1],hx,hy,drop.w,drop.h,drop.img,{"id":screenPic.length-1}))
+                    //V103: полёт из центра спрайта врага; в dropArr — по приземлении
+                    let el = screenPic[screenPic.length - 1]
+                    placeDrop(el,hx,hy,drop.w,drop.h)
+                    dropFly(el, oPos[0] + o.rect._w/2, oPos[1] + o.rect._h/2)
                     //V75: Хлебосол — шанс доп. кучи еды рядом (сплэш-убийство)
-                    blessEcho(drop,oPos[0] + 16,oPos[1] + 55)
+                    blessEcho(drop,hx,hy)
                 }
                 enemyDie(o)
             }

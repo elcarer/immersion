@@ -27,7 +27,7 @@ import { openAlchemy } from "../scripts/alchemy.js"
 //V97: чаша «напёрстков» (22) — выбор чаши (фазы и последствия в portalFx.js)
 import { portalUse, puzzleButtonUse, shellCupUse } from "../scripts/portalFx.js"
 //V69: дроп из объектов (бочки/двери) не застревает в стенах — dropSafe.js
-import { placeDrop } from "../scripts/dropSafe.js"
+import { placeDrop,dropFly } from "../scripts/dropSafe.js"
 //V75: шкафчик с древностями (тип 20) — меню благословений; эхо Хлебосола/Золотого эха на дропе
 import { openAncient,blessEcho } from "../scripts/blessFx.js"
 
@@ -226,10 +226,12 @@ function drop(obj,lvl=0) {
         let x = bx + Math.trunc(Math.random() * obj[3]*16)
         let y = by + obj[4]*32 + Math.trunc(Math.random() * 16) - 16
         screenPic.push(worldImage(svgArr[1],x,y,drop.w,drop.h,drop.img,{"id":screenPic.length-1}))
-        dropArr.push(screenPic[screenPic.length - 1])
-        bossRarity > 0 && bossWeaponDrops.set(dropArr[dropArr.length - 1], bossRarity)
-        //V69: дроп упал в стену/пустоту — переносим на свободную клетку рядом
-        placeDrop(screenPic[screenPic.length - 1],x,y,drop.w,drop.h)
+        //V103: полёт из центра спрайта объекта (obj[3]/obj[4] — размер в клетках по 32);
+        //в dropArr кучка попадёт только по приземлении (dropSafe.dropFly)
+        let el = screenPic[screenPic.length - 1]
+        bossRarity > 0 && bossWeaponDrops.set(el, bossRarity)
+        placeDrop(el,x,y,drop.w,drop.h)
+        dropFly(el, bx + obj[3]*16, by + obj[4]*16)
         //V75: Хлебосол/Золотое эхо — шанс доп. кучки еды/золота рядом
         blessEcho(drop,x,y)
     }

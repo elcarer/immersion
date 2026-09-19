@@ -62,8 +62,8 @@ import { svgArr, image, worldImage, spritePos } from "../scripts/svg.js"
 //V97: objectValues — спавн Лидера гоблинов в комнате «напёрстков»
 import { screenPic, objectValues } from "../scripts/del.js"
 //V97: кучки золота — подбор через takeDrop (dropArr) и страховка от стен (placeDrop)
-import { dropArr } from "../scripts/useObject.js"
-import { placeDrop } from "../scripts/dropSafe.js"
+//V103: постановку в dropArr делает dropFly (полёт из центра героя по параболе)
+import { placeDrop,dropFly } from "../scripts/dropSafe.js"
 //V31: единый писатель камеры + фактический размер окна (зависит от зума)
 import { setWorldViewBox, worldViewW, worldViewH } from "../scripts/zoomFx.js"
 //спрайты по состоянию — та же формула, что в createRoom/mapRender (модуль без импортов)
@@ -735,8 +735,10 @@ function spawnGoldRing() {
                 if (!(m[cy] && m[cy][cx] === 1) || placed[cx + "_" + cy]) continue
                 placed[cx + "_" + cy] = 1
                 screenPic.push(worldImage(svgArr[1], cx * 32, cy * 32, 64, 32, "./images/dungeon/drop/gold.png", {"id": screenPic.length - 1}))
-                dropArr.push(screenPic[screenPic.length - 1])
-                placeDrop(screenPic[screenPic.length - 1], cx * 32, cy * 32, 64, 32)
+                //V103: полёт из центра спрайта героя (центр хитбокса, как его видит takeDrop)
+                let el = screenPic[screenPic.length - 1]
+                placeDrop(el, cx * 32, cy * 32, 64, 32)
+                dropFly(el, status.hero.x + 16, status.hero.y + 25)
                 n++
             }
         }

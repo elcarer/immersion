@@ -24,6 +24,8 @@ import { resetPortalFx } from "../scripts/portalFx.js"
 import { resetVoidBoss } from "../scripts/voidBoss.js"
 //V80: реестры наземных теней — только на текущем этаже
 import { resetGroundShadows } from "../scripts/groundShadow.js"
+//V103: летящие кучки дропа — чистятся при смене сцены вместе с dropArr
+import { resetFlyDrops } from "../scripts/dropSafe.js"
 // МИГРАЦИЯ M5: objectValues — Proxy-список, синхронизирующий ECS-сущности zero_engine
 // (компоненты etype/posX/posY/cullPad, группа battle). Контракт массива прежний:
 // push/splice/length=0, индексы, порядок. Подробности — ecsBridge.js
@@ -77,6 +79,7 @@ function del() {
     delPins()
     bars.length = 0
     dropArr.length = 0
+    resetFlyDrops()
     wallsOverlay.length = 0
     acidArr.length = 0
     doorPics.length = 0

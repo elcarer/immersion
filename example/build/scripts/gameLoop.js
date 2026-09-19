@@ -33,6 +33,8 @@ import { itemTipTick,tipDel } from "../scripts/tip.js"
 import { backendHooks } from "../scripts/pixiBackend.js"
 backendHooks.tipDel = tipDel
 import { minimapTick } from "../scripts/minimapFx.js"
+//V103: полёт кучек дропа по параболе (dropSafe.js) — тик в общем цикле, как у спор Гриба
+import { dropFlyTick } from "../scripts/dropSafe.js"
 //V47: окно врага при наведении на поле — тик зовётся КАЖДЫЙ тик безусловно (до блока паузы),
 //guard внутри модуля сам гасит окно при панелях/паузе/выходе из забега
 import { enemyHoverTick } from "../scripts/enemyHover.js"
@@ -102,6 +104,8 @@ function gameLoop() {
         if (status.start !== 1 || status.time === 0) return
         damage()
         timerFloat()
+        //V103: полёт кучек — ДО takeDrop, приземлившаяся в этом тике доступна подбору сразу
+        dropFlyTick()
         takeDrop()
         destroyObjects()
         openDoor()

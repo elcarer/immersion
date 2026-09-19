@@ -76,7 +76,8 @@ import { journalAdd, J_YELLOW } from "../scripts/journal.js"
 import { rollGoldKillPile, setEliteSpeedMod } from "../scripts/sets.js"
 import { dropArr } from "../scripts/useObject.js"
 //V69: кучка золота не должна падать в стену — перенос на свободную клетку (dropSafe.js)
-import { placeDrop } from "../scripts/dropSafe.js"
+//V103: dropFly — кучка вылетает из центра спрайта источника и летит по параболе
+import { placeDrop,dropFly } from "../scripts/dropSafe.js"
 //V75: Золотое эхо (шкафчик) — шанс доп. кучки золота рядом с упавшей
 import { blessEcho } from "../scripts/blessFx.js"
 //V65: смерть Циклопа Пустоты (stats.voidBlob) сразу завершает 4 этаж
@@ -994,12 +995,13 @@ function tickShadow (enemy) {
 // ---------- смерть (общий блок трупа для всех источников урона) ----------
 //V56: кучка золота сета «Победитель турниров» — тот же рецепт дропа, что у ключа элит
 //(dropKey в damage.js): спрайт на слое объектов + очередь подбора dropArr
-function spawnGoldPile(x, y) {
+function spawnGoldPile(x, y, w=64, h=64) {
     let drop = {"w":28,"h":32,"img":"./images/dungeon/drop/gold.png"}
     screenPic.push(worldImage(svgArr[1],x + 16,y + 55,drop.w,drop.h,drop.img,{"id":screenPic.length-1}))
-    dropArr.push(screenPic[screenPic.length - 1])
-    //V69: золото упало в стену/пустоту — переносим на свободную клетку рядом
-    placeDrop(screenPic[screenPic.length - 1],x + 16,y + 55,drop.w,drop.h)
+    //V103: полёт из центра спрайта врага (w/h передаёт вызов — размеры rect врага)
+    let el = screenPic[screenPic.length - 1]
+    placeDrop(el,x + 16,y + 55,drop.w,drop.h)
+    dropFly(el, x + w/2, y + h/2)
     //V75: Золотое эхо — шанс доп. кучки золота рядом
     blessEcho(drop,x + 16,y + 55)
 }
@@ -1028,10 +1030,11 @@ export function enemyDie(enemy, exp) {
     enemy.entShadow && svgArr[1].prepend(enemy.entShadow)
     playback(strike[9].vol, 0, 0, status.settings.soundVolume)
     svgArr[1].prepend(enemy.img)
-    enemy.class.elite === 1 && dropKey(enemy.rect.x.animVal.value, enemy.rect.y.animVal.value)
+    //V103: размеры rect врага — для вылета кучки из центра спрайта (dropSafe.dropFly)
+    enemy.class.elite === 1 && dropKey(enemy.rect.x.animVal.value, enemy.rect.y.animVal.value, enemy.rect._w, enemy.rect._h)
     //V56: сет «Победитель турниров» (6 надетых): 1% шанс кучки золота на месте убитого
     //(любого врага, включая элит и боссов); рецепты дропа — те же, что у ключа элит
-    rollGoldKillPile(enemy) && spawnGoldPile(enemy.rect.x.animVal.value, enemy.rect.y.animVal.value)
+    rollGoldKillPile(enemy) && spawnGoldPile(enemy.rect.x.animVal.value, enemy.rect.y.animVal.value, enemy.rect._w, enemy.rect._h)
     let gain = exp !== undefined ? exp : enemy.stats.exp
     //V46 аудит доп. статов: «Обучаемость» — шанс двойного опыта = countLog% из value2
     //напрямую; раньше лишнее «/100» при πцелочисленном Math.trunc(random*100) прижимало

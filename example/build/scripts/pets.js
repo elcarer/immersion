@@ -15,7 +15,9 @@
 import { status } from "../scripts/start.js"
 import { svgArr, image, worldImage, rectPos } from "../scripts/svg.js"
 import { objectValues, screenPic } from "../scripts/del.js"
-import { dropArr } from "../scripts/useObject.js"
+//V103: принесённая еда вылетает из центра спрайта пета и летит по параболе (dropSafe.js);
+//в dropArr кучка попадает по приземлении — dropFly сам её добавляет
+import { dropFly } from "../scripts/dropSafe.js"
 import { buildChasePath } from "../scripts/enemyAI.js"
 //V75: Хлебосол (шкафчик) — «любое выпадение еды», включая находку питомца
 import { blessEcho } from "../scripts/blessFx.js"
@@ -124,7 +126,8 @@ function spawnLuckyFood(pet) {
     playEffect(pet, data.effects[4], 1)
     const drop = {"w":32,"h":36,"img":"./images/dungeon/drop/food.png"}
     screenPic.push(worldImage(svgArr[1],spot[0]*32,spot[1]*32 - 2,drop.w,drop.h,drop.img,{"id":screenPic.length-1}))
-    dropArr.push(screenPic[screenPic.length - 1])
+    //V103: полёт из центра спрайта пета; в dropArr — по приземлении (dropSafe.dropFly)
+    dropFly(screenPic[screenPic.length - 1], p[0] + pet.rect._w/2, p[1] + pet.rect._h/2)
     blessEcho(drop,spot[0]*32,spot[1]*32 - 2)
 }
 //вызов из enemyAI.enemyTick раз в тик питомца: остановился ли «удачный» пробег.
