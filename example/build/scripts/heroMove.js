@@ -6,6 +6,8 @@ import { svgArr,image,worldImage, moveSprite, rectPos } from "../scripts/svg.js"
 import { screenPic,objectValues,wallsOverlay,acidArr,doorPics } from "../scripts/del.js"
 import { openRoom } from "../scripts/openRoom.js"
 import { useObject,stopUseObject } from "../scripts/useObject.js"
+//V97: чаши «напёрстков» (22) интерактивны только в фазе выбора (portalFx.shellCupReady)
+import { shellCupReady } from "../scripts/portalFx.js"
 //V62: импорт map.js (mapTemp) удалён вместе с map-веткой createCorridor — отрисовка
 //карты переехала в mapRender.js
 import { checkCollision } from "../scripts/damage.js"
@@ -324,10 +326,10 @@ function checkObject (level,x,y) {
         //V43: переключённый столб (тип 15), V54: алхимический стол (тип 17) и V64: портал (18)/
         //рычаг (19) «перезаряжаются», пока герой не выйдет из зоны взаимодействия (obj[11]) —
         //иначе стояние рядом щёлкало бы бесконечно. V75: шкафчик с древностями (тип 20) — так же.
-        //V83: кнопка загадки (21) — так же
+        //V83: кнопка загадки (21) — так же. V97: чаша «напёрстков» (22) — так же
         //(! строка не может начинаться с «(» — после безточного `let hit = …+32` ASI склеивает
         //её в «вызов» выражения: «32 is not a function»)
-        obj[11] === 1 && !hit && (obj[2] === 15 || obj[2] === 17 || obj[2] === 18 || obj[2] === 19 || obj[2] === 20 || obj[2] === 21) && (obj[11] = 0)
+        obj[11] === 1 && !hit && (obj[2] === 15 || obj[2] === 17 || obj[2] === 18 || obj[2] === 19 || obj[2] === 20 || obj[2] === 21 || obj[2] === 22) && (obj[11] = 0)
         if (!hit) {continue}
         //стоя НА взведённой ловушке (тип 14) обезвреживание не запускается — только с соседней клетки.
         //x,y здесь уже смещены на +16/+50 от rect героя, поэтому хитбокс ног = x-3, y-13, 14x14
@@ -339,8 +341,9 @@ function checkObject (level,x,y) {
         //V64: портал (18) и рычаг (19) взаимодействию поддаются только в АКТИВНОЙ фазе
         //(obj[10]===1); в «выключенной» — мёртвый объект (решение по ТЗ).
         //V75: шкафчик (20) с взведённым obj[11] (меню открыто/закрыто без выбора) — мимо.
-        //V83: кнопка загадки (21) с взведённым obj[11] — мимо; интерактивна в ОБЕИХ фазах
-        if (obj[5] === undefined && obj[7] !== 1 && !((obj[2] === 15 || obj[2] === 17 || obj[2] === 20 || obj[2] === 21) && obj[11] === 1) && !((obj[2] === 18 || obj[2] === 19) && obj[10] !== 1) && status.use === 0) {
+        //V83: кнопка загадки (21) с взведённым obj[11] — мимо; интерактивна в ОБЕИХ фазах.
+        //V97: чаша (22) интерактивна только в фазе выбора «напёрстков» (shellCupReady)
+        if (obj[5] === undefined && obj[7] !== 1 && !((obj[2] === 15 || obj[2] === 17 || obj[2] === 20 || obj[2] === 21) && obj[11] === 1) && !((obj[2] === 18 || obj[2] === 19) && obj[10] !== 1) && !(obj[2] === 22 && !shellCupReady(obj)) && status.use === 0) {
         status.use = 1
         useObject(obj,i0)
         }

@@ -19,6 +19,9 @@ import { dropArr } from "../scripts/useObject.js"
 import { buildChasePath } from "../scripts/enemyAI.js"
 //V75: Хлебосол (шкафчик) — «любое выпадение еды», включая находку питомца
 import { blessEcho } from "../scripts/blessFx.js"
+//V97: еда принесена — над петом однократно играет эффект приручения (effects/4.png)
+import { data } from "../scripts/data.js"
+import { playEffect } from "../scripts/damage.js"
 
 const PET_FOOD_CHANCE = 0.02 //V96: поднято с 0.01 (решение пользователя)
 
@@ -116,6 +119,9 @@ function petLuckyFood() {
 function spawnLuckyFood(pet) {
     const p = rectPos(pet.rect)
     const spot = [Math.trunc((p[0] + 16) / 32), Math.trunc((p[1] + 25) / 32)]
+    //V97: «зверёк принёс еду» — однократный эффект приручения (data.effects[4],
+    //effects/4.png) над петом, тем же вызовом, что в encounters.checkRat
+    playEffect(pet, data.effects[4], 1)
     const drop = {"w":32,"h":36,"img":"./images/dungeon/drop/food.png"}
     screenPic.push(worldImage(svgArr[1],spot[0]*32,spot[1]*32 - 2,drop.w,drop.h,drop.img,{"id":screenPic.length-1}))
     dropArr.push(screenPic[screenPic.length - 1])

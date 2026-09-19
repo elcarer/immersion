@@ -3,7 +3,8 @@ import { status } from "../scripts/start.js"
 //V63: спрайт ловушки по её состоянию (Ne.png/N.png) — единая формула с mapRender/enemyHover/trapsFx
 import { trapSpriteSrc } from "../scripts/trapSprite.js"
 //V64: спрайт Портала (18) и Рычага (19) по состоянию — единая формула с mapRender/portalFx
-import { portalSpriteSrc } from "../scripts/portalSprite.js"
+//V97: спрайт Чаши «напёрстков» (22) по полноте (goldFull/goldEmpty) — оттуда же
+import { portalSpriteSrc, cupSpriteSrc } from "../scripts/portalSprite.js"
 //V75: шкафчик с древностями — ряд иконок-подсказок активных благословений пересобирается на этаже
 import { renderBlessHints } from "../scripts/blessFx.js"
 import { T } from "../scripts/localization.js"
@@ -52,7 +53,7 @@ function sceneGenerate(data,next=false) {
         for (let i = 0; i < length; i++) {
             basicData.data.heroes[status.hero.class].anims[1].attack[i].new.anim[0] = weapon.attack
         }
-        status.info = {"stats":JSON.parse(JSON.stringify(hero.stats)),"exp":0,"lvl":1,"abilPoints":0,"gold":0,"hp":0,"beltCell":0, "beltCellArr":[],"armor":0,"upStat":status.meta.startStat,"keys":status.meta.startKey,"skills":[],"poisonus":0,"poisonusMult":1,"expous":0,"lifeus":0,"viewus":1,"invisible":0,"invisibleTime":0,"activeSkills":[],"pins":0,"backStab":1,"cloudeTime":0,"multSpeed":1,"killHeal":0,"keyLock":0,"pinsAdd":0,"pinsStan":false,"bossKill":0,"time":0,"luckus":0,"fameus":0,"greedus":0,"poison":0,"poisonTime":0,"stoneCurse":0,"goldroom":0,"reflect":1,"energyShotCharge":0,"charm":0,"blesses":[],"log":[],"puzzleUsed":0}
+        status.info = {"stats":JSON.parse(JSON.stringify(hero.stats)),"exp":0,"lvl":1,"abilPoints":0,"gold":0,"hp":0,"beltCell":0, "beltCellArr":[],"armor":0,"upStat":status.meta.startStat,"keys":status.meta.startKey,"skills":[],"poisonus":0,"poisonusMult":1,"expous":0,"lifeus":0,"viewus":1,"invisible":0,"invisibleTime":0,"activeSkills":[],"pins":0,"backStab":1,"cloudeTime":0,"multSpeed":1,"killHeal":0,"keyLock":0,"pinsAdd":0,"pinsStan":false,"bossKill":0,"time":0,"luckus":0,"fameus":0,"greedus":0,"poison":0,"poisonTime":0,"stoneCurse":0,"goldroom":0,"reflect":1,"energyShotCharge":0,"charm":0,"blesses":[],"log":[],"puzzleUsed":0,"shellUsed":0}
         countDopStats()
         status.info.time = Date.now()
     }
@@ -246,6 +247,8 @@ function createRoom (level,i0,tileX,tileY) {
             trapSpriteSrc(o) :
             o[2] === 18 || o[2] === 19 || o[2] === 21 ?
                 portalSpriteSrc(o) :
+            o[2] === 22 ?
+                cupSpriteSrc(o) :
             o[2] === 15 ?
                 "./images/dungeon/objects/fin"+(o[10]||1)+".png" :
                 o[2] === 16 ?
@@ -283,8 +286,9 @@ function createRoom (level,i0,tileX,tileY) {
             isPillar ? 81 : isPortalObj ? 84 : isStatue ? statueH : isExit4 ? 128 : isAncient ? 42 : o[4]*tileY,objSrc,{"id":screenPic.length+"O"}))
         o[6] = screenPic.length-1
         //V80: наземная тень под объектом (тип 14 — ловушка-плитка: лежит на полу,
-        //тень не нужна); при выключенных тенях хост запоминается groundShadow.js
-        o[2] !== 14 && objectShadow(screenPic[screenPic.length-1])
+        //тень не нужна; V97: чаша 22 — переезжает при перемешивании, статичная тень
+        //осталась бы на старом месте). При выключенных тенях хост запоминает groundShadow.js
+        o[2] !== 14 && o[2] !== 22 && objectShadow(screenPic[screenPic.length-1])
     }
     //пол комнаты + стены/объекты в клетках
     for (let i = 0; i < roomRec[2]; i++) {

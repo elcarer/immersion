@@ -51,13 +51,18 @@ function buffArmorBonus() {
 }
 
 //активация статуи (useObject case 16): случайный 1 из 4 бафов; бафы складываются,
-//повторный выпад того же обновляет его таймер до полных 60 секунд
+//повторный выпад того же обновляет его таймер до полных 60 секунд.
+//V98: имя выпавшего бафа всплывает над героем и пишется в журнал — повтор того же
+//(обновление таймера, решение V50) теперь виден игроку, а не только по звуку статуи
 function giveBuff() {
     const roll = Math.trunc(Math.random() * 4) + 1
     if (roll === 1) status.info.buffSpeedT = BUFF_TICKS
     else if (roll === 2) status.info.buffFireT = BUFF_TICKS
     else if (roll === 3) status.info.buffShieldT = BUFF_TICKS
     else status.info.buffCdT = BUFF_TICKS
+    const name = T("buff." + roll + ".name")
+    floatText(status.hero.x - 16 + Math.trunc(Math.random() * 32), status.hero.y + 8, T("float.buffGet", name), "#FFD68C", "18px", "none")
+    journalAdd(T("journ.buffGet", name), J_GREEN)
 }
 
 //атака героя по врагу (attack.js): повесить/освежить ожог, по горящему — ещё 2 плоских

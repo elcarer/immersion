@@ -41,15 +41,33 @@
 // до выхода героя из зоны (как у столба 15 и алхимического стола 17). Арена (ОДНА на
 // этаж, V64a4) хранится в link.arenas (комната-«остров» в roomsArr — opens/спавн/туман
 // работают штатно). V83: вид портала — obj[12]; комната-загадка — link.puzzle.
+// V97 — третий вид Портала, красный (100b.png, obj[12]=3, решение пользователя): комната
+// «напёрстков» — третий «остров» нижнего ряда (правее комнаты-загадки), 13×13. Внутри —
+// возвратный Портал, взведённый Рычаг и 9 ЧАШ (тип 22, спрайты goldFull/goldEmpty) в той
+// же раскладке 3×3, что кнопки загадки. У ОДНОЙ чаши спрайт goldFull. Через 2с после
+// появления (shellTick — тики игры, вызов из gameLoop) «полная» чаша меняет спрайт на
+// «пустой», и чаши начинают меняться местами (скольжение: интервал 45 тиков, каждый
+// следующий своп быстрее — ×0.78, минимум 10); через 8с останавливаются (репорт V97:
+// 6с — слишком легко угадать). Юз чаши в фазе
+// выбора (перезарядка obj[11], как у кнопки): «настоящая» показывает goldFull, все чаши
+// перестают быть интерактивными. Угадал — 9 кучек золота вокруг героя; не угадал — Рычаг
+// исчезает, возвратный Портал гаснет и появляется Лидер гоблинов (босс 1 этажа) с
+// максимальным усилением 4 главы (все три блока множителей openRoom), но БЕЗ тега boss
+// (без полосы ХП и зачёта bossKill). После его смерти (portalArenaKill) Рычаг
+// возвращается — герой активирует им портал и уходит.
 import { status } from "../scripts/start.js"
 import { data } from "../scripts/data.js"
 import { dataGeneric, createMatrix } from "../scripts/sceneGenerate.js"
 import { svgArr, image, worldImage, spritePos } from "../scripts/svg.js"
-import { screenPic } from "../scripts/del.js"
+//V97: objectValues — спавн Лидера гоблинов в комнате «напёрстков»
+import { screenPic, objectValues } from "../scripts/del.js"
+//V97: кучки золота — подбор через takeDrop (dropArr) и страховка от стен (placeDrop)
+import { dropArr } from "../scripts/useObject.js"
+import { placeDrop } from "../scripts/dropSafe.js"
 //V31: единый писатель камеры + фактический размер окна (зависит от зума)
 import { setWorldViewBox, worldViewW, worldViewH } from "../scripts/zoomFx.js"
 //спрайты по состоянию — та же формула, что в createRoom/mapRender (модуль без импортов)
-import { portalSpriteSrc } from "../scripts/portalSprite.js"
+import { portalSpriteSrc, cupSpriteSrc } from "../scripts/portalSprite.js"
 //V83: выдача чужой активной способности — тот же конвейер, что дерево способностей
 import { skillEffect } from "../scripts/skillTree.js"
 //V83: анонс награды загадки — всплывающий текст и журнал
@@ -62,6 +80,15 @@ const LEVER_TYPE = 19
 //V83: кнопка загадки (тип 21) и размер комнаты-загадки
 const BUTTON_TYPE = 21
 const PUZZLE_SIZE = 13
+//V97: чаша «напёрстков» — интерактивный объект комнаты вида 3
+const CUP_TYPE = 22
+//V97: комната «напёрстков» (вид 3 портала) и её тайминги (60 тиков ≈ 1 секунда)
+const SHELL_SIZE = 13
+const SHELL_REVEAL_TICKS = 120 //2с показа «полной» чаши
+const SHELL_SWAP_TICKS = 480   //8с перемещений (репорт V97: 6с — слишком легко угадать)
+const SHELL_SWAP_START = 45    //тиков между свопами в начале
+const SHELL_SWAP_MIN = 10      //потолок скорости к концу
+const SHELL_SWAP_DECAY = 0.78  //множитель ускорения каждого следующего свопа
 //нативный размер спрайта портала 100.png/100d.png — рисуется 1:1, низ по клетке объекта,
 //горизонтально по центру клетки (аналог столба 32×81, но шире клетки)
 const PORTAL_SPRITE_W = 64
@@ -70,7 +97,7 @@ const PORTAL_SPRITE_H = 84
 const ARENA_SIZE = 9
 const ARENA_ENEMES = 9
 
-let link = null // {portal, lever, arenas: [{room, portal, lever, left, entryCell}], puzzle: {room, portal, lever, buttons, solved, entry}|null}
+let link = null // {portal, lever, arenas: [{room, portal, lever, left, entryCell}], puzzle: {room, portal, lever, buttons, solved, entry}|null, shell: {room, portal, lever, cups, full, phase, timer, interval, swapIn, done, bossSpawned, bossDown, entry}|null}
 
 //----- генерация: портал кладёт ОБЩИЙ пул объектов (configEnemesRoomObject в newGame.js,
 //комнаты с врагами, не более 1 на этаж — решение пользователя V64a); здесь только рычаг -----
@@ -82,15 +109,17 @@ function configPortal(level) {
         if (level.objects[i][2] === PORTAL_TYPE) { portal = level.objects[i]; break }
     }
     if (!portal) return
-    //V83: вид портала (obj[12]): 1 — арена (100.png), 2 — комната-загадка (100a.png).
-    //Ролл 50/50, вид 2 — не более одного за забег (решение пользователя): флаг в
-    //status.info переживает смены этажей, у арен/возвратных порталов obj[12] не ставится
-    if (!status.info.puzzleUsed) {
-        portal[12] = Math.random() < 0.5 ? 2 : 1
-        portal[12] === 2 && (status.info.puzzleUsed = 1)
-    } else {
-        portal[12] = 1
-    }
+    //V97: вид портала (obj[12]) — пул из трёх видов: 1 — арена (100.png), 2 — комната-
+    //загадка (100a.png), 3 — «напёрстки» (100b.png). Каждый спец-вид — не более одного
+    //за забег (решение пользователя): флаги status.info (puzzleUsed/shellUsed) переживают
+    //смены этажей; уже использованные виды выпадают из пула. У арен/возвратных порталов
+    //obj[12] не ставится
+    let kinds = [1]
+    status.info.puzzleUsed || kinds.push(2)
+    status.info.shellUsed || kinds.push(3)
+    portal[12] = kinds[Math.trunc(Math.random() * kinds.length)]
+    portal[12] === 2 && (status.info.puzzleUsed = 1)
+    portal[12] === 3 && (status.info.shellUsed = 1)
     //рычаг — в ЛЮБОЙ комнате этажа (решение пользователя, включая стартовую и комнату портала)
     let rooms = level.roomsArr
     let idxs = []
@@ -152,6 +181,18 @@ function portalUse(obj) {
             teleportHero(cell[0], cell[1])
             return
         }
+        //V97: возвратный портал комнаты «напёрстков» — телепорт ОБРАТНО к главному порталу
+        //(аналог комнаты-загадки; во время наказания рычага нет — guard ниже пропустит)
+        let sh = link.shell
+        if (sh && obj === sh.portal) {
+            if (obj[10] !== 1) return
+            let cell = freeCellNear(level, link.portal[0], link.portal[1])
+            if (!cell) return
+            setObjectState(obj, 0)
+            sh.lever && setObjectState(sh.lever, 0)
+            teleportHero(cell[0], cell[1])
+            return
+        }
         //аренный портал — телепорт ОБРАТНО к главному порталу (рычаг арены гаснет,
         //он и так уже выключен своим юзом; сам портал гаснет, но связка НЕ одноразовая:
         //вернувшись главным порталом, герой снова взведёт рычаг зачищенной арены).
@@ -185,6 +226,16 @@ function portalUse(obj) {
             teleportHero(link.puzzle.entry[0], link.puzzle.entry[1])
             return
         }
+        //V97: вид 3 — комната «напёрстков» вместо арены: первый юз создаёт её (и запускает
+        //отсчёт «напёрстков»), повторные телепортируют в ту же (выбор мог быть ещё не
+        //сделан); рычаг возврата пере-взводится, если он существует (после проигрыша он
+        //появится только с победой над боссом)
+        if (obj[12] === 3) {
+            if (!link.shell) createShellRoom(level)
+            else link.shell.lever && link.shell.lever[10] !== 1 && setObjectState(link.shell.lever, 1)
+            teleportHero(link.shell.entry[0], link.shell.entry[1])
+            return
+        }
         let target = link.arenas[0]
         if (!target) target = createArena(level)
         else if (target.left <= 0 && target.lever) setObjectState(target.lever, 1)
@@ -199,6 +250,11 @@ function portalUse(obj) {
         if (link.puzzle.portal[10] === 1) return
         setObjectState(obj, 0)
         setObjectState(link.puzzle.portal, 1)
+    } else if (link.shell && obj === link.shell.lever) {
+        //V97: рычаг комнаты «напёрстков» — включает возвратный портал
+        if (link.shell.portal[10] === 1) return
+        setObjectState(obj, 0)
+        setObjectState(link.shell.portal, 1)
     } else {
         //рычаг арены: включает портал своей арены
         let arena = link.arenas.find(a => a.lever === obj)
@@ -320,12 +376,20 @@ function arenaSpec() {
 }
 //счёт убийств арены: хук из enemyAI.enemyDie (единственная точка смерти врага).
 //Враги знают свою room (roomsArr-запись из openRoom) — по ней находим арену.
+//V97: та же точка возвращает Рычаг комнаты «напёрстков» после победы над её боссом
 function portalArenaKill(enemy) {
-    if (!link || link.arenas.length === 0 || !enemy.room) return
-    let arena = link.arenas.find(a => a.room === enemy.room && a.left > 0)
-    if (!arena) return
-    arena.left--
-    arena.left <= 0 && spawnArenaLever(dataGeneric.scenes[status.levelFloor], arena)
+    if (!link || !enemy.room) return
+    let arena = link.arenas.length > 0 && link.arenas.find(a => a.room === enemy.room && a.left > 0)
+    if (arena) {
+        arena.left--
+        arena.left <= 0 && spawnArenaLever(dataGeneric.scenes[status.levelFloor], arena)
+        return
+    }
+    let sh = link.shell
+    if (sh && sh.room === enemy.room && sh.bossSpawned && !sh.bossDown) {
+        sh.bossDown = true
+        spawnShellLever(dataGeneric.scenes[status.levelFloor], sh)
+    }
 }
 //все 9 убиты — в арене появляется Рычаг в АКТИВНОЙ фазе (решение по ТЗ) на случайной
 //свободной клетке интерьера (не клетка портала, не пересекая хитбокс героя). Комната уже
@@ -482,6 +546,313 @@ function grantForeignSkill() {
     journalAdd(T("journ.skillGet", T(skill.title)), J_STD)
 }
 
+//----- комната «напёрстков» (вид 3 портала, V97) -----
+//Третий «остров» нижнего ряда, правее комнаты-загадки: арена занимает x=3..11, загадка
+//x=17..29, «напёрстки» — x=31..43 (шаг 14 клеток, как между ареной и загадкой)
+function createShellRoom(level) {
+    let sx = 31
+    let sy = level.h + 3
+    level.h = sy + SHELL_SIZE + 3
+    let floorIdx = level.floor.length
+    //пол-прямоугольник комнаты: [x, y, w, h, tex, centerX, centerY] (как у newGame)
+    level.floor.push([sx, sy, SHELL_SIZE, SHELL_SIZE, 3, sx + 6, sy + 6])
+    //кольцо стен — рецепт createArena/createPuzzleRoom: верх 20 (1×1), лево 22 / право 21
+    //(1×1), низ 19 (1×2), верхние углы 6/7 (1×1), нижние 3/2 (1×2)
+    let walls = level.walls
+    walls.push([sx, sy, 6, 1, 1])
+    walls.push([sx + 12, sy, 7, 1, 1])
+    for (let i = 1; i < 12; i++) {
+        walls.push([sx + i, sy, 20, 1, 1])
+        walls.push([sx, sy + i, 22, 1, 1])
+        walls.push([sx + 12, sy + i, 21, 1, 1])
+        walls.push([sx + i, sy + 12, 19, 1, 2])
+    }
+    walls.push([sx, sy + 12, 3, 1, 2])
+    walls.push([sx + 12, sy + 12, 2, 1, 2])
+    //комната в roomsArr: спек из шести ПУСТЫХ групп (формат openRoom) — врагов нет;
+    //[4]=1 — маркер «острова»: волна призыва Демона не ходит
+    let spec = []
+    for (let i = 0; i < 6; i++) spec.push([0, 0])
+    let room = [floorIdx, SHELL_SIZE * SHELL_SIZE, spec, 0]
+    room[4] = 1
+    level.roomsArr.push(room)
+    //возвратный портал — неактивный, клетка (7,5) от угла; взведённый рычаг — (5,5),
+    //как в комнате-загадке. obj[12] возвратному порталу не ставится (portalSprite.js)
+    level.objects.push([sx + 7, sy + 5, PORTAL_TYPE, 1, 1, undefined])
+    let portal = level.objects[level.objects.length - 1]
+    portal[9] = room
+    portal[10] = 0
+    level.objects.push([sx + 5, sy + 5, LEVER_TYPE, 1, 1, undefined])
+    let lever = level.objects[level.objects.length - 1]
+    lever[9] = room
+    lever[10] = 1
+    //9 чаш (тип 22) в той же раскладке, что кнопки загадки: углы, центры сторон, центр.
+    //У случайной чаши спрайт goldFull (obj[10]=1), у остальных goldEmpty
+    let cups = []
+    let cells = [[1, 1], [6, 1], [11, 1], [1, 6], [6, 6], [11, 6], [1, 11], [6, 11], [11, 11]]
+    let fullIdx = Math.trunc(Math.random() * 9)
+    for (let b = 0; b < 9; b++) {
+        level.objects.push([sx + cells[b][0], sy + cells[b][1], CUP_TYPE, 1, 1, undefined])
+        let cup = level.objects[level.objects.length - 1]
+        cup[9] = room
+        cup[10] = b === fullIdx ? 1 : 0
+        cups.push(cup)
+    }
+    //матрица проходимости: комната — «остров»; BFS врагов и коллизии читают её каждый тик
+    createMatrix()
+    //фаза 1 — «показ»: 2с герой запоминает полную чашу, затем её спрайт становится
+    //«пустым» и начинается перемешивание (shellTick). Спрайты чаш создаст createRoom при
+    //открытии комнаты (герой входит телепортом в тот же тик) — все операции со спрайтами
+    //в shellTick под guard'ом
+    link.shell = {room: room, portal: portal, lever: lever, cups: cups, full: cups[fullIdx],
+        phase: 1, timer: SHELL_REVEAL_TICKS, interval: SHELL_SWAP_START, swapIn: SHELL_SWAP_START,
+        done: false, bossSpawned: false, bossDown: false, entry: [sx + 6, sy + 5]}
+}
+//каждый тик игры (вызов из gameLoop): фазы «напёрстков» + скольжение чаш.
+//Фаза 1 (2с): по истечении «полная» чаша становится «пустой». Фаза 2 (8с): раз в
+//interval тиков пара свободных чаш меняется клетками, интервал ускоряется ×0.78
+//(45 → 10 тиков); по истечении новых свопов нет — когда доедут последние, фаза 3
+//(выбор). Пауза игры тик не доставляет — таймеры стоят вместе со всей сценой
+function shellTick() {
+    if (!link || !link.shell) return
+    let sh = link.shell
+    moveShellCups(sh)
+    if (sh.phase === 1) {
+        sh.timer--
+        if (sh.timer <= 0) {
+            setCupSprite(sh.full, 0)
+            sh.phase = 2
+            sh.timer = SHELL_SWAP_TICKS
+            sh.interval = SHELL_SWAP_START
+            sh.swapIn = SHELL_SWAP_START
+        }
+    } else if (sh.phase === 2) {
+        sh.timer--
+        if (sh.timer > 0) {
+            if (!cupsMoving(sh)) {
+                sh.swapIn--
+                if (sh.swapIn <= 0) {
+                    shellSwap(sh, sh.interval)
+                    sh.interval = Math.max(SHELL_SWAP_MIN, Math.trunc(sh.interval * SHELL_SWAP_DECAY))
+                    sh.swapIn = sh.interval
+                }
+            }
+        } else if (!cupsMoving(sh)) {
+            sh.phase = 3
+        }
+    }
+}
+//скольжение: чаша едет из move.fx/fy в свою клетку [0]/[1] линейно за move.dur тиков;
+//координаты объекта обновлены на старте переезда (checkObject/коллизии), спрайт догоняет
+function moveShellCups(sh) {
+    for (let i = 0; i < sh.cups.length; i++) {
+        let c = sh.cups[i]
+        if (!c.move) continue
+        c.move.age++
+        let img = c[6] !== undefined ? screenPic[c[6]] : null
+        if (!img) { c.move = null; continue }
+        if (c.move.age >= c.move.dur) {
+            spritePos(img, c[0] * 32, c[1] * 32)
+            c.move = null
+        } else {
+            let t = c.move.age / c.move.dur
+            spritePos(img, Math.round(c.move.fx + (c[0] * 32 - c.move.fx) * t), Math.round(c.move.fy + (c[1] * 32 - c.move.fy) * t))
+        }
+    }
+}
+function cupsMoving(sh) {
+    for (let i = 0; i < sh.cups.length; i++) {
+        if (sh.cups[i].move) return true
+    }
+    return false
+}
+//пара чаш (не участвующих в скольжении) меняется клетками; dur — тиков на переезд,
+//равен текущему интервалу (к концу перемешивания чаши переезжают быстрее)
+function shellSwap(sh, dur) {
+    let free = []
+    for (let i = 0; i < sh.cups.length; i++) !sh.cups[i].move && free.push(sh.cups[i])
+    if (free.length < 2) return
+    let i1 = Math.trunc(Math.random() * free.length)
+    let i2 = (i1 + 1 + Math.trunc(Math.random() * (free.length - 1))) % free.length
+    let a = free[i1]
+    let b = free[i2]
+    let ax = a[0], ay = a[1]
+    a.move = {fx: ax * 32, fy: ay * 32, dur: dur, age: 0}
+    b.move = {fx: b[0] * 32, fy: b[1] * 32, dur: dur, age: 0}
+    a[0] = b[0]; a[1] = b[1]
+    b[0] = ax; b[1] = ay
+}
+//спрайт чаши по полноте (obj[10]): свап href отрисованного спрайта — как setObjectState
+function setCupSprite(cup, full) {
+    cup[10] = full
+    let img = cup[6] !== undefined ? screenPic[cup[6]] : null
+    img && img.setAttribute("href", cupSpriteSrc(cup))
+}
+//интерактивность чаши (guard в heroMove.checkObject): только в фазе выбора и пока выбор
+//не сделан — в фазах показа/перемешивания и после вскрытия чаши «мёртвые» объекты
+function shellCupReady(obj) {
+    return !!(link && link.shell && link.shell.phase === 3 && !link.shell.done &&
+        link.shell.cups.indexOf(obj) !== -1)
+}
+//юз чаши (вызов из useObject, тип 22): выбор сделан — «настоящая» показывает goldFull,
+//все чаши перестают быть интерактивными. Угадал — 9 кучек золота вокруг героя;
+//нет — рычаг исчезает, возвратный портал гаснет и появляется Лидер гоблинов
+//(глава 4 без тега boss)
+function shellCupUse(obj) {
+    if (!shellCupReady(obj)) return
+    let sh = link.shell
+    sh.done = true
+    let level = dataGeneric.scenes[status.levelFloor]
+    setCupSprite(sh.full, 1)
+    if (obj === sh.full) {
+        spawnGoldRing()
+        journalAdd(T("journ.shellWin"), J_STD)
+    } else {
+        removeShellLever(level, sh)
+        sh.portal[10] === 1 && setObjectState(sh.portal, 0)
+        sh.bossSpawned = true
+        let cls = spawnShellBoss(level, sh)
+        cls && journalAdd(T("journ.shellLose", T(cls.name)), J_STD)
+    }
+}
+//9 кучек золота вокруг героя: ближайшие свободные клетки (пол матрицы), кольца r=1..3;
+//placeDrop страхует от стен/объектов (спрайт переедет на соседнюю клетку)
+function spawnGoldRing() {
+    let m = status.matrixLevel
+    let hc = [Math.trunc(status.hero.x / 32), Math.trunc(status.hero.y / 32)]
+    let placed = {}
+    let n = 0
+    for (let r = 1; r <= 3 && n < 9; r++) {
+        for (let dy = -r; dy <= r && n < 9; dy++) {
+            for (let dx = -r; dx <= r && n < 9; dx++) {
+                if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue
+                let cx = hc[0] + dx
+                let cy = hc[1] + dy
+                if (!(m[cy] && m[cy][cx] === 1) || placed[cx + "_" + cy]) continue
+                placed[cx + "_" + cy] = 1
+                screenPic.push(worldImage(svgArr[1], cx * 32, cy * 32, 64, 32, "./images/dungeon/drop/gold.png", {"id": screenPic.length - 1}))
+                dropArr.push(screenPic[screenPic.length - 1])
+                placeDrop(screenPic[screenPic.length - 1], cx * 32, cy * 32, 64, 32)
+                n++
+            }
+        }
+    }
+}
+//рычаг исчезает: объект из level.objects + его спрайт из screenPic («надгробие» —
+//guard, как в setObjectState)
+function removeShellLever(level, sh) {
+    if (!sh.lever) return
+    let idx = level.objects.indexOf(sh.lever)
+    idx >= 0 && level.objects.splice(idx, 1)
+    let img = sh.lever[6] !== undefined ? screenPic[sh.lever[6]] : null
+    img && img.remove()
+    sh.lever = null
+}
+//Лидер гоблинов (id 4, босс 1 этажа) с максимальным усилением 4 главы —
+//все три блока множителей openRoom (гл.2: hp×2, урон +1/+2; гл.3: hp×2, +2/+6, скорость
+//и зоркость +1; гл.4: hp×1.5, +2/+8, скорость +2, зоркость +1; итого hp×6). Тег boss
+//снимается у КЛОНА класса: полосы ХП нет, bossKill не засчитывается (решение
+//пользователя). Клетка — свободный интерьер комнаты, не пересекающий хитбокс героя
+//(поиск как у spawnArenaLever). ВАЖНО: ГРУППА enemes ≠ id врага — у 1 этажа id = группа+1,
+//data.enemes[4] — Мумия (репорт V97: по ошибке спавнилась она) — поэтому класс ищется
+//по id. Возвращает клон класса (или null — свободных клеток нет)
+function spawnShellBoss(level, sh) {
+    let lider = null
+    for (let g = 0; g < data.enemes.length && !lider; g++) {
+        let grp = data.enemes[g]
+        let arr = Array.isArray(grp) ? grp : [grp]
+        for (let v = 0; v < arr.length; v++) {
+            if (arr[v].id === 4) { lider = arr[v]; break }
+        }
+    }
+    if (!lider) return null
+    let f = level.floor[sh.room[0]]
+    let matrix = status.matrixLevel
+    let cells = []
+    for (let x = f[0] + 1; x < f[0] + f[2] - 1; x++) {
+        for (let y = f[1] + 1; y < f[1] + f[3] - 1; y++) {
+            if (!(matrix[y] && matrix[y][x] === 1)) continue
+            let hx = status.hero.x + 13
+            let hy = status.hero.y + 37
+            let busy = hx < x * 32 + 32 && hx + 14 > x * 32 && hy < y * 32 + 32 && hy + 14 > y * 32
+            for (let i = 0; i < level.objects.length && !busy; i++) {
+                let o = level.objects[i]
+                x >= o[0] && x < o[0] + o[3] && y >= o[1] && y < o[1] + o[4] && (busy = true)
+            }
+            !busy && cells.push([x, y])
+        }
+    }
+    if (cells.length === 0) return
+    let cell = cells[Math.trunc(Math.random() * cells.length)]
+    let cls = JSON.parse(JSON.stringify(lider))
+    delete cls.boss
+    let stats = JSON.parse(JSON.stringify(lider.stats))
+    stats.hp *= 2
+    stats.dmg[0] += 1
+    stats.dmg[1] += 2
+    stats.hp *= 2
+    stats.dmg[0] += 2
+    stats.dmg[1] += 6
+    stats.speed += 1
+    stats.range += 1
+    stats.hp *= 1.5
+    stats.dmg[0] += 2
+    stats.dmg[1] += 8
+    stats.speed += 2
+    stats.range += 1
+    let spawnAnim = cls.anims[2].others[2]
+    objectValues.push({"id":status.oVcount,"type":"enemy","class":cls,"stats":stats,
+    "animCounters":60/spawnAnim.speed,"currentAnim":spawnAnim,"currentStill":0,"room":sh.room,"cells":cells,
+    "state":0,"stop":0,"xCell":cell[0],"yCell":cell[1],"noStunTime":0,
+    "img":image(svgArr[1],
+        cell[0]*32,
+        cell[1]*32-19,
+        spawnAnim.w,
+        spawnAnim.h,
+        spawnAnim.img,
+        {"times":spawnAnim.times,"id":status.oVcount,"frame":1})})
+    status.oVcount++
+    objectValues[objectValues.length-1].rect = objectValues[objectValues.length-1].img.clipRect
+    let lengthAttacks = cls.attacks.length
+    for (let iA = 0; iA < lengthAttacks; iA++) {
+        objectValues[objectValues.length-1].stats.attacksCd[iA] = Math.trunc((data.attacks[cls.attacks[iA]].cooldown*1000)/16)
+    }
+    return cls
+}
+//победа над боссом (portalArenaKill): рычаг возвращается на свободную клетку интерьера
+//(клетки чаш заняты объектами — там рычаг не встанет); комната уже отрисована — спрайт
+//создаём сразу тем же конвейером, что spawnArenaLever
+function spawnShellLever(level, sh) {
+    let f = level.floor[sh.room[0]]
+    let matrix = status.matrixLevel
+    let cells = []
+    for (let x = f[0] + 1; x < f[0] + f[2] - 1; x++) {
+        for (let y = f[1] + 1; y < f[1] + f[3] - 1; y++) {
+            if (!(matrix[y] && matrix[y][x] === 1)) continue
+            let hx = status.hero.x + 13
+            let hy = status.hero.y + 37
+            let busy = hx < x * 32 + 32 && hx + 14 > x * 32 && hy < y * 32 + 32 && hy + 14 > y * 32
+            for (let i = 0; i < level.objects.length && !busy; i++) {
+                let o = level.objects[i]
+                x >= o[0] && x < o[0] + o[3] && y >= o[1] && y < o[1] + o[4] && (busy = true)
+            }
+            !busy && cells.push([x, y])
+        }
+    }
+    if (cells.length === 0) return
+    let cell = cells[Math.trunc(Math.random() * cells.length)]
+    level.objects.push([cell[0], cell[1], LEVER_TYPE, 1, 1, undefined])
+    let lever = level.objects[level.objects.length - 1]
+    lever[9] = sh.room
+    lever[10] = 1
+    sh.lever = lever
+    drawObjectSprite(lever)
+}
+//состояние комнаты «напёрстков» (тест-харнесс: чтение фаз/чаш в headless)
+function shellState() {
+    return link && link.shell ? link.shell : null
+}
+
 //спрайт объекта 1×1 (рычаг) «вне createRoom»: комната уже отрисована — рисуем сразу тем же
 //конвейером (id «NO», svg.image дописывает «I», obj[6] = индекс в screenPic)
 function drawObjectSprite(obj) {
@@ -507,4 +878,4 @@ function resetPortalFx() {
     link = null
 }
 
-export {configPortal, portalUse, portalArenaKill, resetPortalFx, placeRoomObject, puzzleButtonUse, PORTAL_TYPE, LEVER_TYPE, PORTAL_SPRITE_W, PORTAL_SPRITE_H}
+export {configPortal, portalUse, portalArenaKill, resetPortalFx, placeRoomObject, puzzleButtonUse, shellTick, shellCupUse, shellCupReady, shellState, PORTAL_TYPE, LEVER_TYPE, PORTAL_SPRITE_W, PORTAL_SPRITE_H}

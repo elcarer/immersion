@@ -3,7 +3,7 @@ import { status } from "../scripts/start.js"
 //V63: спрайт ловушки по её состоянию (Ne.png/N.png) — та же формула, что в createRoom
 import { trapSpriteSrc } from "../scripts/trapSprite.js"
 //V64: спрайт Портала (18) и Рычага (19) по состоянию — та же формула, что в createRoom
-import { portalSpriteSrc } from "../scripts/portalSprite.js"
+import { portalSpriteSrc, cupSpriteSrc } from "../scripts/portalSprite.js"
 
 // V62: отрисовка содержимого БОЛЬШОЙ КАРТЫ (панель «Карта», map.js) — вынесена из
 // sceneGenerate.js (map-ветка createRoom) и heroMove.js (map-ветка createCorridor).
@@ -105,21 +105,23 @@ function mapRender(level, tileX, tileY, layer) {
         //копия ветки объектов createRoom (sceneGenerate.js): ловушка из traps/, столб
         //32×81 с якорем низа в клетку, статуя натуральной высоты (65/69/48) с якорем
         //низа в 2 клетки, алхимический стол 15+этаж*20, шкафчик (V75) 101|101d 64×42;
-        //V83: кнопка загадки (21) — push0/push1 по фазе, там же портал вида 2 (100a)
-        for (let i = 0; i < level.objects.length; i++) {
-            const o = level.objects[i]
-            let inRoom = false
-            for (let r = 0; r < openRooms.length; r++) {
-                const room = openRooms[r]
-                if (o[0] >= room.fx && o[0] < room.fx + room.fw && o[1] >= room.fy && o[1] <= room.fy + room.fh) {
-                    inRoom = true
-                    break
+            //V83: кнопка загадки (21) — push0/push1 по фазе, там же портал вида 2 (100a);
+            //V97: чаша «напёрстков» (22) — goldFull/goldEmpty по полноте (cupSpriteSrc)
+            for (let i = 0; i < level.objects.length; i++) {
+                const o = level.objects[i]
+                let inRoom = false
+                for (let r = 0; r < openRooms.length; r++) {
+                    const room = openRooms[r]
+                    if (o[0] >= room.fx && o[0] < room.fx + room.fw && o[1] >= room.fy && o[1] <= room.fy + room.fh) {
+                        inRoom = true
+                        break
+                    }
                 }
-            }
-            if (!inRoom) continue
-            const objSrc = o[2] === 14 ? trapSpriteSrc(o) :
-                o[2] === 18 || o[2] === 19 || o[2] === 21 ? portalSpriteSrc(o) :
-                o[2] === 15 ? "./images/dungeon/objects/fin"+(o[10]||1)+".png" :
+                if (!inRoom) continue
+                const objSrc = o[2] === 14 ? trapSpriteSrc(o) :
+                    o[2] === 18 || o[2] === 19 || o[2] === 21 ? portalSpriteSrc(o) :
+                    o[2] === 22 ? cupSpriteSrc(o) :
+                    o[2] === 15 ? "./images/dungeon/objects/fin"+(o[10]||1)+".png" :
                 o[2] === 16 ? "./images/dungeon/objects/"+(14+status.levelFloor*20)+".png" :
                 o[2] === 17 ? "./images/dungeon/objects/"+(15+status.levelFloor*20)+".png" :
                 o[2] === 20 ? "./images/dungeon/objects/"+(o[7] ? "101d" : "101")+".png" :

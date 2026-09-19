@@ -53,6 +53,8 @@ import { spiderBossFight,descentBossAttack,bossAttack,bossDown,eggsArr,delEgg } 
 import { valkyrieTick } from "../scripts/valkyrie.js"
 //V80: наземные тени героя/врагов/питомцев — синхронизация после всех шагов движения
 import { shadowTick } from "../scripts/groundShadow.js"
+//V97: комната «напёрстков» (вид 3 портала) — фазы показа/перемешивания чаш
+import { shellTick } from "../scripts/portalFx.js"
 import { svgArr,image, text,gamepadDragStart,gamepadDragMove,gamepadDragEnd,isDragging,getCTM } from "../scripts/svg.js"
 
 //отслеживание мыши
@@ -133,6 +135,8 @@ function gameLoop() {
         itemTipTick()
         //V30: мини-карта — пересборка при смене клетки героя, кружок ползёт каждый тик
         minimapTick()
+        //V97: «напёрстки» — отсчёт показа/перемешивания чаш и их скольжение (portalFx.js)
+        shellTick()
         activeSkillsCD()
         }
     }

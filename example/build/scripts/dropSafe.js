@@ -23,7 +23,8 @@ const OFFSETS = [
 ]
 
 //клетка свободна: пол по матрице (1 = проходимый) И ни одного блокирующего объекта
-//(все типы, кроме проходимых ловушек 14 и рычага 19 — как collisionCheckObject)
+//(все типы, кроме проходимых ловушек 14, рычага 19 и чаш «напёрстков» 22 — как
+//collisionCheckObject)
 function cellFree(col,row) {
     const m = status.matrixLevel
     if (!(m && m[row] && m[row][col] === 1)) return false
@@ -32,7 +33,7 @@ function cellFree(col,row) {
     if (!objects) return true
     for (let i = 0; i < objects.length; i++) {
         const ob = objects[i]
-        if (ob[2] !== 14 && ob[2] !== 19 && col >= ob[0] && col < ob[0] + ob[3] && row >= ob[1] && row < ob[1] + ob[4]) return false
+        if (ob[2] !== 14 && ob[2] !== 19 && ob[2] !== 22 && col >= ob[0] && col < ob[0] + ob[3] && row >= ob[1] && row < ob[1] + ob[4]) return false
     }
     return true
 }

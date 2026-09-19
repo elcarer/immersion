@@ -946,6 +946,16 @@ const PAIRS = [
     ["settings.shadowsOff", "Отключение теней", "Disable shadows"],
     ["float.skillGet", "Получена способность: {0}!", "Ability gained: {0}!"],
     ["journ.skillGet", "Загадка портала решена — изучена способность: {0}.", "Portal puzzle solved — learned ability: {0}."],
+    //V97: комната «напёрстков» — исходы выбора чаши
+    ["journ.shellWin", "Чаша угадана — золото ваше!", "Right cup — the gold is yours!"],
+    ["journ.shellLose", "Чаша пуста... Из тени встаёт {0}!", "Empty cup... The {0} rises from the shadows!"],
+    //V98: имена бафов статуи + анонс выпавшего бафа (текст над героем и журнал)
+    ["buff.1.name", "Ускорение", "Swiftness"],
+    ["buff.2.name", "Огненное оружие", "Fire weapon"],
+    ["buff.3.name", "Магический щит", "Magic shield"],
+    ["buff.4.name", "Находчивость", "Resourcefulness"],
+    ["float.buffGet", "Баф: {0}!", "Buff: {0}!"],
+    ["journ.buffGet", "Статуя дала баф: {0} (60 секунд).", "The statue granted a buff: {0} (60 seconds)."],
     //V85: второй босс 4 этажа + его снаряды (внутренние имена — как у «Звезды пустоты»)
     ["enemy.26.name", "Медуза пустоты", "Void Medusa"],
     ["enemy.26.desc", "Когда здоровье падает до половины, разделяется надвое: осколки вдвое меньше, и каждый получает её остаток здоровья как максимум. Осколки делятся ещё раз.", "When its health drops to half, it splits in two: the pieces are half its size and each receives its remaining health as its maximum. The pieces split once more."],
