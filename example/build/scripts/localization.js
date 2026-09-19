@@ -847,6 +847,8 @@ const PAIRS = [
     ["alchemy.merge", "ОБЪЕДИНИТЬ {0}", "MERGE {0}"],
     ["alchemy.nospace", "НЕТ МЕСТА В ИНВЕНТАРЕ", "NO INVENTORY SPACE"],
     ["alchemy.nogold", "НЕ ХВАТАЕТ ЗОЛОТА ({0})", "NOT ENOUGH GOLD ({0})"],
+    //V101: подсказка внизу меню стола — суть эффекта (просьба пользователя)
+    ["alchemy.hint", "ОБЪЕДИНИТЕ 3 ПРЕДМЕТА ОДНОГО КАЧЕСТВА В ЛУЧШИЙ", "COMBINE 3 ITEMS OF THE SAME QUALITY INTO A BETTER ONE"],
     ["mi.title", "ВЫБЕРИТЕ ПРЕДМЕТЫ ДЛЯ СОХРАНЕНИЯ", "CHOOSE ITEMS TO KEEP"],
     ["st.title", "СПОСОБНОСТИ", "ABILITIES"],
     ["st.unspent", "Неизрасходованных очков способностей: {0}", "Unspent ability points: {0}"],

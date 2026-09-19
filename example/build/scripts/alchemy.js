@@ -91,6 +91,8 @@ function openAlchemy(obj) {
     //кнопка выхода: закрыть меню и возобновить игру, объект остаётся используемым
     alchemyTemp.push(image(svgArr[2],595,980,208,57,"./images/UI/panels/buttons/button.png",{"glow":1,"func":() => {playback(strike[14].vol,0,0,3*status.settings.soundVolume);alchemyDel(0)}}))
     alchemyTemp.push(text(svgArr[2],699,1020,"0pt","50pt","black","2px",`rgb(204, 153, 102)`,T("ui.exit"),{"id":"alchemyExitText","size":42,"font":"baseFont4","anchor":"middle"}))
+    //V101: подсказка внизу меню — суть эффекта стола (просьба пользователя); полоса под кнопками (ниже 1037)
+    alchemyTemp.push(text(svgArr[2],1920/2,1066,"0pt","26pt","black","2px","rgba(204, 153, 102, 0.6)",T("alchemy.hint"),{"id":"alchemyHintText","size":26,"font":"baseFont4","anchor":"middle"}))
     refreshMergeButton()
     svgArr[2].style.display = ''
 }
