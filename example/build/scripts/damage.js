@@ -263,6 +263,27 @@ function countDamage(enemy,bullet,x,y) {
         bullet.currentAnim.bullet === undefined && enemyStun(enemy)
         return false
     }
+    //V104: урон Укуса Волка-союзника (квест «Сопроводить Волка») — бросок по ЕГО
+    //stats.dmg, без оружия/статов/бонусов героя; далее общий хвост (ХП-бар, журнал,
+    //каменная кожа, стан от мили-удара, эффект попадания, смерть через return true)
+    if(bullet.atacker && bullet.atacker.wolfAlly) {
+        let damage = Math.trunc(Math.random() * (bullet.atacker.stats.dmg[1] - bullet.atacker.stats.dmg[0] + 1) + bullet.atacker.stats.dmg[0])
+        enemy.stats.stoneskin && damage > enemy.stats.stoneskin && (damage = enemy.stats.stoneskin)
+        floatText(Math.trunc(Math.random() * 32) + x,y + 8,damage,"white","12px","none")
+        const wolfHitBefore = enemy.stats.hp
+        enemy.stats.hp = enemy.stats.hp - damage
+        showEnemyHpBar(enemy, wolfHitBefore)
+        damage > 0 && journalAdd(T("journ.enemydmg",T("quest.wolf.name"),damage,T((bullet.stats && bullet.stats.name) || "journ.wordattack")), J_GREEN)
+        if(enemy.stats.hp <= 0) {
+            reanimateCheck(enemy) && bullet.targets.push(enemy)
+        } else {
+            bullet.targets.push(enemy)
+            bullet.currentAnim.bullet === undefined && enemyStun(enemy)
+        }
+        enemy.class.effects.takeDamage && playEffect(enemy,data.effects[enemy.class.effects.takeDamage])
+        enemyNoticeHero(enemy)
+        return enemy.stats.hp <= 0
+    }
     let minDmg = 0
     //полный комплект
     //V67 «Вечный сапфир»: копия брони щита из 1-й ячейки инвентаря добавляется к броне героя

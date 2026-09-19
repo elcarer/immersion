@@ -49,7 +49,9 @@ function snapshotCarryPets() {
     status.pets = []
     for (let i = 0; i < objectValues.length; i++) {
         const e = objectValues[i]
-        if (e.type === "pet" && e.stats && e.stats.hp > 0) {
+        //V104: Волк-союзник (квест «Сопроводить Волка») — не ручной зверёк: между
+        //этажами не переносится (награда выдаётся уже на выходе этажа, в nextFloor)
+        if (e.type === "pet" && !e.wolfAlly && e.stats && e.stats.hp > 0) {
             status.pets.push({"class": e.class, "stats": JSON.parse(JSON.stringify(e.stats))})
         }
     }

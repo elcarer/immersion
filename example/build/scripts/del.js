@@ -26,6 +26,8 @@ import { resetVoidBoss } from "../scripts/voidBoss.js"
 import { resetGroundShadows } from "../scripts/groundShadow.js"
 //V103: летящие кучки дропа — чистятся при смене сцены вместе с dropArr
 import { resetFlyDrops } from "../scripts/dropSafe.js"
+//V104: квест «Сопроводить Волка» — сброс состояния/трекера/ссылок сцены
+import { questDel } from "../scripts/quest.js"
 // МИГРАЦИЯ M5: objectValues — Proxy-список, синхронизирующий ECS-сущности zero_engine
 // (компоненты etype/posX/posY/cullPad, группа battle). Контракт массива прежний:
 // push/splice/length=0, индексы, порядок. Подробности — ecsBridge.js
@@ -80,6 +82,8 @@ function del() {
     bars.length = 0
     dropArr.length = 0
     resetFlyDrops()
+    //V104: квест «Сопроводить Волка» — сброс состояния, трекера и ссылок сцены
+    questDel()
     wallsOverlay.length = 0
     acidArr.length = 0
     doorPics.length = 0

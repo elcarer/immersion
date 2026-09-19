@@ -60,6 +60,9 @@ import { objectValues,screenPic,doorPics } from "../scripts/del.js"
 import { achKill } from "../scripts/achievements.js"
 //V64: смерть монстра арены — счёт «все 9 убиты» и появление рычага арены
 import { portalArenaKill } from "../scripts/portalFx.js"
+//V104: Волк-союзник (квест «Сопроводить Волка») — поведение в ветке pet enemyTick.
+//Цикл импортов quest<->enemyAI легален: вызовы только в рантайме
+import { wolfAllyTick } from "../scripts/quest.js"
 // V32 «рывок» нетопыря (stats.dash): триггер и полёт живёт в dashFx.js,
 // сюда встроены только точки проводки (аналогично tickShadow выше)
 import { dashTryTrigger, dashFlyTick, endDashFlight } from "../scripts/dashFx.js"
@@ -1747,7 +1750,9 @@ function pushEnemySep(e, sx, sy) {
 // за экран питомец замер бы навсегда.
 const PET_STOP_CELLS = 2
 const PET_RETRY_TICKS = 20
-function petFollowTick(pet) {
+//V104: экспортирован для quest.js — Волк-союзник в мирном режиме ходит «по пятам»
+//той же механикой, что питомцы
+export function petFollowTick(pet) {
     //V90: «удача» (пробег за едой, pets.js) главнее следования — путь питомца не
     //сбрасываем и не перестраиваем, пока он сам не доставит еду остановкой у героя
     if (pet.luckyRun) return
@@ -1773,6 +1778,14 @@ function petFollowTick(pet) {
 // ---------- главный тик врага (вызывается из enemyMove) ----------
 export function enemyTick(enemy) {
     if (enemy.type === "pet") {
+        //V104: Волк-союзник (квест «Сопроводить Волка», quest.js) — поведение своим
+        //тиком (мирный NPC стоит; принятый — за героем через petFollowTick; в бою —
+        //свой ИИ укуса), движение всё равно отыгрывает общий stepAlongPath
+        if (enemy.wolfAlly) {
+            wolfAllyTick(enemy)
+            stepAlongPath(enemy)
+            return
+        }
         //V90: доставка еды «удачи» — путь иссяк, пет остановился, еда на нём
         petLuckyTick(enemy)
         petFollowTick(enemy)

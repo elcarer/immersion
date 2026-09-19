@@ -11,6 +11,8 @@ import { configPortal, placeRoomObject } from "../scripts/portalFx.js"
 import { spawnVoidBoss } from "../scripts/voidBoss.js"
 //V69: ручные зверьки переносятся на новый этаж — спавн рядом с героем (pets.js)
 import { spawnCarriedPets } from "../scripts/pets.js"
+//V104: квест «Сопроводить Волка» — сброс состояния и спавн NPC (2 глава, 1 этаж)
+import { questNewGame } from "../scripts/quest.js"
 //V52: старт этажа — сброс забегных счётчиков достижений
 import { achFloorStart } from "../scripts/achievements.js"
 
@@ -33,6 +35,8 @@ function newGame(next) {
     //V69: ручные зверьки появляются рядом с героем в стартовой комнате нового этажа
     //(матрица и герой уже готовы; на новом забеге список пуст — sceneGenerate(next=false) чистит)
     spawnCarriedPets()
+    //V104: квест «Сопроводить Волка» — на новом забеге сброс; 2 глава, 1 этаж — NPC Волк
+    questNewGame(next)
     //V52: статус.info готов — кэшируем ХП, чистим «чистый» этаж и окно Массовика
     achFloorStart()
 }

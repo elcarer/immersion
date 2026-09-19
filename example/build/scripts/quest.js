@@ -1,0 +1,380 @@
+// ============================================================================
+// quest.js — V104: квестовая система. Первый квест — «Сопроводить Волка».
+//
+// Мирный NPC: Волк (лист images/sheets/wolf_64.png) стоит в углу стартовой
+// комнаты 1 этажа ТОЛЬКО во 2 главе (status.meta.page === 2). Ушёл из комнаты,
+// не заговорив — Волк исчезает. Взаимодействие — как у объектов: подойти,
+// полоска использования, диалог (dialog.js) на паузе.
+//   СОГЛАСИТЬСЯ → квест: справа окно «текущих квестов» («Сопроводить Волка.»),
+//   Волк становится боевым союзником (type "pet" — идут штатные следование
+//   petFollowTick/stepAlongPath, тени, ХП-бар), параметры — гоблин data.js с
+//   модификаторами глав вплоть до 4-й (как в encounters.js): hp 15,
+//   dmg [5,17], speed 13, range 8; бьёт атакой 11 «Укус».
+//   ОТКАЗАТЬСЯ → Волк исчезает, квест не начинается.
+// Враги НАВОДЯТСЯ только на героя; их снаряды при пересечении с Волком бьют
+// ВОЛКА (damageHero → wolfHitBy). Волк бросается на врагов, напавших на героя
+// (noticed/called/ATTACK в радиусе), подходит по BFS и кусает; урон считается
+// в damage.js countDamage по его stats.dmg (ветка wolfAlly).
+// ХП Волка иссякли → смерть (анимация), квест провален, окно квеста гаснет.
+// Выход с этажа с живым Волком (nextFloor) → прощальный диалог, «ПРИНЯТЬ» →
+// случайный легендарный (сетовый) предмет (itemGenerate(4)) → квест закрыт.
+// Состояния status.quest.state: 0 нет, 1 NPC предложен, 2 активен,
+// 4 выполнен, 5 провален.
+// ============================================================================
+import { status } from "../scripts/start.js"
+import { T } from "../scripts/localization.js"
+import { data } from "../scripts/data.js"
+import { dataGeneric } from "../scripts/sceneGenerate.js"
+import { svgArr, image, text, rect, rectPos, uiRightEdge, releaseSprite } from "../scripts/svg.js"
+import { objectValues, screenPic } from "../scripts/del.js"
+import { floatText } from "../scripts/floatText.js"
+import { checkCollision, playEffect } from "../scripts/damage.js"
+import { showEnemyHpBar } from "../scripts/enemyHpBarFx.js"
+import { journalAdd, J_RED } from "../scripts/journal.js"
+import { playback, strike } from "../scripts/sound.js"
+import { addAnim } from "../scripts/animPlay.js"
+import { openDialog } from "../scripts/dialog.js"
+import { itemGenerate } from "../scripts/itemGenerate.js"
+//следование «по пятам» и путь — штатная механика питомцев enemyAI (цикл импортов
+//легален: enemyAI зовёт wolfAllyTick только в рантайме)
+import { ENEMY_STATE, animInterval, buildChasePath, petFollowTick, setEnemyPose, waitPose } from "../scripts/enemyAI.js"
+
+//параметры: гоблин data.js (id 0) с главовыми модификаторами вплоть до 4-й
+//(encounters.js: ×2 ХП, dmg +2/+4, speed/range +1; ещё ×1.5 ХП, dmg +2/+8, speed +2, range +1)
+const WOLF_STATS = {"hp":15,"dmg":[5,17],"exp":0,"speed":13,"range":8,"attacksCd":[],"noStunTime":55}
+//класс Волка — структура как у врагов data.js, анимации читаются из листа wolf_64.png
+//через SHEETS (пути легаси-полос ./images/enemy/wolf/...). attackNew НЕ ставится:
+//цель укуса — конкретный враг, снаряд спавнит combatTick через addAnim сам.
+const wolfClass = {
+    "id": 100,
+    "name": "quest.wolf.name",
+    "attacks": [11],
+    "effects": {"takeDamage": 1},
+    "anims": [
+        {"move":[
+            {"speed":5,"times":4,"w":128,"h":51,"img":"./images/enemy/wolf/move/back.png"},
+            {"speed":5,"times":4,"w":128,"h":51,"img":"./images/enemy/wolf/move/front.png"},
+            {"speed":5,"times":4,"w":128,"h":51,"img":"./images/enemy/wolf/move/left.png"},
+            {"speed":5,"times":4,"w":128,"h":51,"img":"./images/enemy/wolf/move/right.png"}
+        ]},
+        {"attack":[
+            {"speed":5,"times":4,"w":128,"h":51,"img":"./images/enemy/wolf/attack/back.png","once":1},
+            {"speed":5,"times":4,"w":128,"h":51,"img":"./images/enemy/wolf/attack/front.png","once":1},
+            {"speed":5,"times":4,"w":128,"h":51,"img":"./images/enemy/wolf/attack/left.png","once":1},
+            {"speed":5,"times":4,"w":128,"h":51,"img":"./images/enemy/wolf/attack/right.png","once":1}
+        ]},
+        {"others":[
+            {"speed":10,"times":4,"w":128,"h":51,"img":"./images/enemy/wolf/others/damage.png","once":1,"stun":1},
+            {"speed":5,"times":4,"w":128,"h":51,"img":"./images/enemy/wolf/others/death.png","once":1},
+            {"speed":5,"times":4,"w":128,"h":51,"img":"./images/enemy/wolf/others/wait.png"}
+        ]}
+    ],
+}
+const WOLF_AGGRO = 8 * 32        //радиус «враги напали на героя» от Волка (px)
+const WOLF_BITE_RANGE = 52       //дистанция укуса (центр-центр)
+const BITE_CD = 25               //кулдаун укуса: attack.11 cooldown 0.4с ≈ 25 тиков
+const USE_TICKS = 45             //полоска взаимодействия с NPC (как у объектов, ~0.72с)
+//кольцо клеток вокруг данной для поиска свободной (как NEAR в pets.js)
+const NEAR = [[0,0],[0,-1],[1,-1],[-1,-1],[1,0],[-1,0],[1,1],[-1,1],[0,1]]
+
+let wolfRef = null      //живая сущность Волка текущей сцены
+let useBarFill = null   //полоска взаимодействия над NPC
+let useT = 0
+
+function wolfUnit() {
+    return wolfRef
+}
+
+// ---------- спавн NPC (newGame: 2 глава, 1 этаж, стартовая комната) ----------
+function questNewGame(next) {
+    if (next === false) {
+        status.quest = {"state":0}
+        useT = 0
+        useBarFill = null
+        wolfRef = null
+        status.meta.page === 2 && status.levelFloor === 0 && spawnWolfNpc()
+        return
+    }
+    //новый этаж при активном квесте сюда дойти не может (награда выдаётся на выходе
+    //этажа, в nextFloor) — страховка от рассинхрона: сцена сменилась, ссылки гасим
+    wolfRef = null
+    useBarFill = null
+    useT = 0
+}
+
+function spawnWolfNpc() {
+    const lv = dataGeneric.scenes[status.levelFloor]
+    if (!lv.roomsArr || !lv.roomsArr[0]) return
+    const f = lv.floor[lv.roomsArr[0][0]]
+    status.quest = {"state":1,"room":[f[0],f[1],f[2],f[3]]}
+    //угол комнаты (клетка внутрь от угла); клетка не пол — поиск по кольцу NEAR
+    let cell = null
+    for (let i = 0; i < NEAR.length; i++) {
+        const cx = f[0] + 1 + NEAR[i][0]
+        const cy = f[1] + 1 + NEAR[i][1]
+        if (status.matrixLevel[cy] && status.matrixLevel[cy][cx] === 1) { cell = [cx,cy]; break }
+    }
+    if (!cell) { status.quest = {"state":0}; return }
+    const anim = wolfClass.anims[2].others[2]
+    objectValues.push({"id":status.oVcount,"type":"pet","wolfAlly":1,"npc":1,"class":wolfClass,
+    "stats":JSON.parse(JSON.stringify(WOLF_STATS)),"attacksCdInit":1,
+    "animCounters":60/anim.speed,"currentAnim":anim,"currentStill":0,"room":null,"cells":[],
+    "state":0,"stop":0,"xCell":cell[0],"yCell":cell[1],"noStunTime":0,
+    "img":image(svgArr[1],cell[0]*32,cell[1]*32,anim.w,anim.h,anim.img,{"times":anim.times,"id":status.oVcount,"frame":1})})
+    status.oVcount++
+    wolfRef = objectValues[objectValues.length-1]
+    wolfRef.rect = wolfRef.img.clipRect
+    //кулдаун укуса — как у врагов при спавне (encounters.js)
+    wolfRef.stats.attacksCd[0] = Math.trunc(data.attacks[wolfClass.attacks[0]].cooldown*1000/16)
+}
+
+function removeWolf(wolf) {
+    if (useBarFill) { useBarFill.remove(); useBarFill = null }
+    useT = 0
+    const idx = objectValues.indexOf(wolf)
+    idx !== -1 && objectValues.splice(idx, 1)
+    releaseSprite(wolf.img)
+    wolfRef === wolf && (wolfRef = null)
+}
+
+// ---------- окно «текущих квестов» (правый край, под мини-картой) ----------
+let trackNodes = []
+function questTrackerShow() {
+    questTrackerHide()
+    const x = 1612 + (uiRightEdge() - 1920)
+    trackNodes.push(rect(svgArr[2],x,252,296,86,"1px","rgb(204, 153, 102)","rgba(16, 12, 10, 0.85)",{"rx":"5px","id":"questWinBack"}))
+    trackNodes.push(text(svgArr[2],x + 148,284,"0pt","26pt","black","2px","rgb(204, 153, 102)",T("quest.title"),{"id":"questWinTitle","size":24,"font":"baseFont4","anchor":"middle"}))
+    trackNodes.push(text(svgArr[2],x + 148,318,"0pt","24pt","black","2px","rgb(230, 220, 200)",T("quest.track"),{"id":"questWinText","size":22,"font":"baseFont4","anchor":"middle"}))
+}
+function questTrackerHide() {
+    while (trackNodes.length > 0) {
+        const n = trackNodes.pop()
+        n && n.remove && n.remove()
+    }
+}
+
+// ---------- тик Волка (вызов из enemyAI.enemyTick, ветка pet) ----------
+function wolfAllyTick(wolf) {
+    if (!status.quest) return
+    if (wolf.dying) {
+        wolf.deathTicks--
+        wolf.deathTicks <= 0 && removeWolf(wolf)
+        return
+    }
+    if (status.quest.state === 1) { npcTick(wolf); return }
+    if (status.quest.state !== 2) return
+    //конец once-анимации (атака/урон): animPlay заморозил сущность (stop=1) — размораживаем
+    if (wolf.stop === 1) {
+        wolf.stop = 0
+        wolf.currentStill = 0
+        setEnemyPose(wolf, waitPose(wolf))
+    }
+    const foe = findFoe(wolf)
+    foe ? combatTick(wolf, foe) : followTick(wolf)
+}
+
+//NPC: стоит в углу; герой ушёл из стартовой комнаты не поговорив — исчезает
+function npcTick(wolf) {
+    const r = status.quest.room
+    const hx = Math.trunc(status.hero.x / 32)
+    const hy = Math.trunc(status.hero.y / 32)
+    if (hx < r[0] || hx >= r[0] + r[2] || hy < r[1] || hy >= r[1] + r[3]) {
+        removeWolf(wolf)
+        status.quest = {"state":0}
+        return
+    }
+    useBarTick(wolf)
+}
+
+//взаимодействие с NPC: герой рядом — растёт полоска (как у объектов), полная — диалог
+function useBarTick(wolf) {
+    const wp = rectPos(wolf.rect)
+    const d = Math.hypot((status.hero.x + 16) - (wp[0] + 16), (status.hero.y + 25) - (wp[1] + 25))
+    if (d > 56) {
+        useT > 0 && (useT = 0)
+        useBarFill && useBarFill.setAttribute("width", 0)
+        return
+    }
+    useT++
+    if (!useBarFill) {
+        useBarFill = rect(svgArr[1],wp[0] - 9,wp[1] - 16,0,6,"none","0px","#cc9966",{"id":"wolfUseBar"})
+    }
+    useBarFill.setAttribute("width", Math.trunc(50 * useT / USE_TICKS))
+    if (useT >= USE_TICKS) {
+        useBarFill.remove()
+        useBarFill = null
+        useT = 0
+        openWolfDialog(wolf)
+    }
+}
+
+function openWolfDialog(wolf) {
+    openDialog({
+        "lines":[
+            {"who":"wolf","key":"dlg.wolf.1"},
+            {"who":"hero","key":"dlg.hero.1"},
+            {"who":"wolf","key":"dlg.wolf.2"}
+        ],
+        "choices":[
+            {"label":"dlg.choice.agree","cb":() => {
+                status.quest.state = 2
+                wolf.npc = 0
+                questTrackerShow()
+            }},
+            {"label":"dlg.choice.deny","cb":() => {
+                removeWolf(wolf)
+                status.quest = {"state":0}
+            }}
+        ]
+    })
+}
+
+//враги, напавшие на героя (заметили/позваны/атакуют), в радиусе от Волка — ближающий
+function findFoe(wolf) {
+    const wp = rectPos(wolf.rect)
+    const wx = wp[0] + 16
+    const wy = wp[1] + 25
+    let best = null
+    let bestD = Infinity
+    const gE = world.queries.genemy && world.queries.genemy.entities
+    if (!gE) return null
+    const snap = gE.slice()
+    for (let i = 0; i < snap.length; i++) {
+        const o = DATA.bag[snap[i]]
+        if (!o || o.type !== "enemy" || o.lying !== undefined || o.stats.hp <= 0) continue
+        if (!(o.noticed || o.called || o.state === ENEMY_STATE.ATTACK)) continue
+        const p = rectPos(o.rect)
+        const d = Math.hypot((p[0] + 16) - wx,(p[1] + 25) - wy)
+        if (d < bestD) { bestD = d; best = o }
+    }
+    return bestD <= WOLF_AGGRO ? best : null
+}
+
+function followTick(wolf) {
+    //мирный режим: «по пятам» за героем штатной механикой питомцев (petFollowTick
+    //строит путь, stepAlongPath в enemyAI его отыгрывает)
+    petFollowTick(wolf)
+    if ((!wolf.path || !wolf.path.length) && !wolf.attacking) {
+        const wait = waitPose(wolf)
+        wolf.currentAnim !== wait && setEnemyPose(wolf, wait)
+    }
+}
+
+function combatTick(wolf, foe) {
+    wolf.stats.attacksCd[0] > 0 && wolf.stats.attacksCd[0]--
+    //замах укуса: стоит, анимация отыгрывается (снаряд укуса уже летит)
+    if (wolf.attacking) {
+        wolf.path = []
+        wolf.attackTicks--
+        if (wolf.attackTicks <= 0) {
+            wolf.attacking = 0
+            setEnemyPose(wolf, waitPose(wolf))
+        }
+        return
+    }
+    const wp = rectPos(wolf.rect)
+    const fp = rectPos(foe.rect)
+    const dx = (fp[0] + 16) - (wp[0] + 16)
+    const dy = (fp[1] + 25) - (wp[1] + 25)
+    if (Math.hypot(dx,dy) <= WOLF_BITE_RANGE) {
+        if (wolf.stats.attacksCd[0] > 0) { wolf.path = []; return }
+        const dir = Math.abs(dx) >= Math.abs(dy) ? (dx > 0 ? 3 : 2) : (dy > 0 ? 1 : 0)
+        wolf.direction = dir
+        const anim = wolfClass.anims[1].attack[dir]
+        setEnemyPose(wolf, anim)
+        wolf.attacking = 1
+        wolf.attackTicks = Math.ceil(anim.times * animInterval(wolf, anim)) + 1
+        wolf.stats.attacksCd[0] = BITE_CD
+        //укус — штатный снаряд атаки с target = враг: урон идёт шиной damage()
+        //(ветка волка в countDamage), звук атаки addAnim ставит сам
+        addAnim([11,dir],foe,wolf,dir)
+        return
+    }
+    //подход к врагу по BFS (общий поиск пути), перестройка при смене его клетки
+    const wc = [Math.trunc((wp[0] + 16) / 32),Math.trunc((wp[1] + 25) / 32)]
+    const tc = [Math.trunc((fp[0] + 16) / 32),Math.trunc((fp[1] + 25) / 32)]
+    if (wolf.path && wolf.path.length && wolf.pathTarget &&
+        wolf.pathTarget[0] === tc[0] && wolf.pathTarget[1] === tc[1]) return
+    if (wolf.pathTarget === null && status.time % 20 !== wolf.id % 20) return
+    wolf.path = buildChasePath(wc,tc,wolf)
+    wolf.pathTarget = wolf.path.length ? tc : null
+}
+
+// ---------- урон по Волку ----------
+//снаряд врага задел Волка (вызов из damageHero; герой проверяется первым — если
+//снаряд попал герою, до Волка он не доходит). Урон гасит снаряд, как попадание.
+function wolfHitBy(bullet) {
+    const wolf = wolfUnit()
+    if (!wolf || wolf.dying || bullet.result === 1) return false
+    const wp = rectPos(wolf.rect)
+    const bp = rectPos(bullet.rect)
+    if (!checkCollision(wp[0],bp[0],wolf.rect._w,bullet.rect._w,wp[1],bp[1],wolf.rect._h,bullet.rect._h)) return false
+    bullet.currentAnim.effect && playEffect(bullet,data.effects[bullet.currentAnim.effect])
+    playback(strike[15].vol,0,0,status.settings.soundVolume)
+    bullet.result = 1
+    if (bullet.type === "bullet") {
+        releaseSprite(bullet.img)
+        const idx = objectValues.indexOf(bullet)
+        idx !== -1 && objectValues.splice(idx, 1)
+    }
+    const a = bullet.atacker
+    let dmg = 1
+    a && a.stats && a.stats.dmg &&
+        (dmg = Math.trunc(Math.random() * (a.stats.dmg[1] - a.stats.dmg[0] + 1) + a.stats.dmg[0]))
+    wolfDamage(wolf,dmg)
+    return true
+}
+
+//плоский урон Волку (снаряды врагов) — красная цифра, ХП-бар, смерть = провал
+function wolfDamage(wolf, dmg) {
+    if (wolf.dying) return
+    const wp = rectPos(wolf.rect)
+    const before = wolf.stats.hp
+    wolf.stats.hp -= dmg
+    floatText(Math.trunc(Math.random() * 24) + wp[0],wp[1] - 6,dmg,"#CD5C5C","12px","none")
+    showEnemyHpBar(wolf,before)
+    if (wolf.stats.hp <= 0) questFail(wolf)
+}
+
+function questFail(wolf) {
+    wolf.dying = 1
+    //анимация смерти (once) — по концу animPlay заморозит сущность, тик добьёт
+    setEnemyPose(wolf,wolfClass.anims[2].others[1])
+    wolf.deathTicks = Math.ceil(wolfClass.anims[2].others[1].times *
+        animInterval(wolf,wolfClass.anims[2].others[1])) + 2
+    status.quest.state = 5
+    questTrackerHide()
+    playback(strike[9].vol,0,0,2*status.settings.soundVolume)
+    floatText(status.hero.x - 16 + Math.trunc(Math.random() * 32),status.hero.y - 16,T("quest.failed"),"#FF3333","20px","none")
+    journalAdd(T("quest.journ.fail"),J_RED)
+}
+
+// ---------- выход с этажа с живым Волком (вызов из nextFloor) ----------
+function questFloorExit(cont) {
+    openDialog({
+        "lines":[{"who":"wolf","key":"dlg.wolf.3"}],
+        "choices":[{"label":"dlg.choice.accept","cb":() => {
+            //случайный легендарный (сетовый) предмет — itemGenerate(4) сам кладёт его
+            //в инвентарь/пустой слот куклы (V102)
+            itemGenerate(4)
+            playback(strike[3].vol,0,0,2*status.settings.soundVolume)
+            questTrackerHide()
+            status.quest.state = 4
+            const wolf = wolfUnit()
+            wolf && removeWolf(wolf)
+            cont()
+        }}]
+    })
+}
+
+//снос при пересоздании сцены (del.js)
+function questDel() {
+    questTrackerHide()
+    useBarFill && useBarFill.remove()
+    useBarFill = null
+    useT = 0
+    wolfRef = null
+    status.quest = {"state":0}
+}
+
+export { questNewGame, questFloorExit, questDel, wolfAllyTick, wolfHitBy, wolfUnit, questTrackerHide }

@@ -5,8 +5,19 @@ import { comix } from "../scripts/comix.js"
 import { achFloorEnd } from "../scripts/achievements.js"
 //V69: снапшот ручных зверьков перед пересозданием сцены (pets.js)
 import { snapshotCarryPets } from "../scripts/pets.js"
+//V104: выход с этажа с живым Волком — прощальный диалог и награда (quest.js)
+import { questFloorExit } from "../scripts/quest.js"
 
 function nextFloor() {
+    //V104: квест «Сопроводить Волка» активен — сначала прощальный диалог и награда
+    //(случайный легендарный сетовый предмет), продолжение перехода — после «ПРИНЯТЬ»
+    if (status.quest && status.quest.state === 2) {
+        questFloorExit(() => nextFloorGo())
+        return
+    }
+    nextFloorGo()
+}
+function nextFloorGo() {
     //V52: проверка до ветвления — status.levelFloor ещё завершаемого этажа
     achFloorEnd()
     let next = true

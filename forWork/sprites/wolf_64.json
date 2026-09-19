@@ -9,6 +9,16 @@
       "frames": 4
     },
     {
+      "name": "death",
+      "row": 9,
+      "frames": 4
+    },
+    {
+      "name": "damage",
+      "row": 10,
+      "frames": 4
+    },
+    {
       "name": "walk_front",
       "row": 1,
       "frames": 4
@@ -19,12 +29,12 @@
       "frames": 4
     },
     {
-      "name": "walk_right",
+      "name": "walk_left",
       "row": 3,
       "frames": 4
     },
     {
-      "name": "walk_left",
+      "name": "walk_right",
       "row": 4,
       "frames": 4
     },
@@ -36,7 +46,7 @@
     {
       "name": "attack_back",
       "row": 6,
-      "frames": 3
+      "frames": 4
     },
     {
       "name": "attack_right",
@@ -46,16 +56,6 @@
     {
       "name": "attack_left",
       "row": 8,
-      "frames": 4
-    },
-    {
-      "name": "death",
-      "row": 9,
-      "frames": 5
-    },
-    {
-      "name": "damage",
-      "row": 10,
       "frames": 4
     }
   ]

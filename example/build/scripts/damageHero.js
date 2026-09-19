@@ -18,6 +18,8 @@ import { vampDrain } from "../scripts/vampFx.js"
 import { setEliteDamageMult } from "../scripts/sets.js"
 //V75 «Зеркало» (шкафчик): снаряды врагов с шансом 20% разворачиваются к стрелявшему
 import { blessActive } from "../scripts/blessFx.js"
+//V104: снаряды врагов задевают Волка-союзника (квест «Сопроводить Волка», quest.js)
+import { wolfHitBy } from "../scripts/quest.js"
 
 // E-3: перебор пуль из группы gbullet (маркер isBullet на спавне) со снимком на входе;
 // старый фильтр «type === bullet» заменён членством в группе, остальные условия — 1:1.
@@ -68,6 +70,9 @@ function damageHero() {
                     despawn(bullet)
                 }
             }
+            //V104: снаряд врага задел Волка-союзника (квест) — урон Волку, снаряд гасится.
+            //Проверка ПОСЛЕ героя: снаряд, попавший герою, до Волка не доходит (result=1)
+            wolfHitBy(bullet)
         }
     }
 }

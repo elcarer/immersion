@@ -9,6 +9,8 @@ import { portalSpriteSrc, cupSpriteSrc } from "../scripts/portalSprite.js"
 import { renderBlessHints } from "../scripts/blessFx.js"
 import { T } from "../scripts/localization.js"
 import { svgArr,image,worldImage } from "../scripts/svg.js"
+//V104: открытый диалог (quest.js) блокирует хоткеи панелей — панель поверх диалога недопустима
+import { dialogIsOpen } from "../scripts/dialog.js"
 //V62: импорт map.js удалён вместе с map-веткой createRoom — отрисовка карты
 //переехала в mapRender.js (комнаты/коридоры прямоугольниками)
 import * as basicData from "../scripts/data.js"
@@ -151,6 +153,9 @@ function createMatrix() {
 function buttonInit() {
     document.addEventListener('keydown', function(e){
         if(status.start === 1) {
+            //V104: диалог (квест «Сопроводить Волка») — хоткеи панелей глушим целиком
+            //(Escape диалог продвигает его собственный слушатель в dialog.js)
+            if (dialogIsOpen()) return
             //карта
             if (e.code === 'KeyM') {clickButton(1)}
             //отмена

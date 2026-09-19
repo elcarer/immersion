@@ -27,7 +27,8 @@ function fillColor(ratio) {
 }
 
 function showEnemyHpBar(enemy, beforeHp) {
-    if (!enemy || enemy.type !== "enemy") return
+    //V104: бар показывает и Волку-союзнику (квест, type "pet" с маркером wolfAlly)
+    if (!enemy || (enemy.type !== "enemy" && !enemy.wolfAlly)) return
     if (enemy.stats.hp <= 0) return //добитого не подсвечиваем
     //V27b: максимум — ФАКТИЧЕСКИЙ запас ХП этого спавна. Вызывающий код (damage.js)
     //передаёт ХП ДО вычета удара (урон уже вычтен из stats.hp к моменту вызова):

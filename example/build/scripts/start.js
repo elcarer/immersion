@@ -42,6 +42,9 @@ let status = {"mouseX":0,"mouseY":0,"start":0,"pause":0,"rectShadow":0,"nextFunc
 "info":{"stats":[],"exp":0,"lvl":1,"abilPoints":0,"gold":0,"hp":0,"beltCell":0, "beltCellArr":[],"armor":0,"upStat":0,"keys":0,"skills":[],"poisonus":0,"poisonusMult":1,"expous":0,"lifeus":0,"viewus":1,"invisible":0,"invisibleTime":0,"activeSkills":[],"pins":0,"backStab":1,"cloudeTime":0,"multSpeed":1,"killHeal":0,"keyLock":0,"pinsAdd":0,"pinsStan":false,"bossKill":0,"time":0,"luckus":0,"fameus":0,"greedus":0,"poison":0,"poisonTime":0,"stoneCurse":0,"goldroom":0,"reflect":1,"energyShotCharge":0,"charm":0,"blesses":[]},
 "move":0,"moveSpeed":2,"use":0,
 "hero":{"class":0,"x":0,"y":0,"direction":1,"obj":{},"waitTime":0,"noStunTime":0},
+//V104: квесты («Сопроводить Волка», quest.js). state: 0 нет, 1 NPC предложен,
+//2 активен, 4 выполнен, 5 провален. Забеги не сохраняются — поле живёт в сессии
+"quest":{"state":0},
 "levelFloor":0,"panels":0,"attack":{},
 //V69: ручные зверьки (pet) текущего забега — снапшот {class, stats} для переноса на новый
 //этаж; наполняется в nextFloor (snapshotCarryPets), расходуется в newGame (spawnCarriedPets)
