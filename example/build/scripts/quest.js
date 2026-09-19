@@ -261,7 +261,9 @@ function openWolfDialog(wolf) {
     })
 }
 
-//враги, напавшие на героя (заметили/позваны/атакуют), в радиусе от Волка — ближающий
+//враги, напавшие на героя (заметили/позваны/атакуют/раненые в бегстве), в радиусе
+//от Волка — ближайший. V107: добавлено состояние FLEE (E-10) — раненый враг, который
+//уже нападал на героя, остаётся целью Волка, иначе он «не помогал» против убегающих
 function findFoe(wolf) {
     const wp = rectPos(wolf.rect)
     const wx = wp[0] + 16
@@ -274,7 +276,7 @@ function findFoe(wolf) {
     for (let i = 0; i < snap.length; i++) {
         const o = DATA.bag[snap[i]]
         if (!o || o.type !== "enemy" || o.lying !== undefined || o.stats.hp <= 0) continue
-        if (!(o.noticed || o.called || o.state === ENEMY_STATE.ATTACK)) continue
+        if (!(o.noticed || o.called || o.state === ENEMY_STATE.ATTACK || o.state === ENEMY_STATE.FLEE)) continue
         const p = rectPos(o.rect)
         const d = Math.hypot((p[0] + 16) - wx,(p[1] + 25) - wy)
         if (d < bestD) { bestD = d; best = o }
@@ -339,6 +341,11 @@ function combatTick(wolf, foe) {
         wolf.path = []
         return
     }
+    //V107: подход к цели — обязательно снять заморозку. stop=1 от ожидания кулдауна
+    //у ПРЕЖНЕЙ цели переживал смену цели (та умерла/убежала), а stepAlongPath при
+    //stop=1 молчит: Волк навсегда замирал посреди комнаты, «не помогая в бою»
+    wolf.stop = 0
+    wolf.idleT = 0
     //подход к врагу по BFS (общий поиск пути), перестройка при смене его клетки
     const wc = [Math.trunc((wp[0] + 16) / 32),Math.trunc((wp[1] + 25) / 32)]
     const tc = [Math.trunc((fp[0] + 16) / 32),Math.trunc((fp[1] + 25) / 32)]
