@@ -1037,6 +1037,10 @@ const PAIRS = [
     ["float.flameWeapon", "Пламя!", "Flame!"],
     //V111: метка зачарованного оружия в подсказке
     ["tip.fire", "огненное", "flame"],
+    //V112: окошко «завершённые квесты» в лобби + названия сюжетных квестов
+    ["lobby.questsDone", "Завершённые квесты", "Completed quests"],
+    ["quest.wolf.title", "Сопроводить Волка", "Accompany the Wolf"],
+    ["quest.portal.title", "Голос в портале", "Voice in the Portal"],
     //V92: кнопка «Снять» в лобби — разом снимает все отметки сундука
     ["lobby.unmark", "Снять", "Unmark"],
     //V95: чекбоксы эффектов предметов в Настройках

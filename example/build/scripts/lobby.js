@@ -37,6 +37,44 @@ let pageText
 //чем влезает в инвентарь героя, нельзя (решение по постановке V39).
 let lobbySelect = []     // iMeta отмеченных вещей (в порядке отметки)
 let lobbySelFrames = {}  // iMeta -> элемент жёлтой рамки
+
+//V112: кнопка «завершённые квесты» (правый верхний угол) и её окошко. Кнопка видна только
+//при наличии хотя бы одного завершённого сюжетного квеста (meta.quests[key] === 1 — отметку
+//ставят Волк/портал/Огнементаль при выдаче награды). Окошко — динамические узлы по образцу
+//updateSellButton: перерисовка лобби (del()) их уносит — здесь сбрасываем массив, первый
+//клик после перерисовки открывает окно заново
+let questsWinNodes = []
+function hasCompletedQuests() {
+    const q = status.meta.quests
+    if (!q) return false
+    for (let k in q) {
+        if (q[k] === 1) return true
+    }
+    return false
+}
+function toggleQuestsWin() {
+    playback(strike[14].vol,0,0,3*status.settings.soundVolume)
+    if (questsWinNodes.length) {
+        for (let i = 0; i < questsWinNodes.length; i++) questsWinNodes[i].remove()
+        questsWinNodes = []
+        return
+    }
+    const done = []
+    const q = status.meta.quests || {}
+    for (let k in q) {
+        q[k] === 1 && done.push(k)
+    }
+    const W = 380, x = 1920 - W - 12, y = 74
+    const H = 70 + done.length * 44 + 14
+    questsWinNodes.push(rect(svgArr[2],x,y,W,H,"rgb(204, 153, 102)","2px","rgba(16,12,10,0.92)",{"rx":"6px"}))
+    questsWinNodes.push(text(svgArr[2],x+W/2,y+42,"0pt","50pt","black","2px","rgb(204, 153, 102)",T("lobby.questsDone"),{"id":"questsWinTitle","size":32,"font":"baseFont4","anchor":"middle"}))
+    for (let i = 0; i < done.length; i++) {
+        const ry = y + 78 + i * 44
+        questsWinNodes.push(image(svgArr[2],x + 22,ry,32,32,"./images/UI/panels/buttons/questComplited.png"))
+        questsWinNodes.push(text(svgArr[2],x + 70,ry + 26,"0pt","50pt","black","2px","rgb(230, 220, 200)",T("quest." + done[i] + ".title"),{"id":"questsWinRow"+i,"size":26,"font":"baseFont4"}))
+    }
+    for (let i = 0; i < questsWinNodes.length; i++) screenPic.push(questsWinNodes[i])
+}
 function lobby(lose,next,pageChest=0) {
     del()
     //E-17: карточка героя при наведении может висеть со старой перерисовки — гасим
@@ -51,6 +89,9 @@ function lobby(lose,next,pageChest=0) {
     //по постановке V39: сброс при любой перерисовке)
     lobbySelect = []
     lobbySelFrames = {}
+    //V112: окошко «завершённые квесты» не переживает перерисовку (узлы унёс del()) —
+    //сбрасываем, чтобы первый клик по кнопке открывал его заново
+    questsWinNodes = []
     //V40: зажим мета-прогресса в допустимые границы (V65: глав теперь ЧЕТЫРЕ). Старые
     //сохранения могли принести page/pageMax за пределами 1..4 — такая мета роняла changePage
     //(pages[page-1].name). Записи выше четвёртой главы удаляем, save() ниже перезаписывает сейв
@@ -86,6 +127,9 @@ function lobby(lose,next,pageChest=0) {
     screenPic.push(text(svgArr[2],1920/2,1020,"0pt","50pt","black","2px",`rgb(204, 153, 102)`,T("lobby.next"),{"id":"delItemText","size":48,"font":"baseFont4","anchor":"middle"}))
     screenPic.push(image(svgArr[2],1610,14,48,48,"./images/UI/point.png"))
     screenPic.push(text(svgArr[2],1700,51,"0pt","50pt","black","2px",`rgb(204, 153, 102)`,status.meta.points,{"id":"delItemText","size":42,"font":"baseFont4","anchor":"middle"}))
+    //V112: кнопка «завершённые квесты» в правом верхнем углу — только при наличии
+    //хотя бы одного завершённого сюжетного квеста в мете
+    hasCompletedQuests() && screenPic.push(image(svgArr[2],1856,12,52,52,"./images/UI/panels/buttons/questComplited.png",{"glow":1,"func":toggleQuestsWin}))
     if (status.meta.pageMax > 1 || lose === true) {viewMetaInv(pageChest)}
     if (status.meta.pageMax > 1 || lose === true) {viewUpgrades()}
     !status.settings.next && status.meta.pageMax > 1 && viewPages()
