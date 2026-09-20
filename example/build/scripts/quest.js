@@ -286,6 +286,8 @@ function findFoe(wolf) {
     for (let i = 0; i < snap.length; i++) {
         const o = DATA.bag[snap[i]]
         if (!o || o.type !== "enemy" || o.lying !== undefined || o.stats.hp <= 0) continue
+        //V113: мирный Огнементаль Волк не трогает (квест «Погоня за пламенем»)
+        if (o.flameNpc === 1) continue
         if (!(o.noticed || o.called || o.state === ENEMY_STATE.ATTACK || o.state === ENEMY_STATE.FLEE)) continue
         const p = rectPos(o.rect)
         const d = Math.hypot((p[0] + 16) - wx,(p[1] + 25) - wy)

@@ -580,7 +580,8 @@ function cultUseBarTick(enemy) {
 }
 function openCultDialog(enemy) {
     openDialog({
-        "right": null,
+        //правый портрет — загруженный арт культиста (192×288, формат портрета Волка)
+        "right": "./images/UI/doll/cultist.png",
         "lines":[{"who":"cultist","key":"dlg.pq.10"}],
         "choices":[
             {"label":"dlg.choice.agree","cb":() => cultAgree(enemy)},
@@ -601,7 +602,7 @@ function cultAgree(enemy) {
 //культист и портал исчезают, квест завершён (мета)
 function cultReward(enemy) {
     openDialog({
-        "right": null,
+        "right": "./images/UI/doll/cultist.png",
         "lines":[{"who":"cultist","key":"dlg.pq.11"}],
         "choices":[{"label":"dlg.pq.dots","cb":() => {
             const wp = rectPos(enemy.rect)

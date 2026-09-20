@@ -88,7 +88,8 @@ function fireBurst(obj) {
     let lengthEnemy = objectValues.length
     for (let i = 0; i < lengthEnemy; i++) {
         let e = objectValues[i]
-        if(e.type !== "enemy" || e.stats.hp <= 0) continue
+        //V113: Огнементаль (flameQuestMob) огню и шипам не поддаётся — ожог не вешается
+        if(e.type !== "enemy" || e.stats.hp <= 0 || e.flameQuestMob === 1) continue
         let p = rectPos(e.rect)
         inRadius(p[0] + e.rect._w/2, p[1] + e.rect._h/2, cx, cy) && applyEnemyBurn(e)
     }
@@ -154,7 +155,8 @@ function trapEnemyTick(traps) {
     let lengthEnemy = objectValues.length
     for (let i = 0; i < lengthEnemy; i++) {
         let enemy = objectValues[i]
-        if(enemy.type !== "enemy" || enemy.class.boss === 1) continue
+        //V113: Огнементаль (flameQuestMob) ловушек не касается — шипы/огонь/кислота мимо
+        if(enemy.type !== "enemy" || enemy.class.boss === 1 || enemy.flameQuestMob === 1) continue
         if(enemy.stats.hp <= 0) continue
         let rectE = enemy.rect
         let ePos = rectPos(rectE)
@@ -250,7 +252,8 @@ function cloudDamage(obj) {
     let lengthEnemy = objectValues.length
     for (let i = 0; i < lengthEnemy; i++) {
         let enemy = objectValues[i]
-        if(enemy.type !== "enemy" || enemy.class.boss === 1 || enemy.stats.hp <= 0) continue
+        //V113: Огнементаль и облако кислоты не задевает
+        if(enemy.type !== "enemy" || enemy.class.boss === 1 || enemy.flameQuestMob === 1 || enemy.stats.hp <= 0) continue
         let rectE = enemy.rect
         let ePos = rectPos(rectE)
         if(!checkCollision(ePos[0]+13, ax, 14, 96, ePos[1]+37, ay, 14, 96)) continue

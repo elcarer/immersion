@@ -1071,6 +1071,13 @@ export function enemyDie(enemy, exp) {
     enemy.currentStill = 0
     setEnemyPose(enemy, enemy.class.anims[2].others[1])
     enemy.class.boss === 1 && (status.info.bossKill = 1)
+    //V113: вид убитого босса — в мету навсегда (bossesSlain, для достижения «Я сделал!»).
+    //Тег boss носят только настоящие боссы: мини-грибы Гриба пустоты — клоны без boss,
+    //осколки Медузы наследуют boss честно (этаж не завершается, пока жив последний)
+    enemy.class.boss === 1 && (() => {
+        Array.isArray(status.meta.bossesSlain) || (status.meta.bossesSlain = [])
+        status.meta.bossesSlain.indexOf(enemy.class.id) === -1 && status.meta.bossesSlain.push(enemy.class.id)
+    })()
     //V90: полоса ХП босса (правый верхний угол) снимается смертью владельца
     //(Медуза — с гибелью последнего живого осколка; логика в hpBar.js)
     bossBarOwnerDied(enemy)

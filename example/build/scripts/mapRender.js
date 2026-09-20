@@ -1,4 +1,4 @@
-import { worldImage, nativeGraphics } from "../scripts/svg.js"
+import { worldImage, nativeGraphics, rectPos } from "../scripts/svg.js"
 import { status } from "../scripts/start.js"
 //V63: спрайт ловушки по её состоянию (Ne.png/N.png) — та же формула, что в createRoom
 import { trapSpriteSrc } from "../scripts/trapSprite.js"
@@ -155,6 +155,19 @@ function mapRender(level, tileX, tileY, layer) {
             20, 32, HERO_ICONS[status.hero.class])
         heroIcon.setAttribute("style", "filter: drop-shadow(0 0 8px rgba(255, 255, 204, 1))")
         nodes.push(heroIcon)
+        //V113: убегающий Огнементаль квеста «Погоня за пламенем» — маркер на карте,
+        //пока идёт погоня (state 2, npc жив) — wait-кадр листа + оранжевое свечение
+        //(координаты — мировые px спрайта NPC, как у героя)
+        const fq = status.questFlame
+        if (fq && fq.state === 2 && fq.npc && fq.npc.stats.hp > 0) {
+            const fp = rectPos(fq.npc.rect)
+            const flameIcon = worldImage(layer,
+                (tileX/32)*fp[0],
+                (tileY/32)*fp[1],
+                20, 30, "./images/UI/map/elemental.png")
+            flameIcon.setAttribute("style", "filter: drop-shadow(0 0 8px rgba(255, 150, 60, 1))")
+            nodes.push(flameIcon)
+        }
     } finally {
         layer.style.display = ""
     }

@@ -97,8 +97,22 @@ function achTick() {
 //--- завершение этажа (nextFloor, до ветвления): status.levelFloor/status.meta.page —
 //ещё завершаемого этажа
 function achFloorEnd() {
-    //5 «Я сделал!»: пройден третий этаж (финал третьей главы)
-    status.meta.page === 3 && status.levelFloor === 2 && achUnlock(5)
+    //5 «Я сделал!»: пройден четвёртый этаж (финал четвёртой главы), причём за все
+    //забеги убиты ВСЕ виды боссов (V113). Виды = записи data.enemes[18] (сейчас три:
+    //Циклоп 25 / Медуза 26 / Гриб пустоты 27 — новый босс добавится в проверку сам).
+    //Убитые виды копятся в meta.bossesSlain (enemyDie, тег boss — мини-грибы/клоны
+    //его не имеют) и между забегами не сбрасываются
+    if (status.meta.page === 4 && status.levelFloor === 3) {
+        const slain = Array.isArray(status.meta.bossesSlain) ? status.meta.bossesSlain : []
+        let all = true
+        for (let i = 0; i < data.enemes[18].length; i++) {
+            //только записи с тегом boss — в группе лежат и квестовые враги
+            //(культист 28 / Огнементаль 29) без него
+            const b = data.enemes[18][i]
+            b.boss === 1 && slain.indexOf(b.id) === -1 && (all = false)
+        }
+        all && achUnlock(5)
+    }
     //2 «Ловкач 99го уровня»: любой этаж третьей главы без единой потери жизни
     status.meta.page === 3 && achFloorClean === 1 && achUnlock(2)
     //3 «Гриндер»: этаж вычищен полностью (любая глава/этаж)

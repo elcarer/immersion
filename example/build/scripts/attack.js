@@ -101,7 +101,9 @@ function checkEnemy(attack) {
     }
     let len = objectValues.length
     for (let i = 0; i < len; i++) {
-        if (objectValues[i].type === "enemy") {
+        //V113: мирный Огнементаль (квест «Погоня за пламенем», выбор не сделан) —
+        //не цель для атак героя; после «НАПАСТЬ» flameNpc сбрасывается и он бьётся
+        if (objectValues[i].type === "enemy" && objectValues[i].flameNpc !== 1) {
             let rect = objectValues[i].rect
             let x1 = rect.x.animVal.value
             let y1 = rect.y.animVal.value
@@ -126,7 +128,9 @@ function checkEnemy(attack) {
 function checkMagic(attack) {
     let len = objectValues.length
     for (let i = 0; i < len; i++) {
-        if (objectValues[i].type === "enemy") {
+        //V113: мирный Огнементаль (квест «Погоня за пламенем», выбор не сделан) —
+        //не цель для атак героя; после «НАПАСТЬ» flameNpc сбрасывается и он бьётся
+        if (objectValues[i].type === "enemy" && objectValues[i].flameNpc !== 1) {
             let rect = objectValues[i].rect
             let x1 = rect.x.animVal.value
             let y1 = rect.y.animVal.value

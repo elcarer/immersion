@@ -198,17 +198,20 @@ function useSkill(skill) {
     if(skill.skill.title === "skill.0.11.title") {
         let lengthEnemy = objectValues.length
         for(let i = 0; i < lengthEnemy; i++) {
-            if(objectValues[i].type === "enemy" && checkCollision(status.hero.x-64,objectValues[i].rect.x.animVal.value,160,objectValues[i].rect.width.animVal.value,status.hero.y-64,objectValues[i].rect.y.animVal.value,179,objectValues[i].rect.height.animVal.value)) {
+            //V113: мирный Огнементаль не цепляется (flameNpc — квест «Погоня за пламенем»)
+            if(objectValues[i].type === "enemy" && objectValues[i].flameNpc !== 1 && checkCollision(status.hero.x-64,objectValues[i].rect.x.animVal.value,160,objectValues[i].rect.width.animVal.value,status.hero.y-64,objectValues[i].rect.y.animVal.value,179,objectValues[i].rect.height.animVal.value)) {
                 objectValues[i].grap = 1
                 status.info.graped = objectValues[i]
                 skill.cooldown = skill.skill.cooldown
             }
         }
     }
+    //V113: мирный Огнементаль не становится целью способностей (два дальних
+    //радиуса 352×371 у шара и земли — текст одинаковый, поэтому с заголовком)
     if(skill.skill.title === "skill.1.0.title") {
         let length = objectValues.length
         for(let i = 0; i < length; i++) {
-            if(objectValues[i].type === "enemy" && checkCollision(status.hero.x-160,objectValues[i].rect.x.animVal.value,352,objectValues[i].rect.width.animVal.value,status.hero.y-160,objectValues[i].rect.y.animVal.value,371,objectValues[i].rect.height.animVal.value)) {
+            if(objectValues[i].type === "enemy" && objectValues[i].flameNpc !== 1 && checkCollision(status.hero.x-160,objectValues[i].rect.x.animVal.value,352,objectValues[i].rect.width.animVal.value,status.hero.y-160,objectValues[i].rect.y.animVal.value,371,objectValues[i].rect.height.animVal.value)) {
                 //V42: урон шара по уровню (2/3/4) — копия скилла, data.js не мутируем
                 addAnim ([16,0],objectValues[i],status.hero.obj,undefined,Object.assign({},skill.skill,{"damage":status.info.fireDmg || skill.skill.damage}))
                 skill.cooldown = skill.skill.cooldown
@@ -220,7 +223,7 @@ function useSkill(skill) {
     if(skill.skill.title === "skill.1.1.title") {
         let length = objectValues.length
         for(let i = 0; i < length; i++) {
-            if(objectValues[i].type === "enemy" && checkCollision(status.hero.x-32,objectValues[i].rect.x.animVal.value,96,objectValues[i].rect.width.animVal.value,status.hero.y-32,objectValues[i].rect.y.animVal.value,115,objectValues[i].rect.height.animVal.value)) {
+            if(objectValues[i].type === "enemy" && objectValues[i].flameNpc !== 1 && checkCollision(status.hero.x-32,objectValues[i].rect.x.animVal.value,96,objectValues[i].rect.width.animVal.value,status.hero.y-32,objectValues[i].rect.y.animVal.value,115,objectValues[i].rect.height.animVal.value)) {
                 addAnim ([18,0],objectValues[i],status.hero.obj,undefined,skill.skill)
                 skill.cooldown = skill.skill.cooldown
                 status.info.grimore === 1 && (skill.cooldown -= 60)
@@ -242,7 +245,7 @@ function useSkill(skill) {
     if(skill.skill.title === "skill.1.2.title") {
         let length = objectValues.length
         for(let i = 0; i < length; i++) {
-            if(objectValues[i].type === "enemy" && checkCollision(status.hero.x-160,objectValues[i].rect.x.animVal.value,352,objectValues[i].rect.width.animVal.value,status.hero.y-160,objectValues[i].rect.y.animVal.value,371,objectValues[i].rect.height.animVal.value)) {
+            if(objectValues[i].type === "enemy" && objectValues[i].flameNpc !== 1 && checkCollision(status.hero.x-160,objectValues[i].rect.x.animVal.value,352,objectValues[i].rect.width.animVal.value,status.hero.y-160,objectValues[i].rect.y.animVal.value,371,objectValues[i].rect.height.animVal.value)) {
                 playEffect(objectValues[i],data.effects[9])
                 skill.cooldown = skill.skill.cooldown
                 status.info.grimore === 1 && (skill.cooldown -= 60)
@@ -385,7 +388,9 @@ function useSkill(skill) {
         let length = objectValues.length
         let enemyArr = []
         for(let i = 0; i < length; i++) {
-            if (objectValues[i].type === "enemy") {
+            //V113: мирный Огнементаль — не цель сплэша (и рядом с центром не пострадает:
+            //фильтр есть и в createSplash)
+            if (objectValues[i].type === "enemy" && objectValues[i].flameNpc !== 1) {
                 enemyArr.push(objectValues[i])
             }
         }

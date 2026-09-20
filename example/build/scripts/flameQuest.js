@@ -147,7 +147,9 @@ function spawnFlameNpc() {
     stats.hp *= 4
     stats.exp = 10
     const anim = c.anims[2].others[2]
-    objectValues.push({"id":status.oVcount,"type":"enemy","flameNpc":1,"class":c,"stats":stats,
+    //flameNpc — «мирный» (сбрасывается выбором боя); flameQuestMob — ПОСТОЯННЫЙ маркер
+    //«это Огнементаль»: ловушки на него не действуют ни до, ни после «НАПАСТЬ» (V113)
+    objectValues.push({"id":status.oVcount,"type":"enemy","flameNpc":1,"flameQuestMob":1,"class":c,"stats":stats,
     "animCounters":60/anim.speed,"currentAnim":anim,"currentStill":0,"room":lv.roomsArr[0],"cells":[],
     "state":0,"stop":0,"xCell":cell[0],"yCell":cell[1],"noStunTime":0,"direction":1,
     "img":image(svgArr[1],cell[0]*32,cell[1]*32-16,anim.w,anim.h,anim.img,

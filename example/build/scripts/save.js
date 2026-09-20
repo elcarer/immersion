@@ -41,6 +41,11 @@ function normMeta(meta) {
     } else if (meta.diedClasses.length < 4) {
         meta.diedClasses.push(...new Array(4 - meta.diedClasses.length).fill(0))
     }
+    //V113: виды убитых боссов (id из data.enemes, тег boss) — для достижения «Я сделал!»;
+    //у старых сохранений поля нет, metaItems его не сбрасывает
+    if (!Array.isArray(meta.bossesSlain)) {
+        meta.bossesSlain = []
+    }
     //V68: пул уникальных реликвий (какие kind уже выпадали) — у старых сохранений поля нет,
     //создаём/добиваем до 7 слотов (семь реликвий = RELICS в relics.js, kind 0..6:
     //жемчуг добавлен в V68 (kind 4), алмаз в E-16 (kind 6))

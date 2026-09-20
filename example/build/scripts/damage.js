@@ -459,8 +459,9 @@ function createSplash(enemy,effect,damage,other=0,range=0,selfTo=0,srcName=undef
     for (let i = 0; i < snap.length; i++) {
         const o = DATA.bag[snap[i]]
         if (!o) continue
-        //V79: неуязвимость (Циклоп, invulnActive) — сплэш способностей не проходит
-        if (o.type !== "enemy" || (o === enemy && !selfTo) || o.invulnActive) continue
+        //V79: неуязвимость (Циклоп, invulnActive) — сплэш способностей не проходит.
+        //V113: мирный Огнементаль — тоже (квест «Погоня за пламенем»)
+        if (o.type !== "enemy" || (o === enemy && !selfTo) || o.invulnActive || o.flameNpc === 1) continue
         const oPos = rectPos(o.rect)
         if (checkCollision(ePos[0]-range,oPos[0],enemy.rect._w+range*2,o.rect._w,
             ePos[1]-(range-(o.rect._h-32)),oPos[1],

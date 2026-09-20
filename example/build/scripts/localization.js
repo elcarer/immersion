@@ -903,7 +903,7 @@ const PAIRS = [
     ["ach.4.name", "Кап-кап", "Drip-drip"],
     ["ach.4.desc", "Все способности класса выучены до максимальных уровней за один забег.", "All class abilities learned to maximum levels in a single run."],
     ["ach.5.name", "Я сделал!", "I did it!"],
-    ["ach.5.desc", "Третий этаж пройден.", "The third floor is complete."],
+    ["ach.5.desc", "Четвёртый этаж пройден, убиты все виды боссов.", "The fourth floor is complete, all boss types slain."],
     ["ach.6.name", "Открыватель", "Opener"],
     ["ach.6.desc", "Открыты все мета-улучшения: максимум всех веток прокачки.", "All meta upgrades unlocked: maximum of every upgrade branch."],
     ["ach.7.name", "Перебор", "Overdone"],
