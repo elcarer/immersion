@@ -284,6 +284,12 @@ function equip(item) {
     if(item.stat === 2 || item.dopType === 6) {
         changeHP(document.getElementById("hpBarI"),document.getElementById("hpText"),"hp")
     }
+    //V110: реликвии меняют статы read-time («Вечный изумруд» — макс. ХП, «Вечный алмаз» —
+    //параметры): changeDopStat пересчитал формулы, но полоса/текст ХП обновляются только
+    //по changeHP — без него изумруд на HUD не виден ни при надевании, ни при снятии
+    if(item.relic !== undefined) {
+        changeHP(document.getElementById("hpBarI"),document.getElementById("hpText"),"hp")
+    }
     if(item.abil && item.abil.desc === "iabil.0.desc") {
         status.info.poisonus++
     }
@@ -369,6 +375,11 @@ function unEquip(item) {
         status.info.armorText && (status.info.armorText.textContent = dollArmor())
     }
     if(item.stat === 2 || item.dopType === 6) {
+        changeHP(document.getElementById("hpBarI"),document.getElementById("hpText"),"hp")
+    }
+    //V110: реликвии — см. equip: снятие тоже обязано обновить полосу/текст ХП
+    //(прибавка «Вечного изумруда» к максимуму уходит, HUD должен это показать)
+    if(item.relic !== undefined) {
         changeHP(document.getElementById("hpBarI"),document.getElementById("hpText"),"hp")
     }
     if(item.abil && item.abil.desc === "iabil.0.desc") {

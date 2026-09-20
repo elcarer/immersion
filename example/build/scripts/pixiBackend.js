@@ -1588,11 +1588,15 @@ function getSectorPath(angleDeg,cx,cy,r,clockwise = false) {
     const sweep = clockwise ? 1 : 0;
     return `M ${cx} ${cy} L ${cx} ${cy - r} A ${r} ${r} 0 ${largeArc} ${sweep} ${x} ${y} Z`;
 }
-// сектор кулдауна активных способностей: нативный Graphics вместо shim-path с
-// clipPath-окном; setSector(angle, clockwise) перерисовывает заливку rgba(0,0,0,0.65)
-// (дефолт redrawPath), окно clipW×clipW вокруг центра = та же маска-обрезка 96×96
+// сектор кулдауна активных способностей: нативный Graphics; setSector(angle, clockwise)
+// перерисовывает заливку rgba(0,0,0,0.65) (дефолт redrawPath).
+//V110: маска-Graphics 96×96 убрана — в живой сцене она не клипует (Graphics-под-mask
+//рисуется мимо стенсила), и тёмный круг r=64 вылезал за иконку: был виден его край на
+//рамке и вокруг. Теперь сектор рисуется радиусом ВПИСАННОЙ окружности иконки (клетка
+//вызова передаёт r=46 при окне 96) — за границы иконки он не выходит по построению.
 function createNativeSector(place, cx, cy, r, clipW, obj = {}) {
     const ws = createNativeGraphics(place)
+    if (num(r) > clipW / 2 - 2) r = clipW / 2 - 2 // страховка: круг не покидает окно иконки
     ws._sx = num(cx); ws._sy = num(cy); ws._sr = num(r)
     ws.setSector = (angleDeg, clockwise = false) => {
         const g = ws.node
@@ -1600,13 +1604,6 @@ function createNativeSector(place, cx, cy, r, clipW, obj = {}) {
         const pts = pathPoints(getSectorPath(+angleDeg || 0, ws._sx, ws._sy, ws._sr, clockwise))
         if (pts.length >= 6) g.poly(pts).fill({ color: "rgba(0, 0, 0, 0.65)" })
     }
-    // окно-клип clipW×clipW вокруг центра (у активных способностей 96×96) —
-    // маска-Graphics sibling'ом в слое, уходит с remove() через WorldSprite._clipMask
-    const mask = new PIXI.Graphics()
-    place.node.addChild(mask)
-    mask.rect(ws._sx - clipW / 2, ws._sy - clipW / 2, clipW, clipW).fill(0xffffff)
-    ws.node.mask = mask
-    ws._clipMask = mask
     if (obj.id) {
         ws.attrs.id = String(obj.id)
         shimById.set(ws.attrs.id, ws)

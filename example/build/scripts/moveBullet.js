@@ -5,6 +5,9 @@ import { dataGeneric } from "../scripts/sceneGenerate.js"
 import { data } from "../scripts/data.js"
 import { svgArr,image,worldImage, moveSprite, releaseSprite, rectPos } from "../scripts/svg.js"
 import { createEgg } from "../scripts/spiderBossFight.js"
+//V110: crushBurst — разделение снаряда на 4 осколка при исчезновении (как у Шипа,
+//у которого срабатывает на конце once-анимации в animPlay)
+import { crushBurst } from "../scripts/animPlay.js"
 
 // E-3: обе системы крутятся по группе gbullet (маркер isBullet — пули на спавне),
 // а не сканируют весь objectValues. Снимок группы на входе = старая семантика
@@ -82,6 +85,14 @@ function moveBullet() {
                             rectM.y.animVal.value,bPos[1],
                             rectM.height.animVal.value,rect.height.animVal.value)) {
                                 playEffect(b,data.effects[b.currentAnim.effect])
+                                //V110: снаряд врага с crushAttack (культист квеста «Голос в
+                                //портале») исчезает о стену — разделяется на 4 осколка, как у
+                                //Шипа (у того burst стоит на конце once-анимации в animPlay,
+                                //но «Звезда пустоты» гаснет о стену, а не по таймеру анимации).
+                                //Прямое попадание в героя/волка осколков не даёт — снаряд
+                                //поглощается без burst (иначе двойной урон в упор)
+                                if (b.type === "bullet" && b.atacker && b.atacker.type === "enemy" &&
+                                    b.atacker.stats.crushAttack && !b.crush) crushBurst(b)
                                 releaseSprite(b.img)
                                 despawn(b)
                                 remove = 1

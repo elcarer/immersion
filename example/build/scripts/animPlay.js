@@ -179,6 +179,13 @@ function checkEndAnim (d) {
 //сработала сразу (damageHero требует currentStill>0), не дожидаясь смены кадра.
 function crushBurst(bullet) {
     let anim = bullet.currentAnim
+    //V110: осевые снаряды (Звезда пустоты, поле bullet) — осколку поле гасится в КОПИИ
+    //анимации: движение диагональю идёт по b.bullet, а once:1 даёт осколку конец
+    //анимации как срок жизни (как у Шипа); effect гасится — осколки стены не читают.
+    //У Шипа (13) анимация уже once без bullet/effect — копия не нужна, поведение то же
+    if (anim.bullet || anim.effect !== undefined) {
+        anim = Object.assign({}, anim, {"bullet": undefined, "effect": undefined, "once": 1})
+    }
     let range = bullet.atacker.stats.crushAttack * 32
     //V65: глава 4 — осколки Шипа (вражеский снаряд) тоже fxSlow
     let cs = status.meta.page > 3 && bullet.atacker !== status.hero.obj ? 2 : 1
@@ -242,4 +249,4 @@ function addAnim (anim,target,atacker=status.hero.obj,direction,magic=undefined,
         playback(strike[11].vol,0,0,3*status.settings.soundVolume)
     }
 }
-export {animPlay,addAnim}
+export {animPlay,addAnim,crushBurst}

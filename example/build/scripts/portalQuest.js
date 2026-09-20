@@ -27,9 +27,10 @@
 //   характеристик (scroll.png → takeScroll +1 upStat каждый), мета portal=1;
 //   «НАПАСТЬ» — культист становится врагом: статы вождя гоблинов (id 4) со ВСЕМИ
 //   модификаторами глав вплоть до 4-й (рецепт spawnShellBoss: hp×6, dmg +5/+16,
-//   speed +3, range +2), атака 21 «Звезда пустоты» (как у боссов 4 этажа), БЕЗ
-//   тега boss (и без elite — не дропает ключ). Победа — кучка item5.png
-//   (подбор = случайная реликвия, relicGenerate) и мета portal=1.
+//   speed +3, range +2; V110: ещё hp×4), атака 22 — уменьшенная «Звезда пустоты»
+//   (×0.5 спрайт, как осколки Медузы пустоты), снаряды при исчезновении разделяются
+//   на 4 (crushAttack:1, как у Шипа), БЕЗ тега boss (и без elite — не дропает ключ).
+//   Победа — кучка item5.png (подбор = случайная реликвия, relicGenerate) и мета portal=1.
 // ============================================================================
 import { status } from "../scripts/start.js"
 import { T } from "../scripts/localization.js"
@@ -499,18 +500,22 @@ function spawnCultist(level) {
     const base = findClassById(28)
     const lider = findClassById(4)
     if (!base || !lider) return
-    //класс культиста (анимации), атака — пустотная «Звезда пустоты» (21), статы —
-    //вождь гоблинов со всеми модификаторами глав (вплоть до 4-й). Без boss/elite:
-    //нет полосы босса, зачёта bossKill и ключа элит
+    //класс культиста (анимации), атака — уменьшенная копия «Звезды пустоты» (22, ×0.5
+    //спрайт — как осколки Медузы пустоты), статы — вождь гоблинов со всеми модификаторами
+    //глав (вплоть до 4-й). Без boss/elite: нет полосы босса, зачёта bossKill и ключа элит.
+    //V110 (решение пользователя): ХП ×4 к прежним 240; базовые снаряды при исчезновении
+    //разделяются на 4 осколка, как у Шипа (crushAttack:1 — burst-хук в moveBullet)
     const cls = JSON.parse(JSON.stringify(base))
     delete cls.boss
     delete cls.elite
-    cls.attacks = [21]
-    for (const a of cls.anims[1].attack) a.attackNew && (a.attackNew.anim[0] = 21)
+    cls.attacks = [22]
+    for (const a of cls.anims[1].attack) a.attackNew && (a.attackNew.anim[0] = 22)
     const stats = JSON.parse(JSON.stringify(lider.stats))
     stats.hp *= 2; stats.dmg[0] += 1; stats.dmg[1] += 2
     stats.hp *= 2; stats.dmg[0] += 2; stats.dmg[1] += 6; stats.speed += 1; stats.range += 1
     stats.hp *= 1.5; stats.dmg[0] += 2; stats.dmg[1] += 8; stats.speed += 2; stats.range += 1
+    stats.hp *= 4
+    stats.crushAttack = 1
     stats.exp = 10
     //клетка рядом с порталом: свободный пол, не хитбокс героя (поиск как spawnShellBoss)
     const f = level.floor[level.roomsArr[0][0]]
@@ -544,7 +549,7 @@ function spawnCultist(level) {
     status.oVcount++
     const e = objectValues[objectValues.length - 1]
     e.rect = e.img.clipRect
-    e.stats.attacksCd[0] = Math.trunc(data.attacks[21].cooldown * 1000 / 16)
+    e.stats.attacksCd[0] = Math.trunc(data.attacks[22].cooldown * 1000 / 16)
     qp.cult = e
 }
 //тик мирного культиста (перехват из enemyAI.enemyTick до штатного ИИ): стоит и ждёт

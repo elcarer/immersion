@@ -46,12 +46,12 @@ function activeSkills() {
         const sk = status.info.activeSkills[i].skill
         activeSkillsTemp.push(image(svgArr[2],xIcon,970 - yUp,96,96,sk.img,
             {"funcShow":e => tip(e,sk),"funcShowOut":tipDel}))
-        //R4.4: нативный сектор (Graphics + маска-окно 96×96) вместо path()+clipPath;
-        //геометрия d-string — та же (getSectorPath переехал в pixiBackend)
-        let sector = nativeSector(svgArr[2], xIcon + 48, 970 + 48 - yUp, 64, 96, {"id": i})
-        sector._sx = xIcon + 48
-        sector._sy = 970 + 48 - yUp
-        sector._sr = 64
+        //R4.4: нативный сектор (Graphics) вместо path()+clipPath. V110: радиус 46 —
+        //вписанная в иконку 96×96 окружность; прежний r=64 с маской-окном жил на
+        //неработающей маске (тёмный круг вылезал за иконку — репорт юзера).
+        //_sx/_sy/_sr проставляет сам createNativeSector — прежние строки кэша ниже
+        //перезаписывали _sr назад на 64, и круг снова вылезал за иконку
+        let sector = nativeSector(svgArr[2], xIcon + 48, 970 + 48 - yUp, 46, 96, {"id": i})
         sectorCache[i] = sector
         //V45: стартовое состояние сектора — по фактическому кулдауну/длительности. Раньше
         //сектор всегда рисовался ПОЛНЫМ тёмным кругом: способность, уже готовая (cooldown 0)

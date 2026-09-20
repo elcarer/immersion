@@ -208,10 +208,15 @@ function ensureNavMatrix() {
             }
         }
     }
-    // коридоры: одиночные клетки floor[i] ([2]===1 — размер клетки), флаг открытости [7]
+    // коридоры: одиночные клетки floor[i] ([2]===1 — размер клетки), флаг открытости [7].
+    //V110: без требования matrix===1 — клетки проёма у дверей перекрыты записями боковых
+    //стен (createMatrix пишет 2 ПОВЕРХ пола коридора), и с прежним условием nav считал
+    //их стенами навсегда: коридор был наглухо разорван для ИИ даже с открытыми дверями
+    //(волк квеста вставал в проёме и больше не следовал за героем). Открытая клетка
+    //коридора всегда нарисована полом (createCorridor) — проходима.
     for (let i = 0; i < lv.floor.length; i++) {
         const f = lv.floor[i]
-        if (f[2] === 1 && f[7] === 1 && matrix[f[1]] && matrix[f[1]][f[0]] === 1) {
+        if (f[2] === 1 && f[7] === 1 && matrix[f[1]] && matrix[f[1]][f[0]] !== undefined) {
             n[f[1] * w + f[0]] = 1
         }
     }
@@ -1778,6 +1783,10 @@ export function petFollowTick(pet) {
     if (pet.path && pet.path.length && t && t[0] === hc[0] && t[1] === hc[1]) return
     if (t === null && status.time % PET_RETRY_TICKS !== pet.id % PET_RETRY_TICKS) return
     pet.path = buildChasePath(petCell, hc, pet)
+    //V110: стартовая клетка питомца вне nav (выдавлен в проём двери/на накладку стены) —
+    //flow-field от героя до неё не доходит и путь пуст навсегда. Фолбэк bfsPath: он
+    //допускает старт на «сыром» полу matrix===1 (тот же запас, что у погони врагов)
+    if (!pet.path.length) pet.path = bfsPath(petCell, hc)
     pet.pathTarget = pet.path.length ? hc : null
 }
 

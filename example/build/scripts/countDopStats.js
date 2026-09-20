@@ -13,6 +13,9 @@ function statValue1(i,j) {
 }
 
 function countDopStats() {
+    //V110: «Вечный изумруд» отключил криты (damage.js) — панель экипировки обязана это
+    //показывать: шанс крита и мощь крита выводятся как 0%, пока реликвия надета
+    const emeraldOn = hasRelic(0)
     let damageMin = 0
     let length = status.inventory.doll.length
     for (let i = 0; i < length; i++) {
@@ -36,10 +39,12 @@ function countDopStats() {
 
             i===1&&j===0&&
             (status.info.stats[i].dops[j].value1 = statValue1(i,j))&&
-            (status.info.stats[i].dops[j].value2 = (countLog(status.info.stats[i].dops[j].value1)+"%"))
+            //V110 «Вечный изумруд»: весь шанс крита ушёл в макс. ХП — показываем 0%
+            (status.info.stats[i].dops[j].value2 = (emeraldOn ? 0 : countLog(Math.trunc(status.info.stats[i].dops[j].value1/2)))+"%")
             i===1&&j===1&&
             (status.info.stats[i].dops[j].value1 = statValue1(i,j))&&
-            (status.info.stats[i].dops[j].value2 = (100+2*countLog(status.info.stats[i].dops[j].value1)+"%"))
+            //V110 «Вечный изумруд»: и база 100% мощи крита тоже ушла в ХП — 0%
+            (status.info.stats[i].dops[j].value2 = (emeraldOn ? 0 : 100+2*countLog(status.info.stats[i].dops[j].value1))+"%")
             i===1&&j===2&&
             (status.info.stats[i].dops[j].value1 = statValue1(i,j))&&
             (status.info.stats[i].dops[j].value2 = (countLog(Math.trunc(status.info.stats[i].dops[j].value1/2)))+"%")

@@ -222,7 +222,19 @@ function tip (e,obj) {
         strokeNum++
     }
     obj.abil && obj.rarity > 1 && obj.rarity < 5 && helpWord2(color,obj.abil,x-16,y+255)
-    tempTip.push(text(svgArr[2],x+200,y+580,"0pt","50pt","none","2px",color,T(obj.desc),{"id":"itemName","size":26,"font":"baseFont4","anchor":"middle"}))
+    //V110: реликвии — описание (rel.N.desc) рисуется ОТДЕЛЬНЫМ блоком под спрайтом
+    //с переносом по строкам. Прежняя одна строка 26px на y+580 у длинного
+    //художественного текста уходила за обе рамки тултипа
+    if (obj.relic !== undefined) {
+        const relicRows = itWrap(T(obj.desc), 24, 364)
+        let ry = y + 404
+        for (let i = 0; i < relicRows.length; i++) {
+            tempTip.push(text(svgArr[2],x+200,ry,"0pt","50pt","none","2px",color,relicRows[i],{"id":"itemName","size":24,"font":"baseFont4","anchor":"middle"}))
+            ry += 28
+        }
+    } else {
+        tempTip.push(text(svgArr[2],x+200,y+580,"0pt","50pt","none","2px",color,T(obj.desc),{"id":"itemName","size":26,"font":"baseFont4","anchor":"middle"}))
+    }
     if(obj.descFull) {
         let y1 = y
         obj.damage && (y1 = y1 + 35*strokeNum)
@@ -307,7 +319,17 @@ function compareTip(e,obj,lower=0) {
     }
     //метка между картинкой и характеристиками: игроку сразу ясно, какое из двух окон «старое»
     tempTip.push(text(svgArr[2],x+200,y+346,"0pt","50pt","none","1px","#999999",T("tip.worn"),{"id":"cmpLabel","size":20,"font":"baseFont4","anchor":"middle"}))
-    tempTip.push(text(svgArr[2],x+200,y+580,"0pt","50pt","none","2px",color,T(obj.desc),{"id":"itemName","size":26,"font":"baseFont4","anchor":"middle"}))
+    //V110: реликвии — перенос описания блоком, как в основном тултипе
+    if (obj.relic !== undefined) {
+        const relicRows = itWrap(T(obj.desc), 24, 364)
+        let ry = y + 404
+        for (let i = 0; i < relicRows.length; i++) {
+            tempTip.push(text(svgArr[2],x+200,ry,"0pt","50pt","none","2px",color,relicRows[i],{"id":"itemName","size":24,"font":"baseFont4","anchor":"middle"}))
+            ry += 28
+        }
+    } else {
+        tempTip.push(text(svgArr[2],x+200,y+580,"0pt","50pt","none","2px",color,T(obj.desc),{"id":"itemName","size":26,"font":"baseFont4","anchor":"middle"}))
+    }
 }
 //V53: окошко сета ПОД основным тултипом идентифицированной легендарки
 //(y+600 основное окно + зазор 14). V56: окно принадлежит сету setN самого предмета —

@@ -124,6 +124,16 @@ function spawnWolfNpc() {
         const cy = f[1] + 1 + NEAR[i][1]
         if (status.matrixLevel[cy] && status.matrixLevel[cy][cx] === 1) { cell = [cx,cy]; break }
     }
+    //V110: вся угловая зона могла оказаться перекрыта записями стен (createMatrix пишет
+    //2 поверх пола — тот же дефект, что рвал проёмы дверей для navMatrix) — тогда Волк
+    //молча не спавнился. Запасной проход: первая клетка пола в глубине комнаты
+    if (!cell) {
+        for (let y = f[1] + 1; y < f[1] + f[3] - 1 && !cell; y++) {
+            for (let x = f[0] + 1; x < f[0] + f[2] - 1 && !cell; x++) {
+                status.matrixLevel[y] && status.matrixLevel[y][x] === 1 && (cell = [x, y])
+            }
+        }
+    }
     if (!cell) { status.quest = {"state":0}; return }
     const anim = wolfClass.anims[2].others[2]
     objectValues.push({"id":status.oVcount,"type":"pet","wolfAlly":1,"npc":1,"class":wolfClass,
