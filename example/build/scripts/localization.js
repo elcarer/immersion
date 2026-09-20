@@ -1011,6 +1011,32 @@ const PAIRS = [
     //V108: культист — квестовый персонаж
     ["enemy.28.name", "Культист", "Cultist"],
     ["enemy.28.desc", "Служитель багряного культа в тёмной рясе с посохом-черепом. Бьёт магическими разрядами на расстоянии. В обычные главы не попадается.", "A servant of the crimson cult in dark robes with a skull staff. Hurls magic discharges at range. Does not appear in regular chapters."],
+    //V111: Огнементаль — квестовый персонаж «Погоня за пламенем» (4 глава, 3 этаж)
+    ["enemy.29.name", "Огнементаль", "Fire Elemental"],
+    ["enemy.29.desc", "Живой огонёк из глубин лавовых этажей. Шалун и беглец: не даётся в руки и поджигает всё вокруг себя. В обычные главы не попадается.", "A living flame from the depths of the lava floors. A playful runaway: it won't be caught and scorches everything around it. Does not appear in regular chapters."],
+    //V111: ближняя атака Огнементя (принцип mace, спрайт fireball)
+    ["attack.25.name", "Огненный взмах", "Fire Swipe"],
+    //V111: квест «Погоня за пламенем» — диалоги, трекер, журнал
+    ["quest.flame.title", "Погоня за пламенем", "Chase the Flame"],
+    ["quest.flame.track", "Догони огонёк", "Catch the little flame"],
+    ["dlg.fq.1", "...вы замечаете в углу комнаты странный огонёк, возможно это что-то опасное...", "...you notice a strange little flame in the corner of the room. Perhaps it is something dangerous..."],
+    ["dlg.fq.attack", "НАПАСТЬ", "ATTACK"],
+    ["dlg.fq.track", "ПРОСЛЕДИТЬ", "TRACK"],
+    ["dlg.fq.final", "...огонёк проскользнул в дыру в полу и исчез, однако на месте его исчезновения осталось что-то интересное...", "...the little flame slipped into a hole in the floor and vanished, yet something interesting remained where it disappeared..."],
+    ["dlg.fq.inspect", "ОСМОТРЕТЬ", "INSPECT"],
+    ["journ.fq.fight", "Огнементаль вспыхивает от злости и принимает бой!", "The Fire Elemental flares up in anger and accepts battle!"],
+    ["journ.fq.chase", "Огонёк ускользает. Погоня началась — и лава дышит вместе с ним...", "The little flame slips away. The chase begins — and the lava breathes with it..."],
+    ["journ.fq.flee", "Огнементаль перебегает в соседнюю комнату!", "The Fire Elemental dashes into a neighboring room!"],
+    ["journ.fq.lava1", "Лава ушла.", "The lava has receded."],
+    ["journ.fq.lava2", "Лава хлынула в коридоры!", "Lava floods the corridors!"],
+    ["journ.fq.lava3", "Лава залила открытые комнаты!", "Lava fills the open rooms!"],
+    ["journ.fq.buff", "Огненное оружие пылает — до конца этажа!", "Flame Weapon blazes — until the end of the floor!"],
+    ["journ.fq.done", "Квест «Погоня за пламенем» завершён!", "The quest \"Chase the Flame\" is complete!"],
+    ["journ.fq.weapon", "Твоё оружие объято пламенем: удары поджигают врагов.", "Your weapon is wreathed in flame: strikes set enemies ablaze."],
+    ["float.flameBuff", "Огненное оружие!", "Flame Weapon!"],
+    ["float.flameWeapon", "Пламя!", "Flame!"],
+    //V111: метка зачарованного оружия в подсказке
+    ["tip.fire", "огненное", "flame"],
     //V92: кнопка «Снять» в лобби — разом снимает все отметки сундука
     ["lobby.unmark", "Снять", "Unmark"],
     //V95: чекбоксы эффектов предметов в Настройках

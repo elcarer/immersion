@@ -15,6 +15,8 @@ import { spawnCarriedPets } from "../scripts/pets.js"
 import { questNewGame } from "../scripts/quest.js"
 //V109: квест «Голос в портале» — сброс состояния и спавн объекта (3 глава, 2 этаж)
 import { portalQuestNewGame } from "../scripts/portalQuest.js"
+//V111: квест «Погоня за пламенем» — сброс состояния и спавн NPC (4 глава, 3 этаж)
+import { flameQuestNewGame } from "../scripts/flameQuest.js"
 //V52: старт этажа — сброс забегных счётчиков достижений
 import { achFloorStart } from "../scripts/achievements.js"
 
@@ -41,6 +43,8 @@ function newGame(next) {
     questNewGame(next)
     //V109: квест «Голос в портале» — сброс; 3 глава, 2 этаж — выключенный портал в углу
     portalQuestNewGame(next)
+    //V111: квест «Погоня за пламенем» — сброс; 4 глава, 3 этаж — мирный Огнементаль в углу
+    flameQuestNewGame(next)
     //V52: статус.info готов — кэшируем ХП, чистим «чистый» этаж и окно Массовика
     achFloorStart()
 }

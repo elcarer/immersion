@@ -30,6 +30,8 @@ import { resetFlyDrops } from "../scripts/dropSafe.js"
 import { questDel } from "../scripts/quest.js"
 //V109: квест «Голос в портале» — сброс состояния/трекера/ссылок сцены
 import { portalQuestDel } from "../scripts/portalQuest.js"
+//V111: квест «Погоня за пламенем» — сброс состояния/трекера/лавы + этажный бафф огня
+import { flameQuestDel } from "../scripts/flameQuest.js"
 // МИГРАЦИЯ M5: objectValues — Proxy-список, синхронизирующий ECS-сущности zero_engine
 // (компоненты etype/posX/posY/cullPad, группа battle). Контракт массива прежний:
 // push/splice/length=0, индексы, порядок. Подробности — ecsBridge.js
@@ -100,6 +102,7 @@ function del() {
     heroTipDel() //E-17: карточка героя в лобби гаснет при старте забега/смене сцены
     resetPortalFx() //V64: связка портал/рычаг/арены — только на текущем этаже
     portalQuestDel() //V109: квест «Голос в портале» — только на текущем этаже
+    flameQuestDel() //V111: квест «Погоня за пламенем» — лава/этажный бафф только на текущем этаже
     resetVoidBoss() //V65: босс 4 этажа и его Сгустки — только на текущем этаже
     resetGroundShadows() //V80: реестры наземных теней — узлы уже снесены очисткой слоёв
 

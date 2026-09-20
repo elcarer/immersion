@@ -98,6 +98,18 @@ function applyEnemyBurn(target) {
     target.burnT = BURN_TICKS
 }
 
+//V111: зачарованное оружие квеста «Погоня за пламенем» (item.fire у предмета в слотах
+//куклы 11-12) — каждая атака героя вешает ожог цели (только маркер, без плоского урона)
+function weaponFireOnAttack(target) {
+    for (let k = 11; k <= 12; k++) {
+        const w = status.inventory.doll[k]
+        if (w && w.fire) {
+            applyEnemyBurn(target)
+            return
+        }
+    }
+}
+
 //тик (gameLoop, после flameTick): отсчёт таймеров бафов + ряд иконок над героем,
 //отсчёт ожогов врагов + пламя над горящими
 function buffTick() {
@@ -174,4 +186,4 @@ function hideBuffs() {
     burnList.length = 0
 }
 
-export { giveBuff, buffTick, fireOnAttack, buffActive, buffArmorBonus, applyEnemyBurn }
+export { giveBuff, buffTick, fireOnAttack, buffActive, buffArmorBonus, applyEnemyBurn, weaponFireOnAttack }

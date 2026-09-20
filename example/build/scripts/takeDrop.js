@@ -17,6 +17,8 @@ import { rollGoldPickup } from "../scripts/sets.js"
 import { relicGenerate, abilCopyBonus } from "../scripts/relics.js"
 //V109: квест «Голос в портале» — кучка «части посоха» (маркер WeakSet, ветка до href-цепочки)
 import { portalQuestTakePile } from "../scripts/portalQuest.js"
+//V111: квест «Погоня за пламенем» — кучка-награда (зачарование текущего оружия)
+import { flameQuestTakePile } from "../scripts/flameQuest.js"
 //V67: новый предмет мог встать в 1-ю ячейку инвентаря — пересчёт копии «Вечного сапфира»
 import { changeDopStat } from "../scripts/drag.js"
 
@@ -35,6 +37,13 @@ function takeDrop() {
             let useDrop = false
             //V109: кучка квеста «Голос в портале» (часть посоха) — ветка в portalQuest.js
             if (portalQuestTakePile(dropArr[i])) {
+                playback(strike[3].vol,0,0,7*status.settings.soundVolume)
+                dropArr[i].remove()
+                dropArr.splice(i, 1)
+                return
+            }
+            //V111: кучка квеста «Погоня за пламенем» (огненное оружие) — ветка в flameQuest.js
+            if (flameQuestTakePile(dropArr[i])) {
                 playback(strike[3].vol,0,0,7*status.settings.soundVolume)
                 dropArr[i].remove()
                 dropArr.splice(i, 1)

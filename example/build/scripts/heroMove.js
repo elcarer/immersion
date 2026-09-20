@@ -16,6 +16,8 @@ import { dashPress,updateRazgon,wingsActive,dashInvulnActive } from "../scripts/
 import { setWorldViewBox } from "../scripts/zoomFx.js"
 //V49 баф скорости (статуя): перемещение героя ×1.5
 import { buffActive } from "../scripts/buffFx.js"
+//V111: квест «Погоня за пламенем» — свежая клетка коридора получает лаву (режим «лава в коридорах»)
+import { flameQuestCorridorOpen } from "../scripts/flameQuest.js"
 //V43: попытка призыва босса 3 этажа при открытии новой комнаты (все столбы могли
 //уже стоять в состоянии 2 от генерации — тогда последнее условие выполняется именно здесь)
 import { tryFinSummon } from "../scripts/finPillars.js"
@@ -391,6 +393,8 @@ function checkNewRoom (data,num,x,y) {
             x<level.floor[i][0]*32+32+64&&
             y<level.floor[i][1]*32+32+64) {
             createCorridor(level.floor[i],32,32,level)
+            //V111: в режиме погони «лава в коридорах» новая клетка заливается лавой сразу
+            flameQuestCorridorOpen(level.floor[i])
             //E-9: navMatrix ИИ врагов (enemyAI) перестраивается — коридор проходим
             status.navVersion = (status.navVersion || 0) + 1
             svgArr[1].append(status.hero.obj.img)

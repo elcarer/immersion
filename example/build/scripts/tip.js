@@ -143,6 +143,8 @@ function showItemTip(obj) {
     obj.stat !== undefined && lines.push(["#999999", T(statArr[obj.stat]) + " +" + obj.statCount])
     obj.dopType !== undefined && lines.push(["#9999FF", T(statArrDop[obj.dopType]) + " +" + obj.dop])
     obj.abil !== undefined && lines.push(["#9933CC", T(obj.abil.desc)])
+    //V111: огненное оружие — оранжевая метка в блоке характеристик
+    obj.fire && lines.push(["#FF8800", T("tip.fire")])
     const maxPx = IT_W - IT_PADX * 2
     let rows = [] //перенесённые строки характеристик
     for (let i = 0; i < lines.length; i++)
@@ -156,6 +158,8 @@ function showItemTip(obj) {
     const Y = 1080 - H - 12
     tempTip.push(rect(svgArr[2], X, Y, IT_W, H, color, "3px", "black", {"id":"itemDropTip","rx":"5px"}))
     tempTip.push(image(svgArr[2], X + (IT_W - 56) / 2, Y + 8, 56, 56, obj.img, {"blur":"filter: drop-shadow(0 0 4px "+color+")"}))
+    //V111: оверлей пламени на иконке огненного оружия (карточка поднятого предмета)
+    obj.fire && tempTip.push(image(svgArr[2], X + (IT_W - 56) / 2, Y + 8, 56, 56, "./images/effects/flameWeapon.png", {}))
     let cy = Y + 94
     for (let i = 0; i < rowTitles.length; i++) {
         tempTip.push(text(svgArr[2], X + IT_W / 2, cy, "0pt","50pt","none","1px", color, rowTitles[i], {"id":"itemName","size":IT_F_TITLE,"font":"baseFont4","anchor":"middle"}))
@@ -193,6 +197,8 @@ function tip (e,obj) {
     tipTitle(x+200,y+45,color,itemName(obj),"itemName")
     tempTip.push(rect(svgArr[2],x+71,y+66,258,258,color,"2px","black",{"id":"tip","rx":"6px"}))
     tempTip.push(image(svgArr[2],x+72,y+67,256,256,obj.img,{"blur":'filter: drop-shadow(0 0 4px '+color+')'}))
+    //V111: огненное оружие — оверлей пламени поверх иконки (подсказки/инвентарь/кукла)
+    obj.fire && tempTip.push(image(svgArr[2],x+72,y+67,256,256,"./images/effects/flameWeapon.png",{}))
     let strokeNum = 0
     if (obj.type!==undefined) {
         let desc
@@ -219,6 +225,12 @@ function tip (e,obj) {
     }
     if (obj.abil!==undefined) {
         tempTip.push(text(svgArr[2],x+200,y+365+strokeNum*35,"0pt","50pt","none","2px","#9933CC",T(obj.abil.desc),{"id":"itemName","size":32,"font":"baseFont4","anchor":"middle"}))
+        strokeNum++
+    }
+    //V111: огненное оружие — оранжевая надпись «огненное» во фрейме характеристик,
+    //чуть выше художественного описания
+    if (obj.fire) {
+        tempTip.push(text(svgArr[2],x+200,y+365+strokeNum*35,"0pt","50pt","none","2px","#FF8800",T("tip.fire"),{"id":"itemName","size":32,"font":"baseFont4","anchor":"middle"}))
         strokeNum++
     }
     obj.abil && obj.rarity > 1 && obj.rarity < 5 && helpWord2(color,obj.abil,x-16,y+255)
@@ -290,6 +302,8 @@ function compareTip(e,obj,lower=0) {
     tipTitle(x+200,y+45,color,itemName(obj),"itemName")
     tempTip.push(rect(svgArr[2],x+71,y+66,258,258,color,"2px","black",{"id":"cmpTip","rx":"6px"}))
     tempTip.push(image(svgArr[2],x+72,y+67,256,256,obj.img,{"blur":'filter: drop-shadow(0 0 4px '+color+')'}))
+    //V111: оверлей пламени на иконке огненного оружия (окно сравнения)
+    obj.fire && tempTip.push(image(svgArr[2],x+72,y+67,256,256,"./images/effects/flameWeapon.png",{}))
     let strokeNum = 0
     if (obj.type!==undefined) {
         let desc
@@ -315,6 +329,12 @@ function compareTip(e,obj,lower=0) {
     }
     if (obj.abil!==undefined) {
         tempTip.push(text(svgArr[2],x+200,y+365+strokeNum*35,"0pt","50pt","none","2px","#9933CC",T(obj.abil.desc),{"id":"itemName","size":32,"font":"baseFont4","anchor":"middle"}))
+        strokeNum++
+    }
+    //V111: огненное оружие — оранжевая надпись «огненное» во фрейме характеристик,
+    //чуть выше художественного описания
+    if (obj.fire) {
+        tempTip.push(text(svgArr[2],x+200,y+365+strokeNum*35,"0pt","50pt","none","2px","#FF8800",T("tip.fire"),{"id":"itemName","size":32,"font":"baseFont4","anchor":"middle"}))
         strokeNum++
     }
     //метка между картинкой и характеристиками: игроку сразу ясно, какое из двух окон «старое»

@@ -48,6 +48,8 @@ function inventory () {
                 let invOpts = {"id":13+num,"funcDrag":drag,"funcDbl":doubleClickItem,"funcShow":e => {rectCellShow(obj);e.buttons !== 1 ? (tip(e,obj),compareTip(e,equippedCompareOf(obj),isSetItem(obj))) : tipDel()},"funcShowOut":e => {tipDel();rectCellShowDel()},"item":status.inventory.inv[num]}
                 itemGlowOn() && (invOpts.blur = "filter: drop-shadow(0 0 4px "+rc+")")
                 inventoryTemp.push(image(svgArr[2],940 + i * 130,261 + j * 130,128,128,status.inventory.inv[num].img,invOpts))
+                //V111: оверлей пламени на иконке огненного оружия (сетка инвентаря)
+                status.inventory.inv[num].fire && inventoryTemp.push(image(svgArr[2],940 + i * 130,261 + j * 130,128,128,"./images/effects/flameWeapon.png",{}))
             }
             num++        
         }

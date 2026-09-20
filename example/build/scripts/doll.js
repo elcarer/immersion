@@ -41,7 +41,9 @@ function doll() {
         itemFrameOn() && dollTemp.push(rect(svgArr[2],cellPickArr[i].x,cellPickArr[i].y,"128px","128px",rc,"2px","none",{"rx":"3px"}))
         let dollOpts = {"id":i,"funcDrag":drag,"funcDbl":doubleClickItem,"funcShow":e => {rectCellShow(obj);e.buttons !== 1 ? tip(e,obj) : tipDel()},"funcShowOut":e => {tipDel();rectCellShowDel()},"item":status.inventory.doll[i]}
         itemGlowOn() && (dollOpts.blur = "filter: drop-shadow(0 0 4px "+rc+")")
-        dollTemp.push(image(svgArr[2],cellPickArr[i].x,cellPickArr[i].y,"128px","128px",status.inventory.doll[i].img,dollOpts))}
+        dollTemp.push(image(svgArr[2],cellPickArr[i].x,cellPickArr[i].y,"128px","128px",status.inventory.doll[i].img,dollOpts))
+        //V111: оверлей пламени на иконке огненного оружия (слоты куклы)
+        status.inventory.doll[i].fire && dollTemp.push(image(svgArr[2],cellPickArr[i].x,cellPickArr[i].y,"128px","128px","./images/effects/flameWeapon.png",{}))}
         else
         {dollTemp.push(image(svgArr[2],cellPickArr[i].x,cellPickArr[i].y,"128px","128px",cellPickArr[i].href,{"id":i,"func":()=>{}}))}
     }

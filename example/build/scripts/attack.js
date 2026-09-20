@@ -8,7 +8,7 @@ import { playback,strike } from "../scripts/sound.js"
 import { battleDanceHit } from "../scripts/valkyrie.js"
 import { flameOnHeroAttack } from "../scripts/flameFx.js"
 //V49 огненное оружие (баф статуи): атака по врагу вешает/освежает ожог, по горящему — 2 плоских
-import { fireOnAttack } from "../scripts/buffFx.js"
+import { fireOnAttack, weaponFireOnAttack } from "../scripts/buffFx.js"
 
 function checkAttack() {
     // V34 «очарование»: атаковать нельзя. Стоит ЦЕЛИКОМ (и исполнение, и таймеры
@@ -87,6 +87,8 @@ function attack(target) {
     flameOnHeroAttack()
     //V49 огненное оружие: ожог цели (по уже горящему — ещё 2 плоского урона)
     fireOnAttack(target)
+    //V111 зачарование «Погони за пламенем» (item.fire у оружия на кукле): ожог цели
+    weaponFireOnAttack(target)
     //убрать 1 дебаф при атаке
     if(status.info.removeDebuff) {
         status.info.poison && (status.info.poison -= status.info.removeDebuff)

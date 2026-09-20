@@ -60,6 +60,9 @@ import { shellTick } from "../scripts/portalFx.js"
 //V109: квест «Голос в портале» — тик состояния (исчезновение NPC-портала при выходе
 //из стартовой комнаты, полоска взаимодействия)
 import { portalQuestTick } from "../scripts/portalQuest.js"
+//V111: квест «Погоня за пламенем» — тик состояния (полоска взаимодействия, перебежки
+//огнементя, режимы лавы)
+import { flameQuestTick } from "../scripts/flameQuest.js"
 import { svgArr,image, text,gamepadDragStart,gamepadDragMove,gamepadDragEnd,isDragging,getCTM } from "../scripts/svg.js"
 
 //отслеживание мыши
@@ -146,6 +149,8 @@ function gameLoop() {
         shellTick()
         //V109: «Голос в портале» — состояние квеста (portalQuest.js)
         portalQuestTick()
+        //V111: «Погоня за пламенем» — состояние квеста (flameQuest.js)
+        flameQuestTick()
         activeSkillsCD()
         }
     }

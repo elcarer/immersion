@@ -23,11 +23,14 @@ const PORTRAIT_W = 144, PORTRAIT_H = 216
 const DLG_F_TEXT = 30                        //кегль реплики (textEl ниже)
 const DLG_TEXT_W = WIN_W - 56                //максимальная ширина строки (поля окна)
 //цвета реплик: Волк — золотой проекта, герой — голубой (разные оттенки, решение по постановке).
-//V109: «Голос из портала» — призрачный лиловый, культист — багряный
+//V109: «Голос из портала» — призрачный лиловый, культист — багряный.
+//V111: Огнементаль — пламенный оранжевый, «narr» — нейтральное повествование без имени
 const COL_WOLF = "rgb(204, 153, 102)"
 const COL_HERO = "rgb(153, 204, 255)"
 const COL_VOICE = "rgb(186, 140, 230)"
 const COL_CULT = "rgb(220, 110, 100)"
+const COL_FLAME = "rgb(255, 150, 60)"
+const COL_NARR = "rgb(220, 210, 190)"
 
 let dlgTemp = []     //узлы окна/портретов/оверлея
 let dlgTimer = null
@@ -38,6 +41,8 @@ function speakerOf(who) {
     return who === "wolf" ? {"name":T("quest.wolf.name"),"col":COL_WOLF} :
         who === "voice" ? {"name":T("quest.portal.voice"),"col":COL_VOICE} :
         who === "cultist" ? {"name":T("enemy.28.name"),"col":COL_CULT} :
+        who === "flame" ? {"name":T("enemy.29.name"),"col":COL_FLAME} :
+        who === "narr" ? {"name":"","col":COL_NARR} :
         {"name":T(data.heroes[status.hero.class].name),"col":COL_HERO}
 }
 

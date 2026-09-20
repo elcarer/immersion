@@ -667,6 +667,30 @@ let data = {"heroes":[
             {"speed":5,"times":4,"w":128,"h":51,"img":"./images/enemy/cultist/others/death.png","once":1},
             {"speed":5,"times":4,"w":128,"h":51,"img":"./images/enemy/cultist/others/wait.png"}
         ]}
+    ]},
+    //V111: Огнементаль — квестовый персонаж «Погоня за пламенем» (лист
+    //images/sheets/elemental_64.png, сборка forWork/elemental_register.py). В пулы
+    //спавна глав не входит: в комнаты попадёт только через явный спавн квеста
+    //(4 глава, 3 этаж). Атака 25 — ближний огненный взмах (принцип mace). Ширины
+    //полос — окна строк листа (28/29/32 кадр), высота 48
+    {"id":29,"name":"enemy.29.name","stats":{"hp":12,"dmg":[3,6],"exp":10,"speed":6,"range":7,"attacksCd":[],"noStunTime":50,"desc":"enemy.29.desc"},"attacks":[25],"effects":{"takeDamage":1},"anims":[
+        {"move":[
+            {"speed":5,"times":4,"w":128,"h":48,"img":"./images/enemy/elemental/move/back.png"},
+            {"speed":5,"times":4,"w":128,"h":48,"img":"./images/enemy/elemental/move/front.png"},
+            {"speed":5,"times":4,"w":112,"h":48,"img":"./images/enemy/elemental/move/left.png"},
+            {"speed":5,"times":4,"w":116,"h":48,"img":"./images/enemy/elemental/move/right.png"}
+        ]},
+        {"attack":[
+            {"speed":5,"times":4,"w":128,"h":48,"img":"./images/enemy/elemental/attack/back.png","once":1,"attackNew":{"step":3,"anim":[25,0]}},
+            {"speed":5,"times":4,"w":128,"h":48,"img":"./images/enemy/elemental/attack/front.png","once":1,"attackNew":{"step":3,"anim":[25,1]}},
+            {"speed":5,"times":4,"w":128,"h":48,"img":"./images/enemy/elemental/attack/left.png","once":1,"attackNew":{"step":3,"anim":[25,2]}},
+            {"speed":5,"times":4,"w":128,"h":48,"img":"./images/enemy/elemental/attack/right.png","once":1,"attackNew":{"step":3,"anim":[25,3]}}
+        ]},
+        {"others":[
+            {"speed":10,"times":4,"w":128,"h":48,"img":"./images/enemy/elemental/others/damage.png","once":1,"stun":1},
+            {"speed":5,"times":4,"w":128,"h":48,"img":"./images/enemy/elemental/others/death.png","once":1},
+            {"speed":5,"times":4,"w":112,"h":48,"img":"./images/enemy/elemental/others/wait.png"}
+        ]}
     ]}],
 ],
 "attacks":[
@@ -811,6 +835,15 @@ let data = {"heroes":[
         {"img":"./images/attacks/void/all.png","bullet":"down","effect":0,"bulletSpeed":5,"times":4,"speed":10,"w":76,"h":19,"x":0,"y":10},
         {"img":"./images/attacks/void/all.png","bullet":"left","effect":0,"bulletSpeed":5,"times":4,"speed":10,"w":76,"h":19,"x":-10,"y":0},
         {"img":"./images/attacks/void/all.png","bullet":"right","effect":0,"bulletSpeed":5,"times":4,"speed":10,"w":76,"h":19,"x":10,"y":0},
+    ]},
+    //V111: ближняя атака Огнементя (квест «Погоня за пламенем») — принцип mace (4):
+    //одноразовый взмах в соседней клетке, скорость анимации и кулдаун от mace; спрайт —
+    //лист fireball (огненный шар, как у атаки 16), смещения под кадр 128x32
+    {"name":"attack.25.name","base":1,"cooldown":0.8,"anims":[
+        {"img":"./images/attacks/fireball/all.png","once":1,"times":4,"speed":15,"w":128,"h":32,"x":0,"y":-32},
+        {"img":"./images/attacks/fireball/all.png","once":1,"times":4,"speed":15,"w":128,"h":32,"x":0,"y":32},
+        {"img":"./images/attacks/fireball/all.png","once":1,"times":4,"speed":15,"w":128,"h":32,"x":-32,"y":0},
+        {"img":"./images/attacks/fireball/all.png","once":1,"times":4,"speed":15,"w":128,"h":32,"x":32,"y":0},
     ]},
 ],
 "effects":[

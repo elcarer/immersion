@@ -66,6 +66,9 @@ import { wolfAllyTick } from "../scripts/quest.js"
 //V109: культист квеста «Голос в портале» — мирный перехват тика (cultNpc) и хук
 //смерти (дроп части посоха / победа над культистом). Цикл импортов легален: рантайм
 import { portalQuestCultTick, portalQuestEnemyDie } from "../scripts/portalQuest.js"
+//V111: Огнементаль квеста «Погоня за пламенем» — мирный перехват тика (flameNpc)
+//и хук победы над ним в бою (бафф огня на этаж). Цикл импортов легален: рантайм
+import { flameQuestNpcTickHook, flameQuestEnemyDie } from "../scripts/flameQuest.js"
 // V32 «рывок» нетопыря (stats.dash): триггер и полёт живёт в dashFx.js,
 // сюда встроены только точки проводки (аналогично tickShadow выше)
 import { dashTryTrigger, dashFlyTick, endDashFlight } from "../scripts/dashFx.js"
@@ -1061,6 +1064,8 @@ export function enemyDie(enemy, exp) {
     //V109: хуки квеста «Голос в портале» — дроп части посоха у помеченного врага /
     //победа над культистом (кучка реликвии + отметка в мете)
     portalQuestEnemyDie(enemy)
+    //V111: победа над Огнементем в бою («НАПАСТЬ») — бафф огня на весь этаж
+    flameQuestEnemyDie(enemy)
     checkExp(gain)
     enemy.stop = 0
     enemy.currentStill = 0
@@ -1812,6 +1817,12 @@ export function enemyTick(enemy) {
     //ждёт диалога; cultNpc=0 после «НАПАСТЬ» — дальше штатный ИИ)
     if (enemy.cultNpc) {
         portalQuestCultTick(enemy)
+        return
+    }
+    //V111: Огнементаль квеста «Погоня за пламенем» — мирный NPC своим тиком (полоска
+    //взаимодействия, перебежки в режиме погони; flameNpc=0 после «НАПАСТЬ» — штатный ИИ)
+    if (enemy.flameNpc) {
+        flameQuestNpcTickHook(enemy)
         return
     }
     // совместимость со старыми спавнами (враг создан с behaviour, без state)
