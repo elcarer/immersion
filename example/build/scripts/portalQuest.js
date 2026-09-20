@@ -191,6 +191,12 @@ export function portalQuestTick() {
 function portalUseBarTick() {
     const qp = status.questPortal
     if (!qp.portal) return
+    //перезарядка после диалога: любой диалог портала взводит qp.recharge, снимается
+    //выходом героя из МОЕЙ зоны (ветка d>68 — ДО гейта, иначе снятия не случится
+    //никогда) — повторный диалог только «отошёл-подошёл» (репорт V109: бар refill'ился
+    //на месте и диалог зацикливался). НЕ объектный [11]: герой из нижней клетки портала
+    //вне ванильного хитбокса ±32 (точка героя y+50) — checkObject сбрасывал бы [11]
+    //каждый тик, пока мой радиус 68 его видит
     const img = qp.portal[6] !== undefined ? screenPic[qp.portal[6]] : null
     if (!img || !img.isConnected) return
     const px = img.x.animVal.value + 32
@@ -201,8 +207,10 @@ function portalUseBarTick() {
     if (d > 68) {
         useT > 0 && (useT = 0)
         useBarFill && useBarFill.setAttribute("width", 0)
+        qp.recharge = 0          //вышел из зоны — перезарядка снята
         return
     }
+    if (qp.recharge) return
     useT++
     if (!useBarFill) {
         useBarFill = rect(svgArr[1],px - 25,img.y.animVal.value - 6,0,6,"none","0px","#cc9966",{"id":"pqUseBar"})
@@ -212,6 +220,9 @@ function portalUseBarTick() {
         useBarFill.remove()
         useBarFill = null
         useT = 0
+        qp.recharge = 1
+        qp.portal[11] = 1        //и ванильная перезарядка: в state 3 синий портал не
+                                 //должен авто-телепортировать стоящего на месте героя
         if (qp.state === 1) openPortalDialog()
         else if (qp.parts >= 3) openStaffDialog()
         else openRemindDialog()

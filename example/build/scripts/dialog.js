@@ -20,6 +20,8 @@ import { data } from "../scripts/data.js"
 const TYPE_MS = 35            //мс на букву
 const WIN_X = 560, WIN_Y = 868, WIN_W = 800, WIN_H = 176
 const PORTRAIT_W = 144, PORTRAIT_H = 216
+const DLG_F_TEXT = 30                        //кегль реплики (textEl ниже)
+const DLG_TEXT_W = WIN_W - 56                //максимальная ширина строки (поля окна)
 //цвета реплик: Волк — золотой проекта, герой — голубой (разные оттенки, решение по постановке).
 //V109: «Голос из портала» — призрачный лиловый, культист — багряный
 const COL_WOLF = "rgb(204, 153, 102)"
@@ -37,6 +39,36 @@ function speakerOf(who) {
         who === "voice" ? {"name":T("quest.portal.voice"),"col":COL_VOICE} :
         who === "cultist" ? {"name":T("enemy.28.name"),"col":COL_CULT} :
         {"name":T(data.heroes[status.hero.class].name),"col":COL_HERO}
+}
+
+//замер ширины строки реальным рендером (рецепт tip.itMeasure — getBBox PIXI.Text)
+function dlgMeasure(str, size) {
+    try {
+        const t = text(svgArr[2],-99999,-99999,"0pt","50pt","none","1px","black",str,{"size":size,"font":"baseFont4"})
+        const w = t.getBBox().width
+        t.remove()
+        return w || str.length * size * 0.56
+    } catch {
+        return str.length * size * 0.56
+    }
+}
+//жадный перенос по словам (рецепт tip.itWrap): обычный <text> сам НЕ переносит —
+//длинная реплика уходила одним хвостом за панель (репорт V109: «А. Ну, да...»
+//Голоса портала). Перенос делаю \n-ами — их PIXI.Text рвёт на строки, печатная
+//машинка ниже просто печатает строку посимвольно
+function dlgWrap(str, size) {
+    const words = String(str).split(" ")
+    const out = []
+    let cur = ""
+    for (let i = 0; i < words.length; i++) {
+        const probe = cur ? cur + " " + words[i] : words[i]
+        if (cur && dlgMeasure(probe, size) > DLG_TEXT_W) {
+            out.push(cur)
+            cur = words[i]
+        } else cur = probe
+    }
+    cur && out.push(cur)
+    return out.join("\n")
 }
 
 function openDialog(script) {
@@ -60,7 +92,7 @@ function openDialog(script) {
     //имя говорящего и строка реплики (текст печатается в dlgState.textEl)
     dlgState.nameEl = text(svgArr[2],WIN_X + 24,WIN_Y + 38,"0pt","26pt","black","2px",COL_WOLF,"",{"id":"dlgName","size":24,"font":"baseFont4"})
     dlgTemp.push(dlgState.nameEl)
-    dlgState.textEl = text(svgArr[2],WIN_X + 24,WIN_Y + 92,"0pt","32pt","black","2px","white","",{"id":"dlgText","size":30,"font":"baseFont4"})
+    dlgState.textEl = text(svgArr[2],WIN_X + 24,WIN_Y + 92,"0pt","32pt","black","2px","white","",{"id":"dlgText","size":DLG_F_TEXT,"font":"baseFont4"})
     dlgTemp.push(dlgState.textEl)
     dlgKey = e => {
         if (e.code === "Escape" || e.code === "Space" || e.code === "Enter") {
@@ -83,7 +115,7 @@ function nextLine() {
     dlgState.nameEl.textContent = sp.name
     dlgState.nameEl.setAttribute("fill", sp.col)
     dlgState.textEl.setAttribute("fill", sp.col)
-    dlgState.full = T(line.key)
+    dlgState.full = dlgWrap(T(line.key), DLG_F_TEXT)
     dlgState.shown = 0
     dlgState.typing = 1
     dlgState.textEl.textContent = ""
