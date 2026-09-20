@@ -28,6 +28,8 @@ import { resetGroundShadows } from "../scripts/groundShadow.js"
 import { resetFlyDrops } from "../scripts/dropSafe.js"
 //V104: квест «Сопроводить Волка» — сброс состояния/трекера/ссылок сцены
 import { questDel } from "../scripts/quest.js"
+//V109: квест «Голос в портале» — сброс состояния/трекера/ссылок сцены
+import { portalQuestDel } from "../scripts/portalQuest.js"
 // МИГРАЦИЯ M5: objectValues — Proxy-список, синхронизирующий ECS-сущности zero_engine
 // (компоненты etype/posX/posY/cullPad, группа battle). Контракт массива прежний:
 // push/splice/length=0, индексы, порядок. Подробности — ecsBridge.js
@@ -97,6 +99,7 @@ function del() {
     resetEnemyHover() //V47: окно врага не переживает смену сцены
     heroTipDel() //E-17: карточка героя в лобби гаснет при старте забега/смене сцены
     resetPortalFx() //V64: связка портал/рычаг/арены — только на текущем этаже
+    portalQuestDel() //V109: квест «Голос в портале» — только на текущем этаже
     resetVoidBoss() //V65: босс 4 этажа и его Сгустки — только на текущем этаже
     resetGroundShadows() //V80: реестры наземных теней — узлы уже снесены очисткой слоёв
 

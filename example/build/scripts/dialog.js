@@ -20,9 +20,12 @@ import { data } from "../scripts/data.js"
 const TYPE_MS = 35            //мс на букву
 const WIN_X = 560, WIN_Y = 868, WIN_W = 800, WIN_H = 176
 const PORTRAIT_W = 144, PORTRAIT_H = 216
-//цвета реплик: Волк — золотой проекта, герой — голубой (разные оттенки, решение по постановке)
+//цвета реплик: Волк — золотой проекта, герой — голубой (разные оттенки, решение по постановке).
+//V109: «Голос из портала» — призрачный лиловый, культист — багряный
 const COL_WOLF = "rgb(204, 153, 102)"
 const COL_HERO = "rgb(153, 204, 255)"
+const COL_VOICE = "rgb(186, 140, 230)"
+const COL_CULT = "rgb(220, 110, 100)"
 
 let dlgTemp = []     //узлы окна/портретов/оверлея
 let dlgTimer = null
@@ -31,6 +34,8 @@ let dlgState = null  //{"lines","idx","typing","shown","choices","onEnd","textEl
 
 function speakerOf(who) {
     return who === "wolf" ? {"name":T("quest.wolf.name"),"col":COL_WOLF} :
+        who === "voice" ? {"name":T("quest.portal.voice"),"col":COL_VOICE} :
+        who === "cultist" ? {"name":T("enemy.28.name"),"col":COL_CULT} :
         {"name":T(data.heroes[status.hero.class].name),"col":COL_HERO}
 }
 
@@ -45,10 +50,13 @@ function openDialog(script) {
     dlgTemp.push(rect(svgArr[2],0,0,uiRightEdge(),uiBottomEdge(),"none","0px","none",{"func":e => {advanceDialog()}}))
     //окно текста — тоже продвигает диалог (клик по нему самый естественный)
     dlgTemp.push(rect(svgArr[2],WIN_X,WIN_Y,WIN_W,WIN_H,"2px","rgb(204, 153, 102)","rgba(16, 12, 10, 0.92)",{"rx":"6px","func":e => {advanceDialog()}}))
-    //портреты по разные стороны окна: герой слева, Волк справа (арт 192×288 — тот же
-    //формат, что портрет героя; V106: кадр листа заменён на нормальный UI-портрет)
+    //портреты по разные стороны окна: герой слева, справа — второй говорящий
+    //(по умолчанию Волк, арт 192×288 — тот же формат, что портрет героя; V106: кадр
+    //листа заменён на нормальный UI-портрет). V109: script.right === null — правого
+    //портрета нет (реплики «Голоса из портала»/культиста)
     dlgTemp.push(image(svgArr[2],WIN_X - PORTRAIT_W - 48,WIN_Y - PORTRAIT_H + 76,PORTRAIT_W,PORTRAIT_H,data.heroes[status.hero.class].img))
-    dlgTemp.push(image(svgArr[2],WIN_X + WIN_W + 48,WIN_Y - PORTRAIT_H + 76,PORTRAIT_W,PORTRAIT_H,"./images/UI/doll/wolf.png"))
+    const rightImg = script.right !== undefined ? script.right : "./images/UI/doll/wolf.png"
+    rightImg && dlgTemp.push(image(svgArr[2],WIN_X + WIN_W + 48,WIN_Y - PORTRAIT_H + 76,PORTRAIT_W,PORTRAIT_H,rightImg))
     //имя говорящего и строка реплики (текст печатается в dlgState.textEl)
     dlgState.nameEl = text(svgArr[2],WIN_X + 24,WIN_Y + 38,"0pt","26pt","black","2px",COL_WOLF,"",{"id":"dlgName","size":24,"font":"baseFont4"})
     dlgTemp.push(dlgState.nameEl)

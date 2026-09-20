@@ -74,6 +74,9 @@ import { skillEffect } from "../scripts/skillTree.js"
 import { T } from "../scripts/localization.js"
 import { floatText } from "../scripts/floatText.js"
 import { journalAdd, J_STD } from "../scripts/journal.js"
+//V109: квест «Голос в портале» — юз портала/рычага СЕТИ (свои телепорты и рычаги).
+//Цикл импортов легален: вызов только в рантайме (portalUse)
+import { portalQuestUse } from "../scripts/portalQuest.js"
 
 const PORTAL_TYPE = 18
 const LEVER_TYPE = 19
@@ -164,6 +167,9 @@ function cellBusy(level, x, y) {
 
 //----- юз объекта (вызывается из useObject.finishUsedObject вместо actionsObject) -----
 function portalUse(obj) {
+    //V109: квест «Голос в портале» — свои порталы и рычаги сети. Хук ДО guard link:
+    //квест обязан работать и на этаже, где штатного портала/связки нет
+    if (portalQuestUse(obj)) return
     if (!link) return
     let level = dataGeneric.scenes[status.levelFloor]
     if (obj[2] === PORTAL_TYPE) {
@@ -884,4 +890,6 @@ function resetPortalFx() {
     link = null
 }
 
-export {configPortal, portalUse, portalArenaKill, resetPortalFx, placeRoomObject, puzzleButtonUse, shellTick, shellCupUse, shellCupReady, shellState, PORTAL_TYPE, LEVER_TYPE, PORTAL_SPRITE_W, PORTAL_SPRITE_H}
+//V109: setObjectState/freeCellNear/teleportHero — экспортированы для квеста
+//«Голос в портале» (portalQuest.js: синий квест-портал, телепорты сети, зачистка)
+export {configPortal, portalUse, portalArenaKill, resetPortalFx, placeRoomObject, puzzleButtonUse, shellTick, shellCupUse, shellCupReady, shellState, setObjectState, freeCellNear, teleportHero, PORTAL_TYPE, LEVER_TYPE, PORTAL_SPRITE_W, PORTAL_SPRITE_H}

@@ -63,6 +63,9 @@ import { portalArenaKill } from "../scripts/portalFx.js"
 //V104: Волк-союзник (квест «Сопроводить Волка») — поведение в ветке pet enemyTick.
 //Цикл импортов quest<->enemyAI легален: вызовы только в рантайме
 import { wolfAllyTick } from "../scripts/quest.js"
+//V109: культист квеста «Голос в портале» — мирный перехват тика (cultNpc) и хук
+//смерти (дроп части посоха / победа над культистом). Цикл импортов легален: рантайм
+import { portalQuestCultTick, portalQuestEnemyDie } from "../scripts/portalQuest.js"
 // V32 «рывок» нетопыря (stats.dash): триггер и полёт живёт в dashFx.js,
 // сюда встроены только точки проводки (аналогично tickShadow выше)
 import { dashTryTrigger, dashFlyTick, endDashFlight } from "../scripts/dashFx.js"
@@ -1050,6 +1053,9 @@ export function enemyDie(enemy, exp) {
     howlDie(enemy)
     //V64: убийство монстра арены (по room находим арену; 9/9 — появляется рычаг арены)
     portalArenaKill(enemy)
+    //V109: хуки квеста «Голос в портале» — дроп части посоха у помеченного врага /
+    //победа над культистом (кучка реликвии + отметка в мете)
+    portalQuestEnemyDie(enemy)
     checkExp(gain)
     enemy.stop = 0
     enemy.currentStill = 0
@@ -1793,6 +1799,12 @@ export function enemyTick(enemy) {
         return
     }
     if (enemy.type !== "enemy") return
+    //V109: культист квеста «Голос в портале» — мирный NPC своим тиком (стоит в углу,
+    //ждёт диалога; cultNpc=0 после «НАПАСТЬ» — дальше штатный ИИ)
+    if (enemy.cultNpc) {
+        portalQuestCultTick(enemy)
+        return
+    }
     // совместимость со старыми спавнами (враг создан с behaviour, без state)
     if (enemy.state === undefined) {
         enemy.state = enemy.behaviour === 1 || enemy.behaviour === 2 ? enemy.behaviour : enemy.behaviour === 4 ? ENEMY_STATE.CHASE : ENEMY_STATE.IDLE

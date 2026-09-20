@@ -47,6 +47,9 @@ let status = {"mouseX":0,"mouseY":0,"start":0,"pause":0,"rectShadow":0,"nextFunc
 //V104: квесты («Сопроводить Волка», quest.js). state: 0 нет, 1 NPC предложен,
 //2 активен, 4 выполнен, 5 провален. Забеги не сохраняются — поле живёт в сессии
 "quest":{"state":0},
+//V109: квест «Голос в портале» (portalQuest.js) — состояние живёт в сессии:
+//state 1 NPC-портал предложен, 2 сбор частей, 3 сеть рычагов, 4 культист
+"questPortal":null,
 "levelFloor":0,"panels":0,"attack":{},
 //V69: ручные зверьки (pet) текущего забега — снапшот {class, stats} для переноса на новый
 //этаж; наполняется в nextFloor (snapshotCarryPets), расходуется в newGame (spawnCarriedPets)

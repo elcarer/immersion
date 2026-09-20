@@ -57,6 +57,9 @@ import { valkyrieTick } from "../scripts/valkyrie.js"
 import { shadowTick } from "../scripts/groundShadow.js"
 //V97: комната «напёрстков» (вид 3 портала) — фазы показа/перемешивания чаш
 import { shellTick } from "../scripts/portalFx.js"
+//V109: квест «Голос в портале» — тик состояния (исчезновение NPC-портала при выходе
+//из стартовой комнаты, полоска взаимодействия)
+import { portalQuestTick } from "../scripts/portalQuest.js"
 import { svgArr,image, text,gamepadDragStart,gamepadDragMove,gamepadDragEnd,isDragging,getCTM } from "../scripts/svg.js"
 
 //отслеживание мыши
@@ -141,6 +144,8 @@ function gameLoop() {
         minimapTick()
         //V97: «напёрстки» — отсчёт показа/перемешивания чаш и их скольжение (portalFx.js)
         shellTick()
+        //V109: «Голос в портале» — состояние квеста (portalQuest.js)
+        portalQuestTick()
         activeSkillsCD()
         }
     }

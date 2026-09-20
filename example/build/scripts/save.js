@@ -57,6 +57,10 @@ function normMeta(meta) {
     if (!meta.quests || typeof meta.quests !== "object") {
         meta.quests = {"wolf":0}
     }
+    //V109: квест «Голос в портале» — той же группы одноразовых (portalQuest.js)
+    if (meta.quests.portal === undefined) {
+        meta.quests.portal = 0
+    }
     //V74: герои открыты сразу — покупка героев удалена. Поле openHeroes старых сейвов стираем:
     //save() пишет мету целиком, иначе удалённое поле жило бы в сохранениях вечно
     delete meta.openHeroes

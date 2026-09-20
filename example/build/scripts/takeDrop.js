@@ -15,6 +15,8 @@ import { journalAdd, J_STD, J_YELLOW, J_SCROLL, J_RARITY } from "../scripts/jour
 import { rollGoldPickup } from "../scripts/sets.js"
 //V67: реликвии — «Вечный сапфир»: копия «живучести» источника; генерация реликвии (10% босса 4 этажа)
 import { relicGenerate, abilCopyBonus } from "../scripts/relics.js"
+//V109: квест «Голос в портале» — кучка «части посоха» (маркер WeakSet, ветка до href-цепочки)
+import { portalQuestTakePile } from "../scripts/portalQuest.js"
 //V67: новый предмет мог встать в 1-ю ячейку инвентаря — пересчёт копии «Вечного сапфира»
 import { changeDopStat } from "../scripts/drag.js"
 
@@ -31,6 +33,13 @@ function takeDrop() {
         let h2 = 32
         if (checkCollision(x1, x2, w1, w2, y1, y2, h1, h2)) {
             let useDrop = false
+            //V109: кучка квеста «Голос в портале» (часть посоха) — ветка в portalQuest.js
+            if (portalQuestTakePile(dropArr[i])) {
+                playback(strike[3].vol,0,0,7*status.settings.soundVolume)
+                dropArr[i].remove()
+                dropArr.splice(i, 1)
+                return
+            }
             //E-15: кучка из сундука босса — случайное ОРУЖИЕ фиксированной редкости
             //(фильтр в itemGenerate); href-цепочка ниже — обычные кучки
             let bossRarity = bossWeaponDrops.get(dropArr[i])

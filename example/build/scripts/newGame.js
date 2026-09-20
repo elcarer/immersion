@@ -13,6 +13,8 @@ import { spawnVoidBoss } from "../scripts/voidBoss.js"
 import { spawnCarriedPets } from "../scripts/pets.js"
 //V104: квест «Сопроводить Волка» — сброс состояния и спавн NPC (2 глава, 1 этаж)
 import { questNewGame } from "../scripts/quest.js"
+//V109: квест «Голос в портале» — сброс состояния и спавн объекта (3 глава, 2 этаж)
+import { portalQuestNewGame } from "../scripts/portalQuest.js"
 //V52: старт этажа — сброс забегных счётчиков достижений
 import { achFloorStart } from "../scripts/achievements.js"
 
@@ -37,6 +39,8 @@ function newGame(next) {
     spawnCarriedPets()
     //V104: квест «Сопроводить Волка» — на новом забеге сброс; 2 глава, 1 этаж — NPC Волк
     questNewGame(next)
+    //V109: квест «Голос в портале» — сброс; 3 глава, 2 этаж — выключенный портал в углу
+    portalQuestNewGame(next)
     //V52: статус.info готов — кэшируем ХП, чистим «чистый» этаж и окно Массовика
     achFloorStart()
 }

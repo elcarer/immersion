@@ -15,6 +15,8 @@ import { journalAdd, J_YELLOW } from "../scripts/journal.js"
 import { abilCopyBonus } from "../scripts/relics.js"
 //V69: 1% шанс при открытии комнаты — питомец подбегает, рядом с героем появляется еда
 import { petLuckyFood } from "../scripts/pets.js"
+//V109: квест «Голос в портале» — метка «части посоха» случайному врагу открытой комнаты
+import { portalQuestMarkRoom } from "../scripts/portalQuest.js"
 
 function openRoom(room) {
     playback(strike[16].vol,0,0,2*status.settings.soundVolume)
@@ -140,6 +142,9 @@ function openRoom(room) {
     }
     //Высшая справедливость валькирии: 25% шанс урона от Силы воли каждому врагу открытой комнаты
     justiceStrike(room)
+    //V109: квест «Голос в портале» — открылась комната из списка «частей посоха»:
+    //случайный враг комнаты получает метку (при смерти выпадет часть посоха)
+    portalQuestMarkRoom(room)
 }
 }
 export {openRoom}
