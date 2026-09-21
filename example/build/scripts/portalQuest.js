@@ -33,6 +33,8 @@
 //   Победа — кучка item5.png (подбор = случайная реликвия, relicGenerate) и мета portal=1.
 // ============================================================================
 import { status } from "../scripts/start.js"
+//V117: кооператив — триггеры квеста по ближайшему герою
+import { nearestPlayer,forAlive } from "../scripts/players.js"
 import { T } from "../scripts/localization.js"
 import { data } from "../scripts/data.js"
 import { dataGeneric, createRoom, createMatrix } from "../scripts/sceneGenerate.js"
@@ -174,10 +176,16 @@ export function portalQuestTick() {
     const lv = dataGeneric.scenes[status.levelFloor]
     if (!lv || !lv.roomsArr) return
     if (qp.state === 1) {
-        //герой покинул стартовую комнату, не поговорив — объект исчезает
-        const hx = Math.trunc(status.hero.x / 32)
-        const hy = Math.trunc(status.hero.y / 32)
-        if (hx < qp.room[0] || hx >= qp.room[0] + qp.room[2] || hy < qp.room[1] || hy >= qp.room[1] + qp.room[3]) {
+        //V117: объект исчезает, когда стартовую комнату покинули ВСЕ живые герои
+        let anyInside = false
+        for (let i = 0; i < status.players.length; i++) {
+            const P = status.players[i]
+            if (P.obj.type !== "hero") continue
+            const hx = Math.trunc(P.x / 32)
+            const hy = Math.trunc(P.y / 32)
+            if (hx >= qp.room[0] && hx < qp.room[0] + qp.room[2] && hy >= qp.room[1] && hy < qp.room[1] + qp.room[3]) { anyInside = true; break }
+        }
+        if (!anyInside) {
             removeQuestPortal()
             status.questPortal = null
             return
@@ -202,7 +210,10 @@ function portalUseBarTick() {
     if (!img || !img.isConnected) return
     const px = img.x.animVal.value + 32
     const py = img.y.animVal.value + 55
-    const d = Math.hypot((status.hero.x + 16) - px, (status.hero.y + 25) - py)
+    //V117: полоску растит ближайший к порталу живой герой
+    const HQ = nearestPlayer(px, py)
+    if (!HQ) return
+    const d = Math.hypot((HQ.x + 16) - px, (HQ.y + 25) - py)
     //68, а не 56 (как у Волка): спрайт портала 64×84 торчит НАД клеткой — центр
     //«тела» на 52px выше ноги, снизу/сбоку дистанция до героя больше
     if (d > 68) {
@@ -529,10 +540,14 @@ function spawnCultist(level) {
                 const o = level.objects[i]
                 x >= o[0] && x < o[0] + o[3] && y >= o[1] && y < o[1] + o[4] && (busy = true)
             }
-            //не клетка, пересекающая хитбокс героя (14×14, x+13/y+37 — как spawnShellBoss)
-            const hx = status.hero.x + 13
-            const hy = status.hero.y + 37
-            hx < x * 32 + 32 && hx + 14 > x * 32 && hy < y * 32 + 32 && hy + 14 > y * 32 && (busy = true)
+            //V117: не клетка, пересекающая хитбокс ЛЮБОГО героя (14×14, x+13/y+37)
+            for (let pi = 0; pi < status.players.length && !busy; pi++) {
+                const PP = status.players[pi]
+                if (PP.obj.type !== "hero") continue
+                const hx = PP.x + 13
+                const hy = PP.y + 37
+                hx < x * 32 + 32 && hx + 14 > x * 32 && hy < y * 32 + 32 && hy + 14 > y * 32 && (busy = true)
+            }
             !busy && cells.push([x, y])
         }
     }
@@ -560,7 +575,10 @@ export function portalQuestCultTick(enemy) {
 }
 function cultUseBarTick(enemy) {
     const wp = rectPos(enemy.rect)
-    const d = Math.hypot((status.hero.x + 16) - (wp[0] + 16), (status.hero.y + 25) - (wp[1] + 25))
+    //V117: полоску растит ближайший к культисту живой герой
+    const HQ = nearestPlayer(wp[0], wp[1])
+    if (!HQ) return
+    const d = Math.hypot((HQ.x + 16) - (wp[0] + 16), (HQ.y + 25) - (wp[1] + 25))
     if (d > 56) {
         useT > 0 && (useT = 0)
         useBarFill && useBarFill.setAttribute("width", 0)

@@ -96,6 +96,9 @@ function gameLoop() {
     //V77: видимость ряда bless-иконок (наведение на верх экрана) — каждый тик, до паузы
     blessHintsTick()
     if(status.start===1 && status.pause === 0) {
+        //V117: страховка — вне пер-игроковой фазы контекст обязан быть P1
+        //(квест-диалоги/полоски могли оставить контекст триггер-игрока)
+        status.hero !== status.players[0] && setContext(status.players[0])
         status.time++
         animPlay()
     //V114: мир тикает, пока жив хотя бы один игрок
@@ -256,6 +259,8 @@ function checkGamepadMenu() {
     timePadButtons++
     if(status.start === 1 && navigator.getGamepads()[0] && timePadButtons > 15) {
         timePadButtons = 0
+        //V117: меню-кнопки пада 0 — от имени игрока 1 (pad0 назначен ему; в коопе
+        //pad1-меню добавляется вместе с назначением устройств в лобби — V118)
         let but = navigator.getGamepads()[0].buttons
         //карта
         if (but[2] && but[2].pressed) {clickButton(1)}

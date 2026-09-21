@@ -198,21 +198,18 @@ function buttonInit() {
             //V104: диалог (квест «Сопроводить Волка») — хоткеи панелей глушим целиком
             //(Escape диалог продвигает его собственный слушатель в dialog.js)
             if (dialogIsOpen()) return
-            //карта
-            if (e.code === 'KeyM') {clickButton(1)}
+            //V117: панели per-owner — у каждого игрока СВОИ хоткеи: kb1 — N/M/,/.//
+            //(экипировка/карта/журнал/настройки/библиотека), kb2 (2-й игрок, под
+            //стрелками) — K/L/;/' и Backspace. Панель открывается в контексте владельца
+            const PK1 = {"KeyN":0,"KeyM":1,"Comma":2,"Period":3,"Slash":4}
+            const PK2 = {"KeyK":0,"KeyL":1,"Semicolon":2,"Quote":3,"Backspace":4}
+            if (PK1[e.code] !== undefined) {clickButton(PK1[e.code], 0)}
+            if (PK2[e.code] !== undefined && status.players[1]) {clickButton(PK2[e.code], 1)}
             //отмена
             //V93: Esc закрывает и полосу кнопок — все кнопочные пути закрытия (clickButton)
             //делают то же (closePanels+topMenuClose); без topMenuClose полоса оставалась
             //нарисованной при panels=0, и автоскрытие (y>100&&panels===10) её не подбирало
             if (e.code === 'Escape') {closePanels(0);topMenuClose();playback(strike[14].vol,0,0,3*status.settings.soundVolume)}
-            //экипировка
-            if (e.code === 'KeyN') {clickButton(0)}
-            //журнал
-            if (e.code === 'Comma') {clickButton(2)}
-            //настройки
-            if (e.code === 'Period') {clickButton(3)}
-            //библиотека
-            if (e.code === 'Slash') {clickButton(4)}
         }
     })
     document.addEventListener('keyup', function(e){status.start === 1 && status.hero.obj.currentAnim.once !== 1 && (status.hero.obj.stop = 1)})

@@ -22,6 +22,8 @@
 // оранжевая метка «огненное». Оружия нет — награда не на что накладывать.
 // ============================================================================
 import { status } from "../scripts/start.js"
+//V117: кооператив — триггеры по ближайшему герою, лава бьёт каждого
+import { nearestPlayer,setContext,forAlive } from "../scripts/players.js"
 //V115: полосы ХП/опыта — суффиксы по игроку (players.js)
 import { ctxBar,ctxTx } from "../scripts/players.js"
 import { T } from "../scripts/localization.js"
@@ -188,7 +190,10 @@ export function flameQuestTick() {
 //диалога/перебежки — recharge, снимается выходом героя из зоны (репорт V109)
 function npcUseBarTick(q, e) {
     const wp = rectPos(e.rect)
-    const d = Math.hypot((status.hero.x + 16) - (wp[0] + 16), (status.hero.y + 25) - (wp[1] + 25))
+    //V117: полоску растит ближайший к Огнементю живой герой
+    const HQ = nearestPlayer(wp[0], wp[1])
+    if (!HQ) return
+    const d = Math.hypot((HQ.x + 16) - (wp[0] + 16), (HQ.y + 25) - (wp[1] + 25))
     if (d > 56) {
         useT > 0 && (useT = 0)
         useBarFill && useBarFill.setAttribute("width", 0)
@@ -320,15 +325,17 @@ function lavaTick(q) {
     q.secT++
     if (q.secT >= LAVA_SEC_TICKS) {
         q.secT = 0
-        if (status.hero.obj && status.hero.obj.type === "hero" && status.info.hp > 0) {
-            const hx = Math.trunc(status.hero.x / 32)
-            const hy = Math.trunc(status.hero.y / 32)
+        //V117: лава жжёт КАЖДОГО живого игрока, стоящего на лавовой клетке
+        forAlive(P => {
+            if (P.obj.type !== "hero" || P.info.hp <= 0) return
+            const hx = Math.trunc(P.x / 32)
+            const hy = Math.trunc(P.y / 32)
             if (q.lavaSet.has(hx + "_" + hy)) {
-                status.info.hp -= 1
+                P.info.hp -= 1
                 changeHP(ctxBar("hp"),ctxTx("hp"),"hp")
-                floatText(status.hero.x - 16 + Math.trunc(Math.random() * 32), status.hero.y + 8, "1", "#FF5500", "14px", "none")
+                floatText(P.x - 16 + Math.trunc(Math.random() * 32), P.y + 8, "1", "#FF5500", "14px", "none")
             }
-        }
+        })
     }
 }
 function setLavaMode(q, mode) {
@@ -445,7 +452,8 @@ function finale(q, e) {
 export function flameQuestEnemyDie(enemy) {
     if (!enemy.flameFight) return
     const q = status.questFlame
-    status.info.buffFireT = BUFF_FLOOR_TICKS
+    //V117: бафф этажа — ОБЕИМ живым игрокам
+    forAlive(P => { P.info.buffFireT = BUFF_FLOOR_TICKS })
     //floorBuff остаётся в questFlame ДО del-хука (он снимет бафф при уходе с этажа):
     //обнулять questFlame здесь нельзя — иначе бафф переживал бы смену этажа
     q && (q.floorBuff = 1)

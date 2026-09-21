@@ -22,6 +22,8 @@
 // 4 выполнен, 5 провален.
 // ============================================================================
 import { status } from "../scripts/start.js"
+//V117: кооператив — квест-триггеры срабатывает БЛИЖАЙШИЙ живой герой
+import { nearestPlayer,setContext } from "../scripts/players.js"
 import { T } from "../scripts/localization.js"
 import { data } from "../scripts/data.js"
 import { dataGeneric } from "../scripts/sceneGenerate.js"
@@ -218,9 +220,16 @@ function wolfAllyTick(wolf) {
 //NPC: стоит в углу; герой ушёл из стартовой комнаты не поговорив — исчезает
 function npcTick(wolf) {
     const r = status.quest.room
-    const hx = Math.trunc(status.hero.x / 32)
-    const hy = Math.trunc(status.hero.y / 32)
-    if (hx < r[0] || hx >= r[0] + r[2] || hy < r[1] || hy >= r[1] + r[3]) {
+    //V117: NPC исчезает, только когда ИЗ стартовой комнаты ушли ВСЕ живые герои
+    let anyInside = false
+    for (let i = 0; i < status.players.length; i++) {
+        const P = status.players[i]
+        if (P.obj.type !== "hero") continue
+        const hx = Math.trunc(P.x / 32)
+        const hy = Math.trunc(P.y / 32)
+        if (hx >= r[0] && hx < r[0] + r[2] && hy >= r[1] && hy < r[1] + r[3]) { anyInside = true; break }
+    }
+    if (!anyInside) {
         removeWolf(wolf)
         status.quest = {"state":0}
         return
@@ -231,10 +240,17 @@ function npcTick(wolf) {
 //взаимодействие с NPC: герой рядом — растёт полоска (как у объектов), полная — диалог
 function useBarTick(wolf) {
     const wp = rectPos(wolf.rect)
-    const d = Math.hypot((status.hero.x + 16) - (wp[0] + 16), (status.hero.y + 25) - (wp[1] + 25))
+    //V117: полоску взаимодействия растит БЛИЖАЙШИЙ к Волку живой герой;
+    //класс триггера фиксируется для награды диалога (контекст к моменту
+    //клика уже не гарантирован — мир на паузе)
+    const HQ = nearestPlayer(wp[0], wp[1])
+    if (!HQ) return
+    setContext(HQ)
+    const d = Math.hypot((HQ.x + 16) - (wp[0] + 16), (HQ.y + 25) - (wp[1] + 25))
     if (d > 56) {
         useT > 0 && (useT = 0)
         useBarFill && useBarFill.setAttribute("width", 0)
+        setContext(status.players[0])
         return
     }
     useT++
@@ -427,7 +443,7 @@ function questFloorExit(cont) {
             //Плут — «Великий вор», Волшебница — «Учёная волшебница», Рыцарь —
             //«Победитель турниров», Валькирия — «Доблестный небожитель»;
             //itemGenerate сам кладёт его в инвентарь/пустой слот куклы (V102)
-            itemGenerate(4,{"setN":[1,2,3,4][status.hero.class] || 1})
+            itemGenerate(4,{"setN":[1,2,3,4][(HQ && HQ.class) !== undefined ? HQ.class : status.hero.class] || 1})
             playback(strike[3].vol,0,0,2*status.settings.soundVolume)
             questTrackerHide()
             status.quest.state = 4

@@ -17,6 +17,8 @@ import { alchemyDel,alchemyTemp } from "../scripts/alchemy.js"
 import { ancientDel,ancientTemp } from "../scripts/blessFx.js"
 import { tipDel } from "../scripts/tip.js"
 import { lvlFlashDrop } from "../scripts/lvlFlashFx.js"
+//V117: кооператив — панели per-owner (контекст игрока на время панели)
+import { setContext } from "../scripts/players.js"
 
 let menuPic = []
 //V73: подписи кнопок полосы меню — на 48px правее центра кнопки, чтобы осталась видна
@@ -34,6 +36,7 @@ function topMenu(map=0) {
 }
 //закрыть все открытые панели. nomusic=1 — не возобновлять музыку (при переключении)
 function closePanels(nomusic=0) {
+    //V117: после закрытия всех панелей контекст возвращается игроку 1
     dollTemp.length > 0 && dollDel(nomusic)
     inventoryTemp.length > 0 && inventoryDel(nomusic)
     settingsTemp.length > 0 && settingsDel(nomusic)
@@ -46,9 +49,15 @@ function closePanels(nomusic=0) {
     //V75: шкафчик с древностями — выход БЕЗ расхода объекта (благословение не выдано)
     ancientTemp.length > 0 && ancientDel(nomusic)
     tipDel()
+    status.hero !== status.players[0] && setContext(status.players[0])
 }
-function clickButton(buttonNumber) {
+//V117: ownerIdx — игрок, вызвавший панель (клавиша его раскладки / его геймпад).
+//Контекст ставится на владельца ПЕРЕД открытием — кукла/инвентарь/дерево/журнал
+//рисуют ЕГО данные; закрытие возвращает контекст через closePanels. Мышиные
+//кнопки полосы меню и дефолт — игрок 1.
+function clickButton(buttonNumber, ownerIdx = 0) {
     playback(strike[14].vol,0,0,3*status.settings.soundVolume)
+    const owner = status.players[ownerIdx] || status.players[0]
     switch (buttonNumber) {
         case 0: //экипировка (кукла + инвентарь)
             if (dollTemp.length > 0 || inventoryTemp.length > 0) {
@@ -56,6 +65,7 @@ function clickButton(buttonNumber) {
                 topMenuClose()
             } else {
                 closePanels(1)
+                setContext(owner)
                 doll()
                 inventory()
             }
@@ -66,6 +76,7 @@ function clickButton(buttonNumber) {
                 topMenuClose()
             } else {
                 closePanels(1)
+                setContext(owner)
                 map(dataGeneric,status.levelFloor,svgArr[2])
                 topMenu(1)
             }
@@ -76,6 +87,7 @@ function clickButton(buttonNumber) {
                 topMenuClose()
             } else {
                 closePanels(1)
+                setContext(owner)
                 journal()
                 topMenu(1) //панель держит полосу кнопок видимой — повторное нажатие закрывает (как карта)
             }
@@ -86,6 +98,7 @@ function clickButton(buttonNumber) {
                 topMenuClose()
             } else {
                 closePanels(1)
+                setContext(owner)
                 settings()
             }
             break
@@ -95,6 +108,7 @@ function clickButton(buttonNumber) {
                 topMenuClose()
             } else {
                 closePanels(1)
+                setContext(owner)
                 library()
                 topMenu(1) //панель держит полосу кнопок видимой — повторное нажатие закрывает (как карта)
             }
