@@ -1048,6 +1048,13 @@ const PAIRS = [
     ["settings.itemGlow", "Свечение предметов", "Item glow"],
     //V97: алхимия — три выделенных предмета разной редкости (раньше кнопка молча исчезала)
     ["alchemy.samerarity", "ВЫДЕЛИТЕ ПРЕДМЕТЫ ОДНОЙ РЕДКОСТИ", "SELECT ITEMS OF THE SAME RARITY"],
+//V118: кооператив — выбор режима и двухшаговое лобби
+["start.mode","Выбор режима игры","Select game mode"],
+["start.mode.solo","ОДИНОЧНАЯ ИГРА","SINGLE PLAYER"],
+["start.mode.coop","КООПЕРАТИВ — 2 ИГРОКА","CO-OP — 2 PLAYERS"],
+["lobby.coop.step1","Игрок 1 (WASD) — выберите героя","Player 1 (WASD) — pick a hero"],
+["lobby.coop.step2","Игрок 2 (стрелки) — выберите героя","Player 2 (arrows) — pick a hero"],
+["lobby.coop.taken","Занято игроком 1","Taken by player 1"],
 // === V58: END OF DICTIONARY (новые пары добавлять ВЫШЕ этой строки) ===
 ]
 

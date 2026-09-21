@@ -6,7 +6,7 @@ import { data } from "../scripts/data.js"
 import { playback,strike,playTrack,TRACK } from "../scripts/sound.js"
 import { lobby } from "../scripts/lobby.js"
 import { buttonInit } from "../scripts/sceneGenerate.js"
-import { load,loadSettings,save } from "../scripts/save.js"
+import { load,loadSettings,save,hasAnySave } from "../scripts/save.js"
 //V58: локализация — ключи вместо текстов, язык выбирается detectLang (шапка localization.js)
 import { T,setLang,detectLang,getLang } from "../scripts/localization.js"
 //V59: кнопка «Настройки» стартового экрана открывает панель настроек поверх него.
@@ -18,6 +18,8 @@ import { settings,settingsTemp,settingsDel } from "../scripts/settings.js"
 import { resetWorldView } from "../scripts/zoomFx.js"
 //V114: кооператив — фабрика игроков и подмена контекста (см. players.js)
 import { makePlayer,setContext } from "../scripts/players.js"
+//V118: кооператив — экран выбора режима и двухшаговое лобби
+import { modeSelect } from "../scripts/lobby.js"
 //МИГРАЦИЯ (M4): предзагрузка GPU-текстур Pixi (тот же resources.json, HTTP-кэш горячий)
 import { preloadGameTextures } from "../scripts/pixiBackend.js"
 
@@ -181,7 +183,8 @@ function newGameYes() {
     settingsTemp.length > 0 && settingsDel(1)
     playTrack(TRACK.none)
     status.rectShadow = 1
-    status.nextFunction = () => {freshRunReset();lobby(false,false)}
+    //V118: после сброса профиля — выбор режима (соло/кооп)
+    status.nextFunction = () => {freshRunReset();modeSelect()}
 }
 //модальное окно подтверждения на заставке (по образцу exitConfirm в settings.js): подложка
 //гасит клики мимо кнопок; ESC/клавиатура на заставке неактивны (guard status.start===1).
@@ -253,7 +256,8 @@ function drawStartScreen(animate) {
 //решение пользователя). До этого момента кнопок не существует в DOM — нажать их раньше
 //времени невозможно
 function drawStartButtons() {
-    const hasSave = !!localStorage.getItem("meta")
+    //V118: сейв есть и в соло-, и в кооп-профиле — «Продолжить» грузит последний режим
+    const hasSave = hasAnySave()
     screenPic.push(image(svgArr[2],PANEL_X,PANEL_Y,400,500,"./images/UI/backStartMenu.png"))
     //V82: хелпер кнопки заставки — спрайт (glow) + надпись над ним. Надпись дописывается в
     //слот ПОСЛЕ создания: обработчики svg.js держат массив по ссылке, поэтому обработчики
@@ -290,4 +294,4 @@ function drawStartButtons() {
     menuBtn(BTN_YS[3],T("start.exit"),()=>{playback(strike[14].vol,0,0,3*status.settings.soundVolume);window.close()})
 }
 
-export {start,status,drawStartScreen}
+export {start,status,drawStartScreen,freshProfile}

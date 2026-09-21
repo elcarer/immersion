@@ -3,10 +3,26 @@ import { lobby } from "../scripts/lobby.js"
 //V58: язык живёт в settings.lang — при загрузке сейва синхронизируем T();
 //keyByRu — миграция текстовых полей вещей старых сейвов на ключи локализации
 import { setLang,keyByRu } from "../scripts/localization.js"
+//V118: кооп-профиль — фабрика второго игрока при загрузке
+import { makePlayer } from "../scripts/players.js"
 
+//V118: два профиля — соло (ключ "meta", как всегда) и кооп ("metaCoop": те же поля
+//меты + mode:"coop" + players:[{class},{class}]). Активный режим — settings.lastMode;
+//сейв одного режима другим не грузится (несовместимость — по ТЗ коопа)
 function save() {
-    localStorage.setItem("meta",JSON.stringify(status.meta))
+    if (status.settings.lastMode === "coop") {
+        const coopMeta = JSON.parse(JSON.stringify(status.meta))
+        coopMeta.mode = "coop"
+        coopMeta.players = status.players.map(P => ({"class":P.class}))
+        localStorage.setItem("metaCoop",JSON.stringify(coopMeta))
+    } else {
+        localStorage.setItem("meta",JSON.stringify(status.meta))
+    }
     localStorage.setItem("settings",JSON.stringify(status.settings))
+}
+//V118: есть ли запись любого режима (кнопка «Продолжить» на заставке)
+function hasAnySave() {
+    return !!localStorage.getItem("meta") || !!localStorage.getItem("metaCoop")
 }
 //V35/V36: нормализация меты старых сохранений — слоты killedEnemes добиваем до 21 (у монстров
 //3-го этажа теперь свои id 14-20); зачёт библиотеки meta.library появился в V36 — у старых
@@ -106,15 +122,39 @@ function normMeta(meta) {
 }
 function load() {
     try {
-        let meta = JSON.parse(localStorage.getItem("meta"))
         let settings = JSON.parse(localStorage.getItem("settings"))
-        if (meta && typeof meta === "object") {
-            normMeta(meta)
-            status.meta = meta
-        }
         if (settings && typeof settings === "object") {
             status.settings = {musicVolume:0.1, soundVolume:0.1, ...settings}
         }
+        //V118: грузим профиль последнего режима (по умолчанию соло). Кооп-профиль
+        //валидируем: mode="coop" и два игрока с РАЗНЫМИ классами (правило коопа),
+        //иначе откат на соло-профиль
+        let coop = status.settings.lastMode === "coop"
+        let raw = coop ? JSON.parse(localStorage.getItem("metaCoop")) : null
+        if (coop && raw && raw.mode === "coop" && Array.isArray(raw.players) &&
+            raw.players.length === 2 &&
+            typeof raw.players[0].class === "number" && typeof raw.players[1].class === "number" &&
+            raw.players[0].class !== raw.players[1].class) {
+            const {players, ...metaFields} = raw
+            let meta = metaFields
+            normMeta(meta)
+            status.meta = meta
+            //второго игрока может не быть (players на старте — 1, solo-профиль)
+            if (!status.players[1]) status.players.push(makePlayer("kb2", players[1].class, 1))
+            status.players[0].class = players[0].class
+            status.players[1].class = players[1].class
+            status.players[0].device = "kb1"
+            status.players[1].device = "kb2"
+        } else {
+            coop = false
+            let meta = JSON.parse(localStorage.getItem("meta"))
+            if (meta && typeof meta === "object") {
+                normMeta(meta)
+                status.meta = meta
+            }
+            status.settings.lastMode = "solo"
+        }
+        if (coop) status.settings.lastMode = "coop"
         //V58: сейвы без lang (старые) — русский (решение по постановке); дальше T() по нему
         if (status.settings.lang !== "en") status.settings.lang = "ru"
         setLang(status.settings.lang)
@@ -210,4 +250,4 @@ function decryptGameState(encryptedData, secretKey = "secretKey") {
         return null;
     }
 }
-export {save,load,saveSettings,loadSettings,saveToFile,loadFromFile}
+export {save,load,saveSettings,loadSettings,saveToFile,loadFromFile,hasAnySave}

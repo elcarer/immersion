@@ -7,6 +7,9 @@ import { comix } from "../scripts/comix.js"
 import { playback,strike,playTrack,TRACK } from "../scripts/sound.js"
 import { clickButton } from "../scripts/topMenu.js"
 import { save,saveToFile,loadFromFile } from "../scripts/save.js"
+//V118: кооператив — фабрика игроков, сброс профиля
+import { makePlayer } from "../scripts/players.js"
+import { freshProfile } from "../scripts/start.js"
 //V52: достижение «Открыватель» — все мета-улучшения (проверка после покупок).
 //V74: герои открыты сразу — покупка/затемнение героев удалены, проверка осталась на ветках прокачки
 import { achMetaCheck } from "../scripts/achievements.js"
@@ -75,6 +78,71 @@ function toggleQuestsWin() {
     }
     for (let i = 0; i < questsWinNodes.length; i++) screenPic.push(questsWinNodes[i])
 }
+// ==================== V118: кооператив ====================
+//Экран выбора режима (после «Новой игры»): соло или кооп. Выбор определяет,
+//В КАКОЙ слот профиль запишется (solo — "meta", coop — "metaCoop").
+let modeTemp = []
+export function modeSelect() {
+    modeTemp.forEach(n => n.remove && n.remove())
+    modeTemp = []
+    modeTemp.push(rect(svgArr[2],0,0,1920,1080,"none","0px","black",{"fillOpacity":"0.78","func":()=>{}}))
+    modeTemp.push(text(svgArr[2],1920/2,380,"0pt","50pt","none","4px",`rgb(204, 153, 102)`,T("start.mode"),{"id":"delItemText","size":60,"font":"baseFont4","anchor":"middle"}))
+    const modeBtn = (y,label,coop) => {
+        modeTemp.push(image(svgArr[2],1920/2-341/2,y,341,96,"./images/UI/panels/buttons/button.png",{"glow":1,"func":()=>{
+            playback(strike[14].vol,0,0,3*status.settings.soundVolume)
+            modeTemp.forEach(n => n.remove && n.remove())
+            modeTemp = []
+            //сброс профиля ВЫБРАННОГО режима (freshProfile пишет в слот lastMode)
+            status.settings.lastMode = coop ? "coop" : "solo"
+            freshProfile()
+            if (coop) {
+                status.players[0] = makePlayer("kb1", 0, 0)
+                status.players[1] = makePlayer("kb2", 1, 1)
+                coopLobby(0)
+            } else {
+                if (status.players.length > 1) status.players.length = 1
+                status.players[0].device = "solo"
+                status.players[0].class = 0
+                lobby(false,false)
+            }
+        }}))
+        modeTemp.push(text(svgArr[2],1920/2,y+62,"0pt","50pt","black","3px",`rgb(204, 153, 102)`,label,{"id":"delItemText","size":44,"font":"baseFont4","anchor":"middle"}))
+    }
+    modeBtn(500,T("start.mode.solo"),false)
+    modeBtn(640,T("start.mode.coop"),true)
+}
+//Двухшаговый выбор героев: шаг 0 — Игрок 1 (WASD), шаг 1 — Игрок 2 (стрелки);
+//класс, выбранный первым игроком, второму недоступен (правило коопа — классы разные)
+function coopLobby(step) {
+    del()
+    status.start = 0
+    playTrack(TRACK.tavern)
+    screenPic.push(image(svgArr[2],544,0,832,1080,"./images/lobby/1.png"))
+    screenPic.push(text(svgArr[2],1920/2,180,"0pt","50pt","black","4px",`rgb(204, 153, 102)`,T(step === 0 ? "lobby.coop.step1" : "lobby.coop.step2"),{"id":"delItemText","size":44,"font":"baseFont4","anchor":"middle","blur":"filter: drop-shadow(0 0 14px rgba(204, 153, 100, 1))"}))
+    const taken = status.players[0].class
+    for (let i = 0; i < heroesArr.length; i++) {
+        const isTaken = step === 1 && i === taken
+        screenPic.push(image(svgArr[2],heroesArr[i].x,heroesArr[i].y,heroesArr[i].w,heroesArr[i].h,"./images/UI/doll/T"+i+".png",
+            isTaken ? {"opacity":"0.22"} : {"func":e=>{svgArr[2].append(e.target);coopPick(step,i)},"funcShow":e=>heroTip(i,e),"funcShowOut":heroTipDel,"opacity":isTaken ? "0.22" : "0.01"}))
+        if (isTaken) {
+            screenPic.push(text(svgArr[2],heroesArr[i].x + heroesArr[i].w/2,heroesArr[i].y + heroesArr[i].h/2,"0pt","50pt","none","3px","#FF6644",T("lobby.coop.taken"),{"id":"delItemText","size":34,"font":"baseFont4","anchor":"middle"}))
+        }
+    }
+}
+function coopPick(step,i) {
+    if (step === 0) {
+        status.players[0].class = i
+        coopLobby(1)
+    } else {
+        status.players[1].class = i
+        //кооп-профиль собран: устройства и запись профиля; далее — обычное лобби
+        //(сундук, «Далее»), классы уже заданы
+        status.settings.lastMode = "coop"
+        save()
+        lobby(false,false)
+    }
+}
+
 function lobby(lose,next,pageChest=0) {
     del()
     //E-17: карточка героя при наведении может висеть со старой перерисовки — гасим
