@@ -516,3 +516,36 @@
   молчит) — закрывать панель перед проверками wasMoving; (д) главный экспорт devices.js
   один, дубли строк export = SyntaxError и мёртвая страница (поймано через
   Runtime.exceptionThrown).
+- V127: ВОЛНА КООП-ТЕСТИРОВАНИЯ №2 (4 бага + правка + аудит status.info/status.hero),
+  коммит 3d6b753. (1) ЗАГРУЗКА ИЗ ФАЙЛА: «ownKeys on proxy: trap returned duplicate
+  entries» — makeMetaView.ownKeys склеивал ключи metaShared и p.meta (пересечение после
+  миграций сейвов), JSON.stringify(status.meta) падал; ownKeys дедуплицируется Set-ом.
+  Дополнительно save()/saveToFile() выбирают кооп-маршрут по status.players.length > 1,
+  а не только по settings.lastMode — живая кооп-сессия (players=2, lastMode=solo из
+  файла) стрингифицировала прокси в соло-слот. (2) НОЖИ ПЛУТА/ЩИТ: sceneGenerate выдавал
+  Плуту ОДИН объект weapon в ОБА слота ([,,,weapon,weapon,]) — indexOf-снятие брало
+  первый слот (визуально «не снимался»), drag разносил ссылку по массивам («копируется
+  по ячейкам»); вторая рука — глубокий клон. В drag.js swap-ветка (checkTypes===2,
+  первая петля inventoryTemp) писала doll[id источника]: для инвентарных источников —
+  фантомные слоты doll[13+]; гвард srcSlot 0..12, changeItem2 встаёт в ОСВОБОЖДАЕМЫЙ
+  слот-источник (семантика обмена «кукла↔инвентарь»). (3) ИКОНКИ АТАК в окошках у
+  полосок: unEquip снимал ПЕРВОЕ совпадение href по screenPic — при одинаковых иконках
+  у игроков уносилась ЧУЖАЯ; equip рисовал новую в соло-позицию 931,988 (мимо блока P2).
+  Теперь иконки с id «atkIco{idx}I» (суффикс «I» — контракт svg.js; getElementById
+  искать С «I»), unEquip снимает по id + надгробие в screenPic, equip рисует в bx
+  своего блока (-460/+460). (4) ПАНЕЛЬ «УПРАВЛЕНИЕ»: таблица действий перенесена в
+  nativeGroup + setClip (как журнал) — клип 560,330..1410,792, обрезается НАД кнопками;
+  колесо (document-wheel, passive:false, гвард panels===12 и курсор в зоне) + трек/ползунок;
+  СБРОС-текст на 848 (центр подложки). Ячейкам даны уникальные id «ctl_{pi}_{action}»
+  (ключ shimById С суффиксом «I» = «ctl_0_upI»). Экспорт controlsProbe() для тестов.
+  АУДИТ status.info/status.hero: скрипт-скан (forWork/audit_v127.mjs) — во ВСЕХ файлах
+  импорты players.js полные (класс ошибки ctxBar из V126 больше не встречается);
+  глобальные читатели (damageHero/enemyAI/portalFx) — по паттернам ownerPlayer/forAlive/
+  setContext(owner) V115+; HUD/камера читают P0 намеренно. Ловушки харнесса: (а) дети
+  nativeGroup НЕ ВИДНЫ в dumpUI (фабрики не ведут children-книгу группы) — клики по
+  ячейкам тестировать через shimById.get(id).node.getGlobalPosition() (getBounds внутри
+  группы врёт); (б) async-IIFE без awaitPromise сериализует промис как {} (снова);
+  (в) воспроизведение drag-сценариев моками: id ячеек с суффиксом «I», иначе slice(0,-1)
+  даёт мусор; мок-спрайты, попавшие в inventoryTemp (ветка кукла→инвентарь), роняют
+  inventoryDel — после мок-дрога чистить inventoryTemp. Verify: v127_verify.mjs 14
+  (прокси/save/ножи/иконки/скролл) + регресс v126_verify 30 + v126_solo 7 ALL_OK.
