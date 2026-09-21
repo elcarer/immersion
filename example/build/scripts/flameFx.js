@@ -8,6 +8,8 @@
 //с этим скиллом дополнительно гасят горение. Сила эффекта — status.info.burningPower,
 //= stats.flame последнего наложившего врага. Оба поля пересоздаются при новом забеге.
 import { status } from "../scripts/start.js"
+//V115: полосы ХП/опыта — суффиксы по игроку (players.js)
+import { ctxBar,ctxTx } from "../scripts/players.js"
 import { T } from "../scripts/localization.js"
 import { svgArr, image, releaseSprite, spritePos, rectPos } from "../scripts/svg.js"
 import { floatText } from "../scripts/floatText.js"
@@ -21,7 +23,8 @@ const FLAME_SIZE = 32 //flame.png — лист 32×32, одиночный кад
 //V69: было 62 тика (1с) — ожог на игроке теперь висит на 1 секунду дольше (решение пользователя)
 const FLAME_TICKS = 124
 
-let flameImg = null
+//V115: спрайт пламени — по одному на игрока (индекс = status.hero.idx)
+let flameImgs = [null, null]
 
 //наложение горения (damageHero: коллизия пули атакующего со stats.flame и героем)
 function applyFlame(power) {
@@ -37,6 +40,8 @@ function applyFlame(power) {
 //тик эффекта (gameLoop): обратный отсчёт + удержание спрайта над головой героя
 function flameTick() {
     let left = status.info ? (status.info.burning || 0) : 0
+    //V115: спрайт пламени — СВОЙ у каждого игрока (функция зовётся в контексте каждого)
+    let flameImg = flameImgs[status.hero.idx || 0]
     if (left <= 0 || !status.hero.obj || status.hero.obj.type !== "hero") {
         hideFlame()
         return
@@ -57,8 +62,9 @@ function flameTick() {
 }
 
 function hideFlame() {
-    if (flameImg && flameImg.isConnected) releaseSprite(flameImg)
-    flameImg = null
+    const i = status.hero.idx || 0
+    if (flameImgs[i] && flameImgs[i].isConnected) releaseSprite(flameImgs[i])
+    flameImgs[i] = null
 }
 
 //урон герою за удар под горением (attack(): момент фактической атаки по цели)
@@ -70,7 +76,7 @@ function flameOnHeroAttack() {
     status.info.hp -= damage
     status.info.hp <= 0 && (status.info.hp = 0)
     floatText(pos[0] + Math.trunc(Math.random() * 32), pos[1] + 8, damage, "#FF8800", "12px", "none")
-    changeHP(document.getElementById("hpBarI"), document.getElementById("hpText"), "hp")
+    changeHP(ctxBar("hp"),ctxTx("hp"),"hp")
     checkFood()
     status.info.hp <= 0 && endGame()
 }

@@ -22,6 +22,8 @@
 // оранжевая метка «огненное». Оружия нет — награда не на что накладывать.
 // ============================================================================
 import { status } from "../scripts/start.js"
+//V115: полосы ХП/опыта — суффиксы по игроку (players.js)
+import { ctxBar,ctxTx } from "../scripts/players.js"
 import { T } from "../scripts/localization.js"
 import { data } from "../scripts/data.js"
 import { dataGeneric } from "../scripts/sceneGenerate.js"
@@ -323,7 +325,7 @@ function lavaTick(q) {
             const hy = Math.trunc(status.hero.y / 32)
             if (q.lavaSet.has(hx + "_" + hy)) {
                 status.info.hp -= 1
-                changeHP(document.getElementById("hpBarI"), document.getElementById("hpText"), "hp")
+                changeHP(ctxBar("hp"),ctxTx("hp"),"hp")
                 floatText(status.hero.x - 16 + Math.trunc(Math.random() * 32), status.hero.y + 8, "1", "#FF5500", "14px", "none")
             }
         }

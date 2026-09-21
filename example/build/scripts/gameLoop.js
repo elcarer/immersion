@@ -14,10 +14,11 @@ import { enemyMove } from "../scripts/enemyMove.js"
 import { separateEnemiesTick } from "../scripts/enemyAI.js"
 import { moveBullet,moveMagicBullet } from "../scripts/moveBullet.js"
 import { damageHero } from "../scripts/damageHero.js"
-import { checkBuffs } from "../scripts/checkBuffs.js"
+//V115: бафы расщеплены — checkBuffs (герой, per player) + enemyBuffsTick (ловушки/яд врагов/шипы)
+import { checkBuffs,enemyBuffsTick } from "../scripts/checkBuffs.js"
 import { flameTick } from "../scripts/flameFx.js"
 //V49: бафы статуи (таймеры + иконки над героем) и ожоги врагов от огненного оружия
-import { buffTick } from "../scripts/buffFx.js"
+import { buffTick,tickEnemyBurns } from "../scripts/buffFx.js"
 //V51: «вампиризм» врагов (кулдауны выпивания + шлейфы частиц герой→враг)
 import { vampTick } from "../scripts/vampFx.js"
 //V52: достижения — фиксация потери ХП героем за этаж (Ловкач)
@@ -113,6 +114,12 @@ function gameLoop() {
             P.noStunTime > 0 && P.noStunTime--
             //иконки кулдаунов рисуются только для игрока 0 (ряд UI — V117 per-owner)
             activeSkillsCD(pi === 0)
+            //V115: герой-часть бафов (яд/невидимость/автокасты/щит), горение,
+            //бафы статуи (иконки над своим героем), ачивка «Ловкач» — per player
+            checkBuffs()
+            flameTick()
+            buffTick()
+            achTick()
         }
         setContext(status.players[0])
         moveBullet()
@@ -136,12 +143,11 @@ function gameLoop() {
         //V80: наземные тени — после всех сдвигов спрайтов за тик (движение/отбросы/рывки)
         shadowTick()
         damageHero()
-        checkBuffs()
-        //V26 горение: отсчёт времени эффекта + спрайт пламени над героем
-        flameTick()
-        //V49 бафы статуи: таймеры/иконки над героем + ожоги врагов (после блока паузы —
-        //на паузе время бафов замирает, как и всё остальное)
-        buffTick()
+        //V115: ловушки + яд ВРАГОВ + шипы на поле — один раз за тик
+        enemyBuffsTick()
+        //V115: горение героев и бафы статуи переехали в пер-игроковую фазу;
+        //здесь остался глобальный тик ожогов ВРАГОВ (дважды тикать нельзя)
+        tickEnemyBurns()
         //V51 вампиризм врагов: кулдауны выпивания + движение шлейфов частиц
         vampTick()
         //V65: Сгустки пустоты Циклопа (4 этаж) — кулдаун способности + спиральное движение;
@@ -151,8 +157,6 @@ function gameLoop() {
         medusaSplitTick()
         //V91: Гриб пустоты — кулдаун разброса спор + полёт/прорастание лежащих
         sporeTick()
-        //V52 достижения: ХП героя против прошлого тика — любая потеря гасит «чистый» этаж
-        achTick()
         //V27: ХП-бары врагов после урона / мигание меню при левелапе / авточистка окошка предмета
         enemyHpBarTick()
         lvlFlashTick()

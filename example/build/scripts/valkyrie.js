@@ -7,6 +7,8 @@
 // V57: длительность «Крыльев валькирии» заглушкой больше НЕ отмечается — спрайт героини
 // подсвечивается жёлтым фильтром (как «ярость» Вождя гоблинов в enemyAI, но жёлтый оттенок).
 import { status } from "../scripts/start.js"
+//V115: полосы ХП/опыта — суффиксы по игроку (players.js)
+import { ctxBar,ctxTx } from "../scripts/players.js"
 import { objectValues } from "../scripts/del.js"
 import { svgArr, image, spritePos, moveSprite, releaseSprite, rectPos } from "../scripts/svg.js"
 import { checkCollision } from "../scripts/damage.js"
@@ -514,7 +516,7 @@ function auraHeal() {
   info.hp += heal
   info.auraHealCd = 60
   floatText(status.hero.x - 16 + Math.trunc(Math.random() * 32), status.hero.y + 8, "+" + heal, "#33FF66", "18px", "none")
-  changeHP(document.getElementById("hpBarI"), document.getElementById("hpText"), "hp")
+  changeHP(ctxBar("hp"),ctxTx("hp"),"hp")
 }
 //враг закончил атаку, не попав по героине (вызывается из animPlay)
 function auraMissEnd(enemy) {

@@ -17,6 +17,8 @@ import { abilCopyBonus } from "../scripts/relics.js"
 import { petLuckyFood } from "../scripts/pets.js"
 //V109: квест «Голос в портале» — метка «части посоха» случайному врагу открытой комнаты
 import { portalQuestMarkRoom } from "../scripts/portalQuest.js"
+//V115: кооператив — опыт открытия комнаты получают оба живых игрока
+import { forAlive } from "../scripts/players.js"
 
 function openRoom(room) {
     playback(strike[16].vol,0,0,2*status.settings.soundVolume)
@@ -25,11 +27,14 @@ function openRoom(room) {
     //Стакается по числу надетых предметов (expous). Стартовая комната открыта при генерации —
     //сюда не попадает; коридоры открываются мимо openRoom и опыта не дают.
     //V67: копия «учёности» (Вечный сапфир) считается как своя
-    let expousTotal = status.info.expous + abilCopyBonus("expous")
-    if (expousTotal > 0) {
-        status.info.exp += expousTotal
-        checkExp(expousTotal)
-    }
+    //V115: «учёность» — опыт за комнату идёт КАЖДОМУ живому игроку (левелап свой)
+    forAlive(P => {
+        const expousTotal = P.info.expous + abilCopyBonus("expous")
+        if (expousTotal > 0) {
+            P.info.exp += expousTotal
+            checkExp(expousTotal)
+        }
+    })
     //V66: «корыстность» (постфикс «корыстности») — 20% шанс найти 1 золото при открытии
     //новой (ещё не открытой) комнаты; стакается по числу надетых предметов — каждая копия
     //бросает свой шанс. Стартовая комната открыта при генерации, коридоры — мимо openRoom.

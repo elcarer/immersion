@@ -36,7 +36,13 @@ const BURN_SRC = "./images/effects/flame.png"
 const BUFF_SIZE = 32
 const BUFF_SRCS = [null, "./images/effects/buff1.png", "./images/effects/buff2.png", "./images/effects/buff3.png", "./images/effects/buff4.png"]
 
-let buffImgs = [null, null, null, null] //иконки над героем: скорость / огонь / щит / кулдауны
+//V115: иконки бафов — РЯД НА ИГРОКА (ключ = status.hero.idx), у каждого свой набор
+let buffImgsBy = {} //idx -> [скорость / огонь / щит / кулдауны]
+function buffImgs() {
+    const k = status.hero.idx || 0
+    if (!buffImgsBy[k]) buffImgsBy[k] = [null, null, null, null]
+    return buffImgsBy[k]
+}
 let burnList = [] //{"e": враг, "img": спрайт пламени} — чистится при смерти/смене этажа
 
 function buffT(n) {
@@ -130,20 +136,21 @@ function buffTick() {
     let idx = 0
     for (let i = 0; i < 4; i++) {
         if (!active[i]) {
-            if (buffImgs[i] && buffImgs[i].isConnected) releaseSprite(buffImgs[i])
-            buffImgs[i] = null
+            const bImgs = buffImgs()
+            if (bImgs[i] && bImgs[i].isConnected) releaseSprite(bImgs[i])
+            bImgs[i] = null
             continue
         }
-        if (buffImgs[i] && !buffImgs[i].isConnected) buffImgs[i] = null
-        if (!buffImgs[i]) buffImgs[i] = image(svgArr[1], 0, 0, BUFF_SIZE, BUFF_SIZE, BUFF_SRCS[i + 1], {})
+        const bImgs = buffImgs()
+        if (bImgs[i] && !bImgs[i].isConnected) bImgs[i] = null
+        if (!bImgs[i]) bImgs[i] = image(svgArr[1], 0, 0, BUFF_SIZE, BUFF_SIZE, BUFF_SRCS[i + 1], {})
         //ряд иконок центрирован над героем (порядок: скорость, огонь, щит, кулдауны); если герой
         //горит — ряд сдвигается вправо, освобождая центральный слот для пламени
         const shift = info.burning > 0 ? BUFF_SIZE : 0
-        spritePos(buffImgs[i], pos[0] + r._w / 2 - (count * BUFF_SIZE) / 2 + idx * BUFF_SIZE + shift, pos[1] - BUFF_SIZE + 6)
-        if (svgArr[1].lastElementChild !== buffImgs[i]) svgArr[1].append(buffImgs[i])
+        spritePos(bImgs[i], pos[0] + r._w / 2 - (count * BUFF_SIZE) / 2 + idx * BUFF_SIZE + shift, pos[1] - BUFF_SIZE + 6)
+        if (svgArr[1].lastElementChild !== bImgs[i]) svgArr[1].append(bImgs[i])
         idx++
     }
-    tickEnemyBurns()
 }
 
 //ожоги врагов: обратный отсчёт e.burnT + удержание пламени над головой горящего.
@@ -176,9 +183,10 @@ function tickEnemyBurns() {
 }
 
 function hideBuffs() {
+    const bImgs = buffImgs()
     for (let i = 0; i < 4; i++) {
-        if (buffImgs[i] && buffImgs[i].isConnected) releaseSprite(buffImgs[i])
-        buffImgs[i] = null
+        if (bImgs[i] && bImgs[i].isConnected) releaseSprite(bImgs[i])
+        bImgs[i] = null
     }
     for (let i = burnList.length - 1; i >= 0; i--) {
         burnList[i].img && burnList[i].img.isConnected && releaseSprite(burnList[i].img)
@@ -186,4 +194,5 @@ function hideBuffs() {
     burnList.length = 0
 }
 
-export { giveBuff, buffTick, fireOnAttack, buffActive, buffArmorBonus, applyEnemyBurn, weaponFireOnAttack }
+//V115: tickEnemyBurns экспортирован — глобальный тик (врагам ожоги дважды нельзя)
+export { giveBuff, buffTick, tickEnemyBurns, fireOnAttack, buffActive, buffArmorBonus, applyEnemyBurn, weaponFireOnAttack }

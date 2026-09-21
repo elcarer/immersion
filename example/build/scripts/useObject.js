@@ -1,5 +1,7 @@
 import { dataGeneric } from "../scripts/sceneGenerate.js"
 import { status } from "../scripts/start.js"
+//V115: полосы ХП/опыта — суффиксы по игроку (players.js)
+import { ctxBar,ctxTx } from "../scripts/players.js"
 import { T } from "../scripts/localization.js"
 import { svgArr,image,worldImage,rect,picById } from "../scripts/svg.js"
 import { screenPic } from "../scripts/del.js"
@@ -141,7 +143,7 @@ function actionsObject(obj) {
             break
         case 2: drop(obj)
             break
-        case 3: status.info.hp = parseInt(status.info.stats[2].dops[0].value2.slice(0,-1));changeHP(document.getElementById("hpBarI"),document.getElementById("hpText"),"hp");floatText(status.hero.x - 16 + Math.trunc(Math.random() * 32),status.hero.y+8,"+" + status.info.hp,"#33FF66","18px","none")
+        case 3: status.info.hp = parseInt(status.info.stats[2].dops[0].value2.slice(0,-1));changeHP(ctxBar("hp"),ctxTx("hp"),"hp");floatText(status.hero.x - 16 + Math.trunc(Math.random() * 32),status.hero.y+8,"+" + status.info.hp,"#33FF66","18px","none")
             break
         case 4: drop(obj)
             break
@@ -158,11 +160,11 @@ function actionsObject(obj) {
         //V96: порог «ровно до следующего уровня» — ТА ЖЕ формула, что в checkExp (damage.js):
         //((1+20/lvl)^(lvl/20)−1)/(e−1)·100. Прежняя ((1+30/(lvl+3))^((lvl+3)/30)) совпадала
         //с ней только на 6 уровне: выше 6-го алтарь недоливал опыт, ниже — переливал.
-        case 10: status.info.hp -= checkStoneSkin(Math.trunc(2*status.info.hp/3));let nextLvl = Math.trunc(((1 + 20/(status.info.lvl))**((status.info.lvl)/20) - 1) / (Math.exp(1) - 1) * 100)-status.info.exp;status.info.exp += nextLvl;checkExp(nextLvl);changeHP(document.getElementById("hpBarI"),document.getElementById("hpText"),"hp")
+        case 10: status.info.hp -= checkStoneSkin(Math.trunc(2*status.info.hp/3));let nextLvl = Math.trunc(((1 + 20/(status.info.lvl))**((status.info.lvl)/20) - 1) / (Math.exp(1) - 1) * 100)-status.info.exp;status.info.exp += nextLvl;checkExp(nextLvl);changeHP(ctxBar("hp"),ctxTx("hp"),"hp")
         break
         case 11: encounters(obj);drop(obj);drop(obj);drop(obj)
         break
-        case 12: status.info.hp -= checkStoneSkin(Math.trunc(status.info.hp/3));status.info.abilPoints++;abilOverflowToStats();changeHP(document.getElementById("hpBarI"),document.getElementById("hpText"),"hp")
+        case 12: status.info.hp -= checkStoneSkin(Math.trunc(status.info.hp/3));status.info.abilPoints++;abilOverflowToStats();changeHP(ctxBar("hp"),ctxTx("hp"),"hp")
         break
         case 13: nextFloor()
         break

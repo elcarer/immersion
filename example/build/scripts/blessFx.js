@@ -1,4 +1,6 @@
 import { status } from "../scripts/start.js"
+//V115: полосы ХП/опыта — суффиксы по игроку (players.js)
+import { ctxBar,ctxTx } from "../scripts/players.js"
 import { T } from "../scripts/localization.js"
 import { svgArr,image,worldImage,picById,text,rect,nativeHtml,uiRightEdge,uiBottomEdge } from "../scripts/svg.js"
 import { screenPic } from "../scripts/del.js"
@@ -110,7 +112,7 @@ function grantBless(id,obj) {
         countDopStats()
         let maxHp = parseInt(status.info.stats[2].dops[0].value2.slice(0,-1))
         status.info.hp > maxHp && (status.info.hp = maxHp)
-        changeHP(document.getElementById("hpBarI"),document.getElementById("hpText"),"hp")
+        changeHP(ctxBar("hp"),ctxTx("hp"),"hp")
     }
     journalAdd(T("journ.bless",T("bless." + id + ".name")), J_GREEN)
     playback(strike[13].vol,0,0,2*status.settings.soundVolume)

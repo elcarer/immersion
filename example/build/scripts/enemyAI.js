@@ -49,6 +49,8 @@ import { dataGeneric } from "../scripts/sceneGenerate.js"
 import { checkCollision, playEffect, dropKey, checkExp, reanimateCheck } from "../scripts/damage.js"
 import { svgArr, image, worldImage, spritePos, moveSprite, rectPos, releaseSprite } from "../scripts/svg.js"
 import { checkZOrder } from "../scripts/heroMove.js"
+//V115: кооператив — цель врага, цикл по живым игрокам, контекст
+import { forAlive,setContext } from "../scripts/players.js"
 import { enemyOnTrail } from "../scripts/valkyrie.js"
 import { checkRat } from "../scripts/encounters.js"
 import { floatText } from "../scripts/floatText.js"
@@ -128,15 +130,45 @@ function idlePose(enemy) {
 }
 
 // ---------- обнаружение (геометрический range, как раньше) ----------
+// ---------- V115: цель врага в кооперативе ----------
+//Ближайший ЖИВОЙ герой; запоминается на враге (e.th) при обнаружении и
+//переобновляется раз в 15 тиков. В соло игрок один — поведение прежнее.
+function nearestHeroOf(e) {
+    let best = null
+    let bd = Infinity
+    for (let i = 0; i < status.players.length; i++) {
+        const P = status.players[i]
+        if (P.obj.type !== "hero") continue
+        const d = Math.abs(P.x - e.rect.x.animVal.value) + Math.abs(P.y - e.rect.y.animVal.value)
+        if (d < bd) { bd = d; best = P }
+    }
+    return best || status.players[0]
+}
+function curTarget(e) {
+    if (!e.th || e.th.obj.type !== "hero" || status.time - (e.thTick || -1e9) > 15) {
+        e.th = nearestHeroOf(e)
+        e.thTick = status.time
+    }
+    return e.th
+}
+//Видит ли враг ХОТЬ одного героя; увиденный становится его целью (e.th)
 export function enemySeesHero(enemy) {
-    if (status.hero.obj.type !== "hero") return false
-    const range = (enemy.class.stats.range - status.info.invisible) * 32
-    if (range < 0) return false
     const r = enemy.rect
     const pos = rectPos(r)
-    return checkCollision(
-        pos[0] - range, status.hero.x, r._w + 2 * range, 32,
-        pos[1] - range, status.hero.y, r._h + 2 * range, 51)
+    for (let i = 0; i < status.players.length; i++) {
+        const P = status.players[i]
+        if (P.obj.type !== "hero") continue
+        const range = (enemy.class.stats.range - P.info.invisible) * 32
+        if (range < 0) continue
+        if (checkCollision(
+            pos[0] - range, P.x, r._w + 2 * range, 32,
+            pos[1] - range, P.y, r._h + 2 * range, 51)) {
+            enemy.th = P
+            enemy.thTick = status.time
+            return true
+        }
+    }
+    return false
 }
 
 // ---------- эмоция «заметил героя»: emo1.png над rect на 1с ----------
@@ -267,10 +299,11 @@ let flowQx = null
 let flowQy = null
 const DX = [0, 0, -1, 1]
 const DY = [-1, 1, 0, 0]
-function ensureFlowField() {
+function ensureFlowField(e, heroCellArg) {
     const n = ensureNavMatrix()
     if (!n) return false
-    const heroCell = [Math.trunc(status.hero.x / 32), Math.trunc(status.hero.y / 32)]
+    //V115: центр поля — переданная клетка героя или клетка цели врага
+    const heroCell = heroCellArg || (() => { const H = e ? curTarget(e) : status.players[0]; return [Math.trunc(H.x / 32), Math.trunc(H.y / 32)] })()
     if (flowNavRef === n && flowDirs && flowCenter[0] === heroCell[0] && flowCenter[1] === heroCell[1]) return true
     const h = navH
     const w = navW
@@ -355,8 +388,9 @@ function crowdRankOf(enemy) {
     const me = rectPos(enemy.rect)
     const mx = me[0] + 16
     const my = me[1] + 25
-    const hpx = status.hero.x + 16
-    const hpy = status.hero.y + 25
+    const Hcr = curTarget(enemy)
+    const hpx = Hcr.x + 16
+    const hpy = Hcr.y + 25
     const crew = [] // [расстояние-до-героя, id] — только живые ходячие в кадре
     //E-3: перебор врагов из группы genemy (маркер на спавне); фильтр type — 1:1
     const gE = world.queries.genemy && world.queries.genemy.entities
@@ -388,7 +422,7 @@ function crowdRankOf(enemy) {
     return { size: crew.length, rank: crew.findIndex(c => c[1] === enemy.id) }
 }
 function flankTargetFor(heroCell, mx, my, wob) {
-    if (!ensureFlowField()) return null
+    if (!ensureFlowField(null, heroCell)) return null
     const dist = flowDist
     const n = nav
     const w = flowW
@@ -523,7 +557,7 @@ function bfsPathBoss(from, to) {
 //Без третьего аргумента (прочие вызовы) поведение совпадает со старым.
 //export: используется тестом v28EnemyDiversity.txt для проверки на синтетической карте
 export function buildChasePath(enemyCell, heroCell, enemy) {
-    if (!ensureFlowField()) return []
+    if (!ensureFlowField(enemy, heroCell)) return []
     const dist = flowDist
     const n = nav
     const w = flowW
@@ -593,7 +627,8 @@ export function enemyChase(enemy) {
     //клетка врага — по ЦЕНТРУ rect (x+16, y+25): спрайты спавнятся со смещением −19px
     //по Y, и клетка «по верху» прямоугольника может оказаться стеной/пустотой — путь бы не строился
     const enemyCell = [Math.trunc(mx / 32), Math.trunc(my / 32)]
-    const heroCell = [Math.trunc(status.hero.x / 32), Math.trunc(status.hero.y / 32)]
+    const Hc = curTarget(enemy)
+    const heroCell = [Math.trunc(Hc.x / 32), Math.trunc(Hc.y / 32)]
     // враг уже стоит на клетке героя — путь не нужен (атакует с места)
     if (enemyCell[0] === heroCell[0] && enemyCell[1] === heroCell[1]) {
         enemy.called = 0
@@ -666,8 +701,9 @@ function zoneTemplatesFor(attack) {
 export function enemyAim(enemy, attackId, ex, ey) {
     if (ex === undefined) { let p = rectPos(enemy.rect); ex = p[0]; ey = p[1] }
     const attack = data.attacks[attackId]
-    const hx = status.hero.x
-    const hy = status.hero.y
+    const Hh = curTarget(enemy)
+    const hx = Hh.x
+    const hy = Hh.y
     if (attack.type === "magic") {
         // магия летит к цели (moveMagicBullet) — достаточно дистанции range
         return Math.abs(ex - (hx + 16)) + Math.abs(ey - (hy + 35)) < attack.range * 32 ? 0 : null
@@ -694,8 +730,9 @@ function hasRangedAttack(enemy) {
 }
 function aimMiss(enemy, ex, ey) {
     const attacks = enemy.class.attacks
-    const hx = status.hero.x
-    const hy = status.hero.y
+    const Hh = curTarget(enemy)
+    const hx = Hh.x
+    const hy = Hh.y
     let best = Infinity
     let any = false
     for (let i = 0; i < attacks.length; i++) {
@@ -900,7 +937,8 @@ function spawnShadowPool(enemy, wx, wy) {
 // свободная клетка рядом с героем: периметр кольца r=2, иначе r=3;
 // требования — проходимость, не клетка героя, без других живых врагов
 function pickShadowLanding(enemy) {
-    const heroCell = [Math.trunc(status.hero.x / 32), Math.trunc(status.hero.y / 32)]
+    const Hc = curTarget(enemy)
+    const heroCell = [Math.trunc(Hc.x / 32), Math.trunc(Hc.y / 32)]
     const matrix = status.matrixLevel
     const walkable = (cx, cy) => !!(matrix && matrix[cy] && matrix[cy][cx] === 1)
     const taken = new Set()
@@ -999,7 +1037,8 @@ function tickShadow (enemy) {
     enemy.shadowAge = 0
     // герой вплотную — мигать незачем
     const eCell = enemyCellOf(enemy)
-    const hCell = [Math.trunc(status.hero.x / 32), Math.trunc(status.hero.y / 32)]
+    const Hsh = curTarget(enemy)
+    const hCell = [Math.trunc(Hsh.x / 32), Math.trunc(Hsh.y / 32)]
     if (Math.max(Math.abs(eCell[0] - hCell[0]), Math.abs(eCell[1] - hCell[1])) < SHADOW_MIN_DIST) return
     const spot = pickShadowLanding(enemy)
     if (!spot) return
@@ -1054,7 +1093,11 @@ export function enemyDie(enemy, exp) {
     //напрямую; раньше лишнее «/100» при πцелочисленном Math.trunc(random*100) прижимало
     //шанс к константному ~1% (0% при 0–2 очках) независимо от прокачки
     Math.trunc(Math.random() * 100) < parseInt(status.info.stats[4].dops[1].value2.slice(0, -1)) && (gain *= 2)
-    status.info.exp += gain
+    //V115: опыт с убийства получают ОБА живых игрока полностью (левелап у каждого свой)
+    forAlive(P => {
+        P.info.exp += gain
+        checkExp(gain)
+    })
     //V37 журнал: жёлтая строка — убийство врага и полученный опыт (фактический gain)
     journalAdd(T("journ.kill",T(enemy.class.name),gain), J_YELLOW)
     //V38: способность «вой» (stats.howl) — смерть хаунда создаёт зону-бафф (строка воя в журнале)
@@ -1066,11 +1109,11 @@ export function enemyDie(enemy, exp) {
     portalQuestEnemyDie(enemy)
     //V111: победа над Огнементем в бою («НАПАСТЬ») — бафф огня на весь этаж
     flameQuestEnemyDie(enemy)
-    checkExp(gain)
     enemy.stop = 0
     enemy.currentStill = 0
     setEnemyPose(enemy, enemy.class.anims[2].others[1])
-    enemy.class.boss === 1 && (status.info.bossKill = 1)
+    //V115: выход юзает любой игрок — отметку об убитом боссе получают все
+    enemy.class.boss === 1 && forAlive(P => { P.info.bossKill = 1 })
     //V113: вид убитого босса — в мету навсегда (bossesSlain, для достижения «Я сделал!»).
     //Тег boss носят только настоящие боссы: мини-грибы Гриба пустоты — клоны без boss,
     //осколки Медузы наследуют boss честно (этаж не завершается, пока жив последний)
@@ -1260,14 +1303,15 @@ function chaseStep(enemy) {
         //цель — живая позиция героя; запоминаем клетку как «последнюю известную».
         //E-9: попутно считаем смены клетки героя с момента постройки живого пути —
         //их счётчик решает, не пора ли перечитать путь (PATH_HERO_MOVES)
-        const hcNow = [Math.trunc(status.hero.x / 32), Math.trunc(status.hero.y / 32)]
+        const Hs = curTarget(enemy)
+        const hcNow = [Math.trunc(Hs.x / 32), Math.trunc(Hs.y / 32)]
         if (enemy._lastHeroCell && (enemy._lastHeroCell[0] !== hcNow[0] || enemy._lastHeroCell[1] !== hcNow[1])) {
             enemy._heroCellMoves = (enemy._heroCellMoves || 0) + 1
         }
         enemy._lastHeroCell = hcNow
         enemy.lastSeen = hcNow
-        tx = status.hero.x + 16
-        ty = status.hero.y + 25
+        tx = Hs.x + 16
+        ty = Hs.y + 25
     } else if (enemy.lastSeen) {
         //герой потерян — идём к последней известной клетке
         tx = enemy.lastSeen[0] * 32 + 16
@@ -1490,7 +1534,8 @@ function rangedKeepDist(enemy) {
 function sneakHotCells(enemy, pivot) {
     const hot = new Set()
     // сектор перед героем: 3 клетки по направлению взгляда
-    const hd = status.hero.direction
+    const Hdir = curTarget(enemy)
+    const hd = Hdir.direction
     if (hd !== undefined) {
         const dv = DIRV[hd] || DIRV[1]
         for (let k = 1; k <= 3; k++) {
@@ -1522,7 +1567,7 @@ function sneakHotCells(enemy, pivot) {
 // точка подкрадывания: клетка вокруг героя (кольцо 2..5, чебышёв), максимально
 // противоположная вектору «герой → враг» (за спиной/сбоку), с штрафом за горячие клетки
 function buildSneakPath(enemy, pivot) {
-    if (!ensureFlowField()) return []
+    if (!ensureFlowField(enemy, pivot)) return []
     const n = nav
     const w = navW
     const ec = enemyCellOf(enemy)
@@ -1562,7 +1607,7 @@ let fleeSeen = null
 let fleeParent = null
 let fleeQ = null
 function buildFleePath(enemy, pivot) {
-    if (!ensureFlowField()) return []
+    if (!ensureFlowField(enemy, pivot)) return []
     const n = nav
     const w = navW
     const h = navH
@@ -1630,7 +1675,8 @@ function fleeTick(enemy, sees) {
     if (enemy.state === ENEMY_STATE.ATTACK) return
     let pivot
     if (sees || enemy.called) {
-        pivot = [Math.trunc(status.hero.x / 32), Math.trunc(status.hero.y / 32)]
+        const Hf = curTarget(enemy)
+        pivot = [Math.trunc(Hf.x / 32), Math.trunc(Hf.y / 32)]
         enemy.lastSeen = pivot
     } else if (enemy.lastSeen) {
         pivot = enemy.lastSeen
@@ -1781,7 +1827,7 @@ export function petFollowTick(pet) {
     if (pet.luckyRun) return
     const p = rectPos(pet.rect)
     const petCell = [Math.trunc((p[0] + 16) / 32), Math.trunc((p[1] + 25) / 32)]
-    const hc = [Math.trunc(status.hero.x / 32), Math.trunc(status.hero.y / 32)]
+    const hc = [Math.trunc(status.players[0].x / 32), Math.trunc(status.players[0].y / 32)]
     const far = Math.max(Math.abs(petCell[0] - hc[0]), Math.abs(petCell[1] - hc[1])) > PET_STOP_CELLS
     if (!far) {
         // в радиусе стоит: недоигранный путь сбрасываем
@@ -1804,6 +1850,9 @@ export function petFollowTick(pet) {
 
 // ---------- главный тик врага (вызывается из enemyMove) ----------
 export function enemyTick(enemy) {
+    //V115: контекст врага — его цель (invisible/аура-отражение/очарование цели и т.п.);
+    //восстановление контекста — в enemyMove после цикла
+    setContext(curTarget(enemy))
     if (enemy.type === "pet") {
         //V104: Волк-союзник (квест «Сопроводить Волка», quest.js) — поведение своим
         //тиком (мирный NPC стоит; принятый — за героем через petFollowTick; в бою —
@@ -1907,7 +1956,8 @@ export function enemyTick(enemy) {
     // не видел, смысла нет
     if (isWounded(enemy) && (enemy.noticed || enemy.called || enemy.state === ENEMY_STATE.FLEE)) {
         const kd = rangedKeepDist(enemy)
-        const hc = [Math.trunc(status.hero.x / 32), Math.trunc(status.hero.y / 32)]
+        const Ht = curTarget(enemy)
+        const hc = [Math.trunc(Ht.x / 32), Math.trunc(Ht.y / 32)]
         const ec = enemyCellOf(enemy)
         const dx = Math.abs(ec[0] - hc[0]), dy = Math.abs(ec[1] - hc[1])
         const tooClose = kd !== 0 && (enemy._keepMetric === "m" ? dx + dy : Math.max(dx, dy)) < kd

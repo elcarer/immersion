@@ -19,6 +19,8 @@ import { setArmorBonus } from "../scripts/sets.js"
 import { sapphireArmor, hasRelic } from "../scripts/relics.js"
 //V75: благословения шкафчика — «Стальная кожа» (кап 16) и «Второе дыхание» (спасение с 1 ХП)
 import { blessActive,spendBless } from "../scripts/blessFx.js"
+//V115: кооператив — суффиксы DOM-id полос по игроку (hpBarI0/lvlText1…)
+import { ctxBar,ctxTx } from "../scripts/players.js"
 
 //V86: ЕДИНАЯ сумма брони — и для формулы урона, и для числа на кукле: своя броня
 //(щиты, очки рыцаря) + копия щита «Вечного сапфира» + сет «Турниры» (4 предмета) +
@@ -110,7 +112,7 @@ function takeDamage(damage, srcName, srcEnemy) {
         //Ветряной щит валькирии: отбрасывает врагов в квадрате 96×96
         shieldKnockback()
         checkFood()
-        status.info.hp > 0 ? changeHP(document.getElementById("hpBarI"),document.getElementById("hpText"),"hp") : endGame()
+        status.info.hp > 0 ? changeHP(ctxBar("hp"),ctxTx("hp"),"hp") : endGame()
     }
 }
 function checkFood() {
@@ -121,7 +123,7 @@ function checkFood() {
             foodType += Math.trunc(parseInt(status.info.stats[2].dops[2].value2.slice(0,-1))/100 * foodType)
             if(status.info.hp + Math.trunc(parseInt(status.info.stats[2].dops[0].value2.slice(0,-1)) * foodType) <= parseInt(status.info.stats[2].dops[0].value2.slice(0,-1))) {
                 status.info.hp +=  Math.trunc(parseInt(status.info.stats[2].dops[0].value2.slice(0,-1)) * foodType)
-                changeHP(document.getElementById("hpBarI"),document.getElementById("hpText"),"hp")
+                changeHP(ctxBar("hp"),ctxTx("hp"),"hp")
                 floatText(status.hero.x - 16 + Math.trunc(Math.random() * 32),status.hero.y+8,"+" + Math.trunc(parseInt(status.info.stats[2].dops[0].value2.slice(0,-1)) * foodType),"#33FF66","18px","none")
                 status.info.beltCellArr.splice(i,1)
                 i--
@@ -133,7 +135,7 @@ function checkFood() {
     //воскрешение
     if(status.info.resurrect && status.info.hp <= 0) {
         status.info.hp = Math.trunc(parseInt(status.info.stats[2].dops[0].value2.slice(0,-1))/2)
-        changeHP(document.getElementById("hpBarI"),document.getElementById("hpText"),"hp")
+        changeHP(ctxBar("hp"),ctxTx("hp"),"hp")
         status.info.resurrect = false
         floatText(status.hero.x - 16 + Math.trunc(Math.random() * 32),status.hero.y+8,T("float.rebirth"),"#33FF66","18px","none")
     }
@@ -142,31 +144,42 @@ function checkFood() {
     //Рыцарь с воскресением спасается дважды, остальные — один раз
     else if(blessActive(6) && status.info.hp <= 0) {
         status.info.hp = 1
-        changeHP(document.getElementById("hpBarI"),document.getElementById("hpText"),"hp")
+        changeHP(ctxBar("hp"),ctxTx("hp"),"hp")
         spendBless(6)
         floatText(status.hero.x - 16 + Math.trunc(Math.random() * 32),status.hero.y+8,T("float.secondwind"),"#33FF66","18px","none")
     }
 }
+//V115: полосы — по ПАРЕ на игрока: блок P1 сдвинут влево на 460, P2 — вправо на 460
+//(прежний составной блок 554..1365 по центру). Суффиксы DOM-id — по idx игрока
 function checkHP() {
-    screenPic.push(image(svgArr[2],958,987,407,64,"./images/UI/panels/hpBar.png"))
-    screenPic.push(image(svgArr[2],554,987,407,64,"./images/UI/panels/hpBar.png"))
-    //R4: полосы нативные (спрайт + маска) — changeHP правит окно маски напрямую
-    screenPic.push(worldBar(svgArr[2],1007,1007,315,24,"./images/UI/panels/hpBarCol2.png",{"id":"hpBar"}))
-    screenPic.push(worldBar(svgArr[2],598,1007,315,24,"./images/UI/panels/hpBarCol1.png",{"id":"expBar"}))
-    screenPic.push(text(svgArr[2],1164,1026,"0pt","50pt","none","2px",`#FFCC66`,status.info.hp+"/"+status.info.stats[2].dops[0].value2.slice(0,-1),{"id":"hpText","size":24,"font":"baseFont4","anchor":"middle"}))
-    screenPic.push(text(svgArr[2],760,1026,"0pt","50pt","none","2px",`#FFCC66`,status.info.exp+"/"+Math.trunc(((1 + 20/(status.info.lvl))**((status.info.lvl)/20) - 1) / (Math.exp(1) - 1) * 100),{"id":"expText","size":24,"font":"baseFont4","anchor":"middle"}))
-    changeHP(document.getElementById("expBarI"),document.getElementById("expText"),"exp")
-    changeHP(document.getElementById("hpBarI"),document.getElementById("hpText"),"hp")
+    for (let pi = 0; pi < status.players.length; pi++) {
+        const P = status.players[pi]
+        const bx = pi === 0 ? -460 : 460
+        const info = P.info
+        screenPic.push(image(svgArr[2],958+bx,987,407,64,"./images/UI/panels/hpBar.png"))
+        screenPic.push(image(svgArr[2],554+bx,987,407,64,"./images/UI/panels/hpBar.png"))
+        //R4: полосы нативные (спрайт + маска) — changeHP правит окно маски напрямую
+        screenPic.push(worldBar(svgArr[2],1007+bx,1007,315,24,"./images/UI/panels/hpBarCol2.png",{"id":"hp"+pi}))
+        screenPic.push(worldBar(svgArr[2],598+bx,1007,315,24,"./images/UI/panels/hpBarCol1.png",{"id":"exp"+pi}))
+        screenPic.push(text(svgArr[2],1164+bx,1026,"0pt","50pt","none","2px",`#FFCC66`,info.hp+"/"+info.stats[2].dops[0].value2.slice(0,-1),{"id":"hpText"+pi,"size":24,"font":"baseFont4","anchor":"middle"}))
+        screenPic.push(text(svgArr[2],760+bx,1026,"0pt","50pt","none","2px",`#FFCC66`,info.exp+"/"+Math.trunc(((1 + 20/(info.lvl))**((info.lvl)/20) - 1) / (Math.exp(1) - 1) * 100),{"id":"expText"+pi,"size":24,"font":"baseFont4","anchor":"middle"}))
+        changeHP(document.getElementById("exp"+pi+"I"),document.getElementById("expText"+pi),"exp",pi)
+        changeHP(document.getElementById("hp"+pi+"I"),document.getElementById("hpText"+pi),"hp",pi)
 
-    screenPic.push(image(svgArr[2],927,910,64,101,"./images/UI/panels/lvlBack.png"))
-    screenPic.push(image(svgArr[2],912,969,96,96,"./images/UI/panels/portBack2.png"))
-    screenPic.push(image(svgArr[2],931,988,58,58,status.attack.img))
-    screenPic.push(text(svgArr[2],959,967,"0pt","50pt","none","2px",`#FFCC66`,status.info.lvl,{"id":"lvlText","size":24,"font":"baseFont4","anchor":"middle"}))
+        screenPic.push(image(svgArr[2],927+bx,910,64,101,"./images/UI/panels/lvlBack.png"))
+        screenPic.push(image(svgArr[2],912+bx,969,96,96,"./images/UI/panels/portBack2.png"))
+        screenPic.push(image(svgArr[2],931+bx,988,58,58,P.attack.img))
+        screenPic.push(text(svgArr[2],959+bx,967,"0pt","50pt","none","2px",`#FFCC66`,info.lvl,{"id":"lvlText"+pi,"size":24,"font":"baseFont4","anchor":"middle"}))
+    }
 }
 function changeLvl() {
-    document.getElementById("lvlText").textContent = status.info.lvl
+    //V115: уровень — в окно текущего контекстного игрока
+    const el = ctxTx("lvl")
+    el && (el.textContent = status.info.lvl)
 }
-function changeHP(img,text,type) {
+function changeHP(img,text,type,pi) {
+    //V115: суффикс полосы можно не передавать — берём idx контекстного игрока
+    pi === undefined && (pi = status.hero.idx || 0)
     if(type==="hp" && status.info.randomHealDamageAbil && status.info.randomHealDamageAbil.cooldown === 0 && status.info.hp > parseInt(text.textContent.split('/')[0])) {
         status.info.takeHeal = status.info.hp - parseInt(text.textContent.split('/')[0])
         useSkill(status.info.randomHealDamageAbil)

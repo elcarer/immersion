@@ -119,7 +119,7 @@ function takeFood() {
     //5% - 40% * Выносливость
     if(status.info.hp + Math.trunc(parseInt(status.info.stats[2].dops[0].value2.slice(0,-1)) * foodType) <= parseInt(status.info.stats[2].dops[0].value2.slice(0,-1))) {
         status.info.hp +=  Math.trunc(parseInt(status.info.stats[2].dops[0].value2.slice(0,-1)) * foodType)
-        changeHP(document.getElementById("hpBarI"),document.getElementById("hpText"),"hp")
+        changeHP(ctxBar("hp"),ctxTx("hp"),"hp")
         floatText(status.hero.x - 16 + Math.trunc(Math.random() * 32),status.hero.y+8,"+" + Math.trunc(parseInt(status.info.stats[2].dops[0].value2.slice(0,-1)) * foodType),"#33FF66","18px","none")
         return true
     } else if(status.info.beltCell > 0) {

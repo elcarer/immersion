@@ -1,5 +1,7 @@
 import { svgArr,image, text, rect } from "../scripts/svg.js"
 import { status } from "../scripts/start.js"
+//V115: полосы ХП/опыта — суффиксы по игроку (players.js)
+import { ctxBar,ctxTx } from "../scripts/players.js"
 import * as basicData from "../scripts/data.js"
 import { drag,doubleClickItem } from "../scripts/drag.js"
 import { tip,tipDel,helpWord,rarityColor,itemFrameOn,itemGlowOn } from "../scripts/tip.js"
@@ -95,7 +97,7 @@ function upStat(i) {
     status.info.stats[i].value++
     status.info.upStat--
     countDopStats()
-    i === 2 && changeHP(document.getElementById("hpBarI"),document.getElementById("hpText"),"hp")
+    i === 2 && changeHP(ctxBar("hp"),ctxTx("hp"),"hp")
     dollDel(1)
     doll()
 }

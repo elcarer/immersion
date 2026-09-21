@@ -1,4 +1,6 @@
 import { status } from "../scripts/start.js"
+//V115: полосы ХП/опыта — суффиксы по игроку (players.js)
+import { ctxBar,ctxTx } from "../scripts/players.js"
 import { svgArr,image,worldImage,nativeSector, spritePos } from "../scripts/svg.js"
 import { delPins } from "../scripts/checkBuffs.js"
 import { checkCollision,playEffect,createSplash } from "../scripts/damage.js"
@@ -382,7 +384,7 @@ function useSkill(skill) {
         function restoreHP() {
             status.info.hp += status.info.healSelfAbil
             status.info.hp > parseInt(status.info.stats[2].dops[0].value2.slice(0,-1)) && (status.info.hp = parseInt(status.info.stats[2].dops[0].value2.slice(0,-1)))
-            changeHP(document.getElementById("hpBarI"),document.getElementById("hpText"),"hp")
+            changeHP(ctxBar("hp"),ctxTx("hp"),"hp")
             floatText(status.hero.x - 16 + Math.trunc(Math.random() * 32),status.hero.y+8,"+" + status.info.healSelfAbil,"#33FF66","18px","none") //V42: показываем реальное лечение (1/2)
         }
         skill.cooldown = skill.skill.cooldown

@@ -27,9 +27,10 @@ function defaultInventory() {
     return {"doll":[,,,,,,,,,,,,,],"inv":[false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false]}
 }
 //фабрика игрока. device — раскладка из devices.js: "solo" (вся клавиатура + пад 0,
-//поведение одиночной игры 1:1), "kb1" (WASD), "kb2" (стрелки), "pad0"/"pad1"
-function makePlayer(device = "solo", cls = 0) {
-    return {"class":cls,"x":0,"y":0,"direction":1,"obj":{},"waitTime":0,"noStunTime":0,
+//поведение одиночной игры 1:1), "kb1" (WASD), "kb2" (стрелки), "pad0"/"pad1".
+//idx — номер игрока (0/1): суффикс DOM-id его полос ХП/опыта (hpBarI0/lvlText1…)
+function makePlayer(device = "solo", cls = 0, idx = 0) {
+    return {"class":cls,"x":0,"y":0,"direction":1,"obj":{},"waitTime":0,"noStunTime":0,"idx":idx,
         //V114: юз объектов — ПЕР-ИГРОКОВОЙ (бывший status.use): полоска использования
         //одного игрока больше не сбивается проходом другого
         "use":0,
@@ -55,4 +56,43 @@ function anyAlive() {
     }
     return false
 }
-export {defaultInfo,defaultInventory,makePlayer,setContext,playerAlive,anyAlive}
+//игрок-владелец мирового объекта (спрайт героя): bullet.atacker / target / d из animPlay
+function ownerPlayer(obj) {
+    if (!obj) return null
+    for (let i = 0; i < status.players.length; i++) {
+        if (status.players[i].obj === obj) return status.players[i]
+    }
+    return null
+}
+//ближайший ЖИВОЙ герой к точке (x,y) мира — цель врагов/эффектов (null, если все мертвы)
+function nearestPlayer(x, y) {
+    let best = null
+    let bd = Infinity
+    for (let i = 0; i < status.players.length; i++) {
+        const P = status.players[i]
+        if (!playerAlive(P)) continue
+        const d = Math.abs(P.x - x) + Math.abs(P.y - y)
+        if (d < bd) { bd = d; best = P }
+    }
+    return best
+}
+//прогон fn в контексте КАЖДОГО живого игрока (опыт с убийства — обоим и т.п.);
+//после цикла контекст возвращается игроку 1
+function forAlive(fn) {
+    for (let i = 0; i < status.players.length; i++) {
+        const P = status.players[i]
+        if (!playerAlive(P)) continue
+        setContext(P)
+        fn(P)
+    }
+    setContext(status.players[0])
+}
+//суффиксы DOM-id полос текущего контекста: полоса — base+"I"+idx (svg.image суффиксит
+//"I"), текст/уровень — base+"Text"+idx / "lvlText"+idx (svg.text пишет id дословно)
+function ctxBar(base) {
+    return document.getElementById(base + (status.hero.idx || 0) + "I")
+}
+function ctxTx(base) {
+    return document.getElementById(base + "Text" + (status.hero.idx || 0))
+}
+export {defaultInfo,defaultInventory,makePlayer,setContext,playerAlive,anyAlive,ownerPlayer,nearestPlayer,forAlive,ctxBar,ctxTx}

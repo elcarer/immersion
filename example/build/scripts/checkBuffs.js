@@ -1,5 +1,7 @@
 import { objectValues } from "../scripts/del.js"
 import { status } from "../scripts/start.js"
+//V115: полосы ХП/опыта — суффиксы по игроку (players.js)
+import { ctxBar,ctxTx } from "../scripts/players.js"
 //V63: логика ловушек (фазы шипов/огня, облако кислоты, ожог от вспышки) — trapsFx.js
 import { trapTick } from "../scripts/trapsFx.js"
 import { svgArr,image, spritePos, moveSprite, releaseSprite, rectPos } from "../scripts/svg.js"
@@ -14,12 +16,13 @@ import { endGame } from "../scripts/endGame.js"
 import { changeBossHP } from "../scripts/hpBar.js"
 import { wingsActive,dashInvulnActive } from "../scripts/valkyrie.js"
 
+//V115: checkBuffs — ПЕР-ИГРОКОВАЯ часть (вызывается из gameLoop в контексте каждого
+//игрока: своё горение/яд/невидимость/шипы-копилки/автокасты/щит/отражение).
+//Глобальная часть (ловушки, яд ВРАГОВ, шипы на поле) — enemyBuffsTick, раз в тик.
 function checkBuffs() {
-    trapTick()
-    checkPoison()
+    checkPoisonHero()
     checkInvisible()
     checkPins()
-    checkDamPins()
     status.info.cloudeAbil && checkCloude()
     status.info.knifeAbil && checkKnife()
     status.info.grapAbil && checkGrap()
@@ -49,11 +52,18 @@ function checkBuffs() {
     }
     status.info.reflectAbil && checkReflect()
 }
+//V115: глобальная часть бывшего checkBuffs — тикается ОДИН раз за тик
+//(врагам яд/шипы дважды нельзя, ловушки общие)
+function enemyBuffsTick() {
+    trapTick()
+    checkPoisonEnemies()
+    checkDamPins()
+}
 //V63: ловушки переехали в trapsFx.js — фазы шипов/огня (2с), облако кислоты (урон только
 //у облака, не у самой ловушки), ожог от вспышки огненной ловушки. trapTick() зовётся в
 //checkBuffs на месте старого checkTraps; удвоение урона врагам от сета «Великий вор»
 //тоже живёт там (импорт setCount перенесён вслед за логикой).
-function checkPoison() {
+function checkPoisonEnemies() {
     let lengthEnemy = objectValues.length
     for (let i = 0; i < lengthEnemy; i++) {
         //V79: неуязвимость (Циклоп, invulnActive) — яд замирает на окно: стек и таймер
@@ -81,31 +91,34 @@ function checkPoison() {
                 enemyDie(objectValues[i])
             }
         }
-        if (objectValues[i].type === "hero" && status.info.poison && !wingsActive() && !dashInvulnActive()) {
-            status.info.poisonTime--
-            if(status.info.poisonTime <= 0) {
-                //V46b: «Выносливость» пропускает часть тиков яда (проц с накопительным
-                //шансом вын% — урона нет). V67a: пул яда КАЖДЫЙ тик половинится
-                //(округление вниз; было -1 — сумма N+(N-1)+…+1 выходила слишком
-                //сильной), пропущенный тик так же половинит пул — без урона
-                status.info.poisonSkipCarry = (status.info.poisonSkipCarry || 0) + parseInt(status.info.stats[2].dops[2].value2.slice(0,-1))
-                let skipPoison = status.info.poisonSkipCarry >= 100
-                skipPoison && (status.info.poisonSkipCarry -= 100)
-                let takePoison = skipPoison ? 0 : status.info.poison
-                status.info.hp -= takePoison
-                status.info.hp <= 0 && (status.info.hp = 0)
-                let rectM = status.hero.obj.rect
-                let x = rectM.x.animVal.value + rectM.width.animVal.value/2
-                let y = rectM.y.animVal.value
-                takePoison > 0 && floatText(x,y,takePoison,"#339966","12px","none")
-                status.info.poison = Math.trunc(status.info.poison / 2)
-                status.info.poisonTime = 30
-                changeHP(document.getElementById("hpBarI"),document.getElementById("hpText"),"hp")
-            }
-            checkFood()
-            status.info.hp <= 0 && endGame()
-        }
     }
+}
+//V115: яд героя — из цикла вынесен (не зависел от objectValues[i]); тик в контексте игрока.
+//Крылья валькирии / неуязвимость после рывка: яд заморожен целиком, как в старой ветке
+function checkPoisonHero() {
+    if (!status.info.poison || wingsActive() || dashInvulnActive()) return
+    status.info.poisonTime--
+    if(status.info.poisonTime <= 0) {
+        //V46b: «Выносливость» пропускает часть тиков яда (проц с накопительным
+        //шансом вын% — урона нет). V67a: пул яда КАЖДЫЙ тик половинится
+        //(округление вниз; было -1 — сумма N+(N-1)+…+1 выходила слишком
+        //сильной), пропущенный тик так же половинит пул — без урона
+        status.info.poisonSkipCarry = (status.info.poisonSkipCarry || 0) + parseInt(status.info.stats[2].dops[2].value2.slice(0,-1))
+        let skipPoison = status.info.poisonSkipCarry >= 100
+        skipPoison && (status.info.poisonSkipCarry -= 100)
+        let takePoison = skipPoison ? 0 : status.info.poison
+        status.info.hp -= takePoison
+        status.info.hp <= 0 && (status.info.hp = 0)
+        let rectM = status.hero.obj.rect
+        let x = rectM.x.animVal.value + rectM.width.animVal.value/2
+        let y = rectM.y.animVal.value
+        takePoison > 0 && floatText(x,y,takePoison,"#339966","12px","none")
+        status.info.poison = Math.trunc(status.info.poison / 2)
+        status.info.poisonTime = 30
+        changeHP(ctxBar("hp"),ctxTx("hp"),"hp")
+    }
+    checkFood()
+    status.info.hp <= 0 && endGame()
 }
 function checkInvisible() {
     status.info.invisibleTime > 0 && status.info.invisibleTime--
@@ -316,4 +329,4 @@ function checkGrap() {
         } 
     }
 }
-export {checkBuffs,delPins,delPin,pinsArr}
+export {checkBuffs,enemyBuffsTick,delPins,delPin,pinsArr}

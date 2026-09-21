@@ -3,6 +3,8 @@
 import { objectValues } from "../scripts/del.js"
 import { svgArr,rectPos } from "../scripts/svg.js"
 import { emoFxTick, enemyTick } from "../scripts/enemyAI.js"
+//V115: контекст игрока
+import { setContext } from "../scripts/players.js"
 // V32: глобальное гашение следов рывка нетопыря (dashFx.js), один вызов за тик
 import { dashGhostsTick } from "../scripts/dashFx.js"
 // V34: снаряды «очарования» суккуба + обратный отсчёт эффекта (charmFx.js)
@@ -50,5 +52,7 @@ function enemyMove() {
             enemyTick(o)
         }
     }
+    //V115: enemyTick ставил контекст цели врага — возвращаем игроку 1
+    setContext(status.players[0])
 }
 export { enemyMove }

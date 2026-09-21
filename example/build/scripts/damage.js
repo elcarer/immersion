@@ -1,6 +1,8 @@
 import { screenPic,objectValues } from "../scripts/del.js"
 import { floatText } from "../scripts/floatText.js"
 import { status } from "../scripts/start.js"
+//V115: полосы ХП/опыта — суффиксы по игроку (players.js)
+import { ctxBar,ctxTx,ownerPlayer,setContext } from "../scripts/players.js"
 import { T } from "../scripts/localization.js"
 import { changeHP,changeLvl } from "../scripts/takeDamage.js"
 import { data } from "../scripts/data.js"
@@ -57,7 +59,8 @@ function damage() {
     const gB = world.queries.gbullet && world.queries.gbullet.entities
     if (gB) for (let j = 0; j < gB.length; j++) {
         const o = DATA.bag[gB[j]]
-        if (o && o.type === "bullet" && o.target !== status.hero.obj) dmgBullets.push(o)
+        //V115: снаряд героя = target принадлежит одному из игроков (любому, не только P1)
+        if (o && o.type === "bullet" && !ownerPlayer(o.target)) dmgBullets.push(o)
     }
     const gF = world.queries.gfx && world.queries.gfx.entities
     if (gF) for (let j = 0; j < gF.length; j++) {
@@ -88,6 +91,9 @@ function damage() {
     //снаряды: каждый бьёт первого попавшегося врага и исчезает
     for (let j = 0; j < dmgBullets.length; j++) {
         let bullet = dmgBullets[j]
+        //V115: урон/казнь/beacon/killHeal считаются в контексте ВЛАДЕЛЬЦА снаряда
+        const ownP = ownerPlayer(bullet.atacker)
+        ownP && setContext(ownP)
         let rectB = bullet.rect
         let candidates = bulletCandidates(bullet,dmgGrid)
         let hitList = []
@@ -150,7 +156,7 @@ function damage() {
                     status.info.hp += status.info.killHeal
                     floatText(status.hero.x - 16 + Math.trunc(Math.random() * 32),status.hero.y+8,"+" + status.info.killHeal,"#33FF66","18px","none")
                     status.info.hp > parseInt(status.info.stats[2].dops[0].value2.slice(0,-1)) && (status.info.hp = parseInt(status.info.stats[2].dops[0].value2.slice(0,-1)))
-                    changeHP(document.getElementById("hpBarI"),document.getElementById("hpText"),"hp")
+                    changeHP(ctxBar("hp"),ctxTx("hp"),"hp")
                 }
             }
         }
@@ -182,6 +188,9 @@ function damage() {
                 enemy.rect._w,eff.rect._w,
                 enemy.rect._ry,eff.rect._ry,
                 enemy.rect._h,eff.rect._h)) {
+                //V115: зона лежит до конца тика — урон по статам создавшего её игрока
+                const fown9 = ownerPlayer(eff.fxOwner)
+                fown9 && setContext(fown9)
                 createSplash(eff,1,countMagicDamage(0),1,4)
             }
         }
@@ -207,10 +216,14 @@ function damage() {
                 //источников у ветки нет — правка не задевает чужой урон
                 let meteorDmg = status.info.stats[4].dops[0].value1
                 meteorDmg < 4 && (meteorDmg = 4)
+                const fown13 = ownerPlayer(eff.fxOwner)
+                fown13 && setContext(fown13)
                 createSplash(eff,1,meteorDmg,1,0)
             }
         }
     }
+    //V115: контекст возвращается игроку 1
+    setContext(status.players[0])
 }
 //V7: клетки-кандидаты снаряда из пространственного хэша
 //V16: числовой ключ и переиспользуемый Set (dmgSeen) вместо аллокаций на снаряд
@@ -423,7 +436,9 @@ function reflectMagic(enemy,bullet) {
         enemy.rect.y.animVal.value - 8,T("float.reflect"),"#9966FF","12px","none")
     bullet.targets.push(enemy)
     bullet.currentAnim = Object.assign({},bullet.currentAnim,{"bullet":"all"})
-    bullet.target = status.hero.obj
+    //V115: отражённый снаряд летит во владельца (стрелявшего героя), не всегда в P1
+    const ownR = ownerPlayer(bullet.atacker)
+    bullet.target = ownR ? ownR.obj : status.hero.obj
     bullet.atacker = enemy
     return true
 }
@@ -631,7 +646,7 @@ function checkExp(exp=0) {
         lvlFlashShow()
         status.info.exp >= nextLvl&&checkExp()
     }
-    changeHP(document.getElementById("expBarI"),document.getElementById("expText"),"exp")
+    changeHP(ctxBar("exp"),ctxTx("exp"),"exp")
 }
 function playEffect(obj,effect,rectAs=1) {
     let rect
@@ -652,6 +667,8 @@ function playEffect(obj,effect,rectAs=1) {
     objectValues[objectValues.length-1].rect = objectValues[objectValues.length-1].img.clipRect
     //V2: тег спрайта эффекта — чтобы damage() не читал href.animVal для каждой пары объектов
     objectValues[objectValues.length-1].effectImg = effect.img
+    //V115: кто создал эффект (сплэш-зоны 9/13 бьют по статам создателя)
+    objectValues[objectValues.length-1].fxOwner = status.hero.obj
     //V37: имя атаки-источника эффекта (если есть) — для строк журнала о сплэш-уроне
     obj && obj.stats && obj.stats.name && (objectValues[objectValues.length-1].statsName = obj.stats.name)
     //взрыв окружения

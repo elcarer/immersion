@@ -105,6 +105,7 @@ function sceneGenerate(data,next=false) {
         P.obj = objectValues[objectValues.length-1]
         P.obj.rect = P.obj.img.clipRect
         P.info.hp = parseInt(P.info.stats[2].dops[0].value2.slice(0,-1))
+        P.idx = pi
         P.x = cell[0]*tileX
         P.y = cell[1]*tileY
         P.direction = 1

@@ -6,6 +6,8 @@ import { useSkill } from "../scripts/activeSkills.js"
 import { playback,strike } from "../scripts/sound.js"
 import { auraMissEnd } from "../scripts/valkyrie.js"
 import { ENEMY_STATE, enemyChase, enemySeesHero, enemyNoticeHero, setEnemyState, setEnemyPose, waitPose, animInterval } from "../scripts/enemyAI.js"
+//V115: кооператив — контекст владельца анимации героя, ближайший герой
+import { setContext, ownerPlayer, nearestPlayer } from "../scripts/players.js"
 
 function animPlay() {
     //E-3: система крутится по ECS-группе ganim (сущности с компонентами
@@ -36,7 +38,9 @@ function animPlay() {
                 d.currentStill++
                 //добавить новую анимацию
                 if (d.currentAnim.attackNew&&d.currentStill===d.currentAnim.attackNew.step) {
-                    addAnim (d.currentAnim.attackNew.anim,status.hero.obj,d,d.direction)
+                    //V115: контратака врага летит в ближайшего живого героя
+                    const th = nearestPlayer(d.rect.x.animVal.value, d.rect.y.animVal.value)
+                    th && addAnim (d.currentAnim.attackNew.anim,th.obj,d,d.direction)
                 }
                 //удалить анимацию
                 if (d.currentAnim.times&&d.currentStill>d.currentAnim.times-1) {
@@ -99,6 +103,10 @@ function animPlay() {
     }
 }
 function checkEndAnim (d) {
+    //V115: анимация героя принадлежит конкретному игроку — автокасты и stop
+    //исполняются в ЕГО контексте (в соло — тот же единственный герой)
+    const ownP = ownerPlayer(d)
+    ownP && setContext(ownP)
     if (d.type === "hero" && d.currentAnim.img === "./images/hero/rogue/others/wait.png") {
         let i = status.info.activeSkills.findIndex(f => f.skill.title === "skill.0.1.title")
         if(i !== -1 && status.info.invisible === 0 && status.info.activeSkills[i].cooldown === 0) {
@@ -126,7 +134,8 @@ function checkEndAnim (d) {
         status.move = 1
     }
     if (d.type === "hero" && d.currentAnim.once === 1) {
-    status.hero.obj.stop = 1
+    d.stop = 1
+    ownP && setContext(status.players[0])
     return
     }
     //"reanimate" (Mummy): анимация смерти завершилась — враг остаётся на последнем кадре
@@ -135,6 +144,7 @@ function checkEndAnim (d) {
         d.lying = 188
         return "stop"
     }
+    ownP && setContext(status.players[0])
     if (d.currentAnim.once === 1) {
     //враг закончил once-анимацию (атака/стан) — переход машины состояний (enemyAI)
     if (d.type === "enemy") {

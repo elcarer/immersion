@@ -16,6 +16,8 @@
 //Действуют на героя и обычных врагов (не боссов); баф «Великий вор» (6 предметов) удваивает
 //урон по врагам; Крылья валькирии / неуязвимость рывка — иммунитет (облако не выпускают).
 import { status } from "../scripts/start.js"
+//V115: полосы ХП/опыта — суффиксы по игроку (players.js)
+import { ctxBar,ctxTx } from "../scripts/players.js"
 import { T } from "../scripts/localization.js"
 import { data } from "../scripts/data.js"
 import { rectPos, picById } from "../scripts/svg.js"
@@ -141,7 +143,7 @@ function trapHeroTick(traps) {
         floatText(hx + Math.trunc(Math.random() * 32),hy + 8,damage,"#CD5C5C","12px","none")
         playEffect(status.hero.obj,data.effects[1])
         playback(strike[7].vol,0,0,3*status.settings.soundVolume)
-        changeHP(document.getElementById("hpBarI"),document.getElementById("hpText"),"hp")
+        changeHP(ctxBar("hp"),ctxTx("hp"),"hp")
         checkFood()
         status.info.hp <= 0 && endGame()
     } else {
@@ -244,7 +246,7 @@ function cloudDamage(obj) {
             floatText(p[0] + Math.trunc(Math.random() * 32),p[1] + 8,damage,"#CD5C5C","12px","none")
             playEffect(status.hero.obj,data.effects[1])
             playback(strike[7].vol,0,0,3*status.settings.soundVolume)
-            changeHP(document.getElementById("hpBarI"),document.getElementById("hpText"),"hp")
+            changeHP(ctxBar("hp"),ctxTx("hp"),"hp")
             checkFood()
             status.info.hp <= 0 && endGame()
         }
