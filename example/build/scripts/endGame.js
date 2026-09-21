@@ -111,7 +111,9 @@ function endScreen(lose,next) {
     //собранное золото
     screenPic.push(image(svgArr[2],1200,300,64,64,"./images/UI/gold1.png"))
     screenPic.push(image(svgArr[2],1500,300,64,64,"./images/UI/point.png"))
-    numbersArr.push({"input":text(svgArr[2],1310,345,"0pt","50pt","black","2px",`rgb(204, 153, 102)`,status.info.gold,{"id":"delItemText","size":42,"font":"baseFont4","anchor":"middle"}),"export":text(svgArr[2],1610,345,"0pt","50pt","black","2px",`rgb(204, 153, 102)`,status.info.gold,{"id":"delItemText","size":42,"font":"baseFont4","anchor":"middle"})})
+    //V119: кооп — на экране очков СУММА золота обоих игроков (золото пер-игроковое)
+    const totalGold = status.players.reduce((a,P) => a + (P.info.gold || 0), 0)
+    numbersArr.push({"input":text(svgArr[2],1310,345,"0pt","50pt","black","2px",`rgb(204, 153, 102)`,totalGold,{"id":"delItemText","size":42,"font":"baseFont4","anchor":"middle"}),"export":text(svgArr[2],1610,345,"0pt","50pt","black","2px",`rgb(204, 153, 102)`,totalGold,{"id":"delItemText","size":42,"font":"baseFont4","anchor":"middle"})})
     screenPic.push(numbersArr[numbersArr.length - 1].export)
     screenPic.push(numbersArr[numbersArr.length - 1].input)
     //всего очков
