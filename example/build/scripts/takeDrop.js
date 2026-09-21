@@ -22,7 +22,10 @@ import { flameQuestTakePile } from "../scripts/flameQuest.js"
 //V67: новый предмет мог встать в 1-ю ячейку инвентаря — пересчёт копии «Вечного сапфира»
 import { changeDopStat } from "../scripts/drag.js"
 //V114: кооператив — контекст игрока (кучку забирает наступивший)
-import { setContext, playerAlive } from "../scripts/players.js"
+//V126 (репорт юзера: еда не подбиралась ВООБЩЕ даже с малым ХП): takeFood зовёт
+//ctxBar/ctxTx (пер-игроковые id полос, players.js), но импорт их потерялся при
+//V114-расщеплении — при hp<макс ReferenceError убивал takeDropFor до взятия кучки
+import { setContext, playerAlive, ctxBar, ctxTx } from "../scripts/players.js"
 
 function takeDrop() {
     //V114: проход подбора — у КАЖДОГО живого игрока свой: золото/ключи/еда/предметы
@@ -31,11 +34,11 @@ function takeDrop() {
         const P = status.players[pi]
         if (!playerAlive(P)) continue
         setContext(P)
-        takeDropFor()
+        takeDropFor(pi)
     }
     setContext(status.players[0])
 }
-function takeDropFor() {
+function takeDropFor(pi) {
     let length = dropArr.length
     for (let i = 0; i < length; i++) {
         let x1 = parseInt(dropArr[i].getAttribute('x'))
@@ -46,7 +49,14 @@ function takeDropFor() {
         let y2 = status.hero.y + 25
         let w2 = 32
         let h2 = 32
-        if (checkCollision(x1, x2, w1, w2, y1, y2, h1, h2)) {
+        const hit = checkCollision(x1, x2, w1, w2, y1, y2, h1, h2)
+        //V126 (решение юзера): выброшенный на «УДАЛИТЬ» предмет не поднимается выбросившим
+        //сразу — надо отойти из хитбокса кучки и подойти снова. Флаг _dropBy (drag.js)
+        //снимается первым тиком БЕЗ пересечения; чужие игроки могут поднять сразу
+        if (!hit && dropArr[i]._dropBy === pi) { delete dropArr[i]._dropBy; continue }
+        if (!hit) continue
+        if (dropArr[i]._dropBy === pi) continue
+        {
             let useDrop = false
             //V109: кучка квеста «Голос в портале» (часть посоха) — ветка в portalQuest.js
             if (portalQuestTakePile(dropArr[i])) {

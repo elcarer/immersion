@@ -2011,6 +2011,36 @@ function endDragShim(shim, clientX, clientY) {
 // контейнер перетаскиваемых данных для фасада
 const backendHooks = { tipDel: null }
 
+// ----------------------------------------------------------------------------
+// V126: синтетический ховер для курсора геймпада (правый стик двигает курсор в
+// gameLoop, координаты клиентские). Тултипы и подсветка ячеек живут на _over/_out/_move
+// (funcShow/funcShowOut/hoverOpa) и addEventListener-слушателях — прокидываем их ровно
+// как реальные pointer-события: вход/выход/движение по хит-тесту UI-слоя. Без этого
+// курсор пада кликал, но не вызывал ни подсказки, ни hover-подсветку (репорт V126)
+// ----------------------------------------------------------------------------
+let padHoverShim = null
+backendHooks.padHover = (cx, cy) => {
+    if (padHoverShim && padHoverShim._dead) padHoverShim = null
+    const shim = hitTestUI(cx, cy)
+    if (shim !== padHoverShim) {
+        if (padHoverShim) {
+            padHoverShim._out && padHoverShim._out(wrapEvt({"clientX":cx,"clientY":cy,"buttons":0}, padHoverShim))
+            fire(padHoverShim, "mouseout", {"clientX":cx,"clientY":cy}, padHoverShim)
+            fire(padHoverShim, "mouseleave", {"clientX":cx,"clientY":cy}, padHoverShim)
+        }
+        padHoverShim = shim
+        if (shim) {
+            shim._over && shim._over(wrapEvt({"clientX":cx,"clientY":cy,"buttons":0}, shim))
+            fire(shim, "mouseover", {"clientX":cx,"clientY":cy}, shim)
+            fire(shim, "mouseenter", {"clientX":cx,"clientY":cy}, shim)
+        }
+    }
+    if (shim) {
+        shim._move && shim._move(wrapEvt({"clientX":cx,"clientY":cy,"buttons":0}, shim))
+        fire(shim, "mousemove", {"clientX":cx,"clientY":cy}, shim)
+    }
+}
+
 // Pointer-поток для drag: слушаем канвас один раз (drag активен только с зажатым элементом)
 function installDragListeners() {
     const cv = app.canvas

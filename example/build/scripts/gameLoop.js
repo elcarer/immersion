@@ -67,6 +67,9 @@ import { flameQuestTick } from "../scripts/flameQuest.js"
 import { svgArr,image, text,gamepadDragStart,gamepadDragMove,gamepadDragEnd,isDragging,getCTM } from "../scripts/svg.js"
 //V114: кооператив — подмена контекста игрока + гварды живости
 import { setContext,anyAlive,playerAlive } from "../scripts/players.js"
+//V126: переназначаемые кнопки пада (панель «Управление» в НАСТРОЙКАХ)
+import { padBtn } from "../scripts/devices.js"
+import { closeControls } from "../scripts/controls.js"
 
 //отслеживание мыши
 //V16: mousemove приходит 100–1000 раз/сек — не работаем на КАЖДОЕ событие
@@ -82,15 +85,12 @@ function gameLoop() {
         const mx = pendingMouse[0]
         const my = pendingMouse[1]
         pendingMouse = null
-        //V17: курсор мог застрять в 'none' (keyup потерян при смене фокуса). Как и до
-        //V16, движение мыши возвращает курсор — но пишем только когда он реально
-        //скрыт (обычный случай — ноль DOM-записей, не чаще 1 раза за тик).
-        if (document.body.style.cursor === 'none') {
-            document.body.style.cursor = 'url("./images/UI/cur.png"), auto'
-        }
+        //V126: восстановление ОС-курсора на mousemove убрано — ОС-курсор над страницей
+        //скрыт ВСЕГДА (единый курсор — спрайт cur.png, его двигают и мышь, и правый стик)
         checkMenu(mx, my)
     }
     gamepad()
+    cursorTick()
     //V47: окно врага при наведении — до блока паузы, чтобы гаснуть даже при открытой панели
     enemyHoverTick()
     //V77: видимость ряда bless-иконок (наведение на верх экрана) — каждый тик, до паузы
@@ -265,69 +265,109 @@ function checkGamepadMenu() {
     //drag-машина синглтонна
     const pads = navigator.getGamepads()
     let handled = false
+    //V126: панель «Управление» — из пада работает только «отмена» (B), назад в настройки
+    if (status.panels === 12) {
+        for (let pi = 0; pi < status.players.length; pi++) {
+            const pad = pads[pi]
+            if (!pad) continue
+            const b = pad.buttons[padBtn("cancel")]
+            b && b.pressed && (closeControls(0,1), handled = true)
+        }
+        handled && (timePadButtons = 0)
+        return
+    }
     for (let pi = 0; pi < status.players.length; pi++) {
         const pad = pads[pi]
         if (!pad) continue
         handled = true
         let but = pad.buttons
+        const P = (n) => { const b = but[padBtn(n)]; return b && b.pressed }
         //карта
-        if (but[2] && but[2].pressed) {clickButton(1,pi)}
+        if (P("map")) {clickButton(1,pi)}
         //отмена
-        if (but[3] && but[3].pressed) {closePanels(0);playback(strike[14].vol,0,0,3*status.settings.soundVolume)}
+        if (P("cancel")) {closePanels(0);playback(strike[14].vol,0,0,3*status.settings.soundVolume)}
         //экипировка
-        if (but[0] && but[0].pressed) {clickButton(0,pi)}
-        //журнал
-        if (but[6] && but[6].pressed) {clickButton(2,pi)}
+        if (P("equip")) {clickButton(0,pi)}
+        //журнал (V126: переехал с ЛТ на RT — ЛТ теперь клик курсора; переназначается)
+        if (P("journal")) {clickButton(2,pi)}
         //настройки
-        if (but[1] && but[1].pressed) {clickButton(3,pi)}
+        if (P("settings")) {clickButton(3,pi)}
         //библиотека
-        if (but[5] && but[5].pressed) {clickButton(4,pi)}
+        if (P("library")) {clickButton(4,pi)}
     }
     handled && (timePadButtons = 0)
 }
 function movePadCursor(x,y) {
-    !status.newMouse && (status.newMouse = image(svgArr[2],0,0,23,32,"./images/UI/cur.png"))
-    status.newMouse.setAttribute("x",x)
-    status.newMouse.setAttribute("y",y)
+    //V126: шим мог быть уничтожен при смене сцены (del() чистит UI-слой) — пересоздаём
+    !status.newMouse || status.newMouse._dead
+        ? status.newMouse = image(svgArr[2],x,y,23,32,"./images/UI/cur.png")
+        : (status.newMouse.setAttribute("x",x), status.newMouse.setAttribute("y",y))
     //всегда поверх панелей и UI
     svgArr[2].append(status.newMouse)
 }
+//V126: ЕДИНЫЙ КУРСОР — спрайт cur.png (status.newMouse) и есть курсор на ВСЕХ экранах
+//(меню/лобби/забег/панели/результаты): его двигают и мышь (checkMenu), и правый стик
+//(gamepad). ОС-курсор над страницей скрыт всегда — двойного курсора больше нет (репорт
+//V126: «два курсора на экране»). Пока любой герой бежит (в игре, без панелей и паузы)
+//курсор прячется (репорт V126: «перестал скрываться при движении героев»); возвращает
+//его любое движение мыши или стика. На blur ОС-курсор возвращает старый обработчик
+//(heroMove) — при возврате фокуса прячем снова
+function cursorTick() {
+    ;(!status.newMouse || status.newMouse._dead) && movePadCursor(status.mouseX || 960, status.mouseY || 540)
+    const hide = status.start === 1 && status.pause === 0 && status.panels === 0 &&
+        (status.players || []).some(P => P.wasMoving)
+    const want = hide ? "none" : ""
+    if (status.newMouse.getAttribute("display") !== want) status.newMouse.setAttribute("display", want)
+    //ОС-курсор скрыт всегда; возвращает его только blur-обработчик (уход с окна)
+    document.body.style.cursor !== "none" && (document.body.style.cursor = "none")
+}
 function gamepad() {
-    if(navigator.getGamepads()[0]) {
-        let pad = navigator.getGamepads()[0]
-        let but = pad.buttons
-        //попытка перемещения мыши осями джойстика
-        if(pad.axes.length > 1 && (Number(pad.axes[0].toFixed(2)) || Number(pad.axes[1].toFixed(2)))) {
-            status.mouseX += Number(pad.axes[0].toFixed(2))*8
-            status.mouseY += Number(pad.axes[1].toFixed(2))*8
+    const pad = navigator.getGamepads()[0]
+    if(!pad) return
+    let but = pad.buttons
+    //V126 (решение юзера, поправка 2): курсор двигает ПРАВЫЙ стик (оси 2/3) — ЛЕВЫЙ
+    //стик с V126 дублирует перемещение героя (heroMove). Мёртвая зона 0.15, скорость
+    //×8/тик — чувствительность прежнего левого стика
+    if(pad.axes.length > 3) {
+        const ax = Number(pad.axes[2].toFixed(2)), ay = Number(pad.axes[3].toFixed(2))
+        if(Math.abs(ax) > 0.15 || Math.abs(ay) > 0.15) {
+            status.mouseX += ax * 8
+            status.mouseY += ay * 8
             movePadCursor(status.mouseX, status.mouseY)
+            //синтетический ховер: тултипы/подсветка под курсором пада (pixiBackend)
+            const ctm = getCTM()
+            ctm && backendHooks.padHover(status.mouseX * ctm.a + ctm.e, status.mouseY * ctm.d + ctm.f)
         }
-        //перетаскивание предметов (LB — левый бампер)
-        let dragPressed = but[4] && but[4].pressed
-        if(dragPressed && !padDragPrev) {
-            gamepadDragStart(status.mouseX, status.mouseY)
-        } else if(dragPressed && padDragPrev && isDragging()) {
-            gamepadDragMove(status.mouseX, status.mouseY)
-        } else if(!dragPressed && padDragPrev) {
-            gamepadDragEnd()
-        }
-        padDragPrev = dragPressed
-        status.clickTime && status.clickTime > 0 && status.clickTime--
-        if(but[7] && but[7].pressed) {
-            if(!status.clickTime) {
-                // 1. Создаем точку SVG (в координатах UI-слоя viewBox 0 0 1920 1080)
-                const point = svgArr[2].createSVGPoint()
-                point.x = status.mouseX
-                point.y = status.mouseY
-                // 2. Применяем матрицу трансформации UI-слоя svgArr[2].
-                // ВАЖНО: НЕ svgArr[0] — у игровых слоёв viewBox сдвигается камерой
-                // (sceneGenerate), и transform оттуда давал координаты вне окна → "noElement"
-                const screenPoint = point.matrixTransform(svgArr[2].getScreenCTM())
-                let element = document.elementFromPoint(screenPoint.x, screenPoint.y)
-                element && element.dispatchEvent(new MouseEvent('click', { bubbles: true }))
-                //курсор НЕ удаляем — он нужен для последовательных кликов по панелям
-                status.clickTime = 30
-            }
+    }
+    //перетаскивание предметов (LB, переназначается — панель «Управление»)
+    const dragBtn = padBtn("drag")
+    let dragPressed = but[dragBtn] && but[dragBtn].pressed
+    if(dragPressed && !padDragPrev) {
+        gamepadDragStart(status.mouseX, status.mouseY)
+    } else if(dragPressed && padDragPrev && isDragging()) {
+        gamepadDragMove(status.mouseX, status.mouseY)
+    } else if(!dragPressed && padDragPrev) {
+        gamepadDragEnd()
+    }
+    padDragPrev = dragPressed
+    status.clickTime && status.clickTime > 0 && status.clickTime--
+    //клик курсором (V126: ЛТ — «левый нижний курок», кнопка 6, переназначается) =
+    //клик курсором мыши во всех местах: тот же synthetic-click через хит-тест UI
+    const clickBtn = padBtn("click")
+    if(clickBtn !== undefined && but[clickBtn] && but[clickBtn].pressed) {
+        if(!status.clickTime) {
+            // 1. Создаем точку SVG (в координатах UI-слоя viewBox 0 0 1920 1080)
+            const point = svgArr[2].createSVGPoint()
+            point.x = status.mouseX
+            point.y = status.mouseY
+            // 2. Применяем матрицу трансформации UI-слоя svgArr[2].
+            // ВАЖНО: НЕ svgArr[0] — у игровых слоёв viewBox сдвигается камерой
+            // (sceneGenerate), и transform оттуда давал координаты вне окна → "noElement"
+            const screenPoint = point.matrixTransform(svgArr[2].getScreenCTM())
+            let element = document.elementFromPoint(screenPoint.x, screenPoint.y)
+            element && element.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+            //курсор НЕ удаляем — он нужен для последовательных кликов по панелям
+            status.clickTime = 30
         }
     }
 }

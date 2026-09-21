@@ -13,6 +13,8 @@ import { playback,strike } from "../scripts/sound.js"
 import { settings,settingsTemp,settingsDel } from "../scripts/settings.js"
 //V54: алхимический стол — закрывается общим closePanels (ESC/геймпад «отмена»)
 import { alchemyDel,alchemyTemp } from "../scripts/alchemy.js"
+//V126: панель «Управление» — закрывается общим closePanels тоже
+import { controlsDel,controlsTemp } from "../scripts/controls.js"
 //V75: шкафчик с древностями — закрывается так же, объект не расходуется
 import { ancientDel,ancientTemp } from "../scripts/blessFx.js"
 import { tipDel } from "../scripts/tip.js"
@@ -46,6 +48,8 @@ function closePanels(nomusic=0) {
     mapTemp.length > 0 && mapDel(nomusic)
     //V54: алхимический стол — выход БЕЗ расхода объекта (объект можно использовать снова)
     alchemyTemp.length > 0 && alchemyDel(nomusic)
+    //V126: панель «Управление»
+    controlsTemp.length > 0 && controlsDel(nomusic)
     //V75: шкафчик с древностями — выход БЕЗ расхода объекта (благословение не выдано)
     ancientTemp.length > 0 && ancientDel(nomusic)
     tipDel()

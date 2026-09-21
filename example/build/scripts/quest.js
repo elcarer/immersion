@@ -262,6 +262,9 @@ function useBarTick(wolf) {
         useBarFill.remove()
         useBarFill = null
         useT = 0
+        //V126: владелец квеста фиксируется (кто приручил Волка) — награда прощания
+        //идёт ЕГО классу и в ЕГО инвентарь (в коопе игроки разные)
+        questHero = HQ
         openWolfDialog(wolf)
     }
 }
@@ -435,6 +438,8 @@ function questFail(wolf) {
 }
 
 // ---------- выход с этажа с живым Волком (вызов из nextFloor) ----------
+//V126: владелец квеста (кто приручил) — для награды по ЕГО классу
+let questHero = null
 function questFloorExit(cont) {
     openDialog({
         "lines":[{"who":"wolf","key":"dlg.wolf.3"}],
@@ -442,8 +447,13 @@ function questFloorExit(cont) {
             //случайный легендарный (сетовый) предмет сета ПО КЛАССУ героя (V106):
             //Плут — «Великий вор», Волшебница — «Учёная волшебница», Рыцарь —
             //«Победитель турниров», Валькирия — «Доблестный небожитель»;
-            //itemGenerate сам кладёт его в инвентарь/пустой слот куклы (V102)
-            itemGenerate(4,{"setN":[1,2,3,4][(HQ && HQ.class) !== undefined ? HQ.class : status.hero.class] || 1})
+            //itemGenerate сам кладёт его в инвентарь/пустой слот куклы (V102).
+            //V126 (репорт юзера: после «ПРИНЯТЬ» не было ни спуска, ни экрана очков):
+            //здесь читался HQ — локальная переменная useBarTick, ReferenceError убивал
+            //весь колбэк; берём зафиксированного владельца квеста (кооп — свой герой)
+            const hero = (questHero && status.players.indexOf(questHero) !== -1) ? questHero : status.players[0]
+            setContext(hero)
+            itemGenerate(4,{"setN":[1,2,3,4][hero.class] || 1})
             playback(strike[3].vol,0,0,2*status.settings.soundVolume)
             questTrackerHide()
             status.quest.state = 4
@@ -452,6 +462,7 @@ function questFloorExit(cont) {
             save()
             const wolf = wolfUnit()
             wolf && removeWolf(wolf)
+            setContext(status.players[0])
             cont()
         }}]
     })
@@ -464,6 +475,7 @@ function questDel() {
     useBarFill = null
     useT = 0
     wolfRef = null
+    questHero = null
     status.quest = {"state":0}
 }
 

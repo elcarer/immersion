@@ -1,7 +1,7 @@
 import { svgArr,image, text, rect } from "../scripts/svg.js"
 import { status } from "../scripts/start.js"
 //V115: полосы ХП/опыта — суффиксы по игроку (players.js)
-import { ctxBar,ctxTx } from "../scripts/players.js"
+import { ctxBar,ctxTx,nextLvlExp } from "../scripts/players.js"
 import * as basicData from "../scripts/data.js"
 import { drag,doubleClickItem } from "../scripts/drag.js"
 import { tip,tipDel,helpWord,rarityColor,itemFrameOn,itemGlowOn } from "../scripts/tip.js"
@@ -74,8 +74,10 @@ function doll() {
     dollTemp.push(image(svgArr[2],190,823,20,20,"./images/UI/gold.png"))
     
     //V96: делитель — настоящий порог уровня (формула checkExp из damage.js), а не прежний
-    //(1+30/(lvl+3))^(lvl/30): полоса показывала прогресс не к тому порогу
-    let lengthCol = status.info.exp*100 / Math.trunc(((1 + 20/(status.info.lvl))**((status.info.lvl)/20) - 1) / (Math.exp(1) - 1) * 100)
+    //(1+30/(lvl+3))^(lvl/30): полоса показывала прогресс не к тому порогу.
+    //V126 (репорт юзера): порог через nextLvlExp — В КООПЕ он ×2 (V122), а полоса над
+    //портретом считала соло-порог и показывала двойной прогресс
+    let lengthCol = status.info.exp*100 / nextLvlExp(status.info.lvl)
     for (let i = 0; i < lengthCol; i++) {
         dollTemp.push(image(svgArr[2],498+i,361,"1px","4px","./images/UI/panels/expBarCol.png"))
     }

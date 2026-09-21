@@ -21,6 +21,9 @@ import { inventory } from "../scripts/inventory.js"
 import { skillTree } from "../scripts/skillTree.js"
 import { playback,strike,playTrack,TRACK } from "../scripts/sound.js"
 import { clickButton,closePanels,topMenuClose } from "../scripts/topMenu.js"
+//V126: перенашиваемые раскладки (панель «Управление») + per-player стоп-кадр анимации
+import { ownerOfPanelKey,ownerOfMoveKey } from "../scripts/devices.js"
+import { closeControls } from "../scripts/controls.js"
 import { minimapBtn } from "../scripts/minimapFx.js"
 //V31: зум игровой сцены — единый писатель камеры игровых слоёв
 import { setWorldViewBox } from "../scripts/zoomFx.js"
@@ -203,13 +206,15 @@ function buttonInit() {
             //V104: диалог (квест «Сопроводить Волка») — хоткеи панелей глушим целиком
             //(Escape диалог продвигает его собственный слушатель в dialog.js)
             if (dialogIsOpen()) return
-            //V117: панели per-owner — у каждого игрока СВОИ хоткеи: kb1 — N/M/,/.//
-            //(экипировка/карта/журнал/настройки/библиотека), kb2 (2-й игрок, под
-            //стрелками) — K/L/;/' и Backspace. Панель открывается в контексте владельца
-            const PK1 = {"KeyN":0,"KeyM":1,"Comma":2,"Period":3,"Slash":4}
-            const PK2 = {"KeyK":0,"KeyL":1,"Semicolon":2,"Quote":3,"Backspace":4}
-            if (PK1[e.code] !== undefined) {clickButton(PK1[e.code], 0)}
-            if (PK2[e.code] !== undefined && status.players[1]) {clickButton(PK2[e.code], 1)}
+            //V126: панель «Управление» открыта — хоткеи игры глушим, Esc возвращает в настройки
+            if (status.panels === 12) {
+                e.code === 'Escape' && closeControls(0,1)
+                return
+            }
+            //V117: панели per-owner — у каждого игрока СВОИ хоткеи.
+            //V126: раскладки из привязок (devices.js, панель «Управление»), не литералы
+            const hit = ownerOfPanelKey(e.code)
+            hit && status.players[hit.player.idx] && clickButton(hit.panel, hit.player.idx)
             //отмена
             //V93: Esc закрывает и полосу кнопок — все кнопочные пути закрытия (clickButton)
             //делают то же (closePanels+topMenuClose); без topMenuClose полоса оставалась
@@ -217,7 +222,19 @@ function buttonInit() {
             if (e.code === 'Escape') {closePanels(0);topMenuClose();playback(strike[14].vol,0,0,3*status.settings.soundVolume)}
         }
     })
-    document.addEventListener('keyup', function(e){status.start === 1 && status.hero.obj.currentAnim.once !== 1 && (status.hero.obj.stop = 1)})
+    //V126 (репорт юзера: герой 2 игрока бесконечно проигрывает анимацию ходьбы стоя):
+    //keyup ставил stop=1 только status.hero — а контекст ПОСЛЕ тика всегда возвращается
+    //на players[0], так что замирал только первый герой. Стоп — ВЛАДЕЛЬЦУ отпущенной
+    //клавиши (раскладки из devices.js); чужие клавиши — игроку 0, как раньше
+    document.addEventListener('keyup', function(e){
+        if (status.start !== 1) return
+        const hit = ownerOfMoveKey(e.code)
+        const targets = hit ? [hit.player] : [status.players[0]]
+        for (let i = 0; i < targets.length; i++) {
+            const o = targets[i] && targets[i].obj
+            o && o.currentAnim.once !== 1 && (o.stop = 1)
+        }
+    })
 }
 //случайная текстура пола: 1-й этаж (levelFloor 0) — список 1, 2-й (1) — список 2, 3-й (2) —
 //список 3, 4-й «Пустота» (3, V65) — список 18–24, дальше — прежняя схема (база+этаж)

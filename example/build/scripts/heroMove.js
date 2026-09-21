@@ -23,7 +23,7 @@ import { flameQuestCorridorOpen } from "../scripts/flameQuest.js"
 import { tryFinSummon } from "../scripts/finPillars.js"
 //V114: кооператив — контекст игрока + профили устройств ввода
 import { setContext } from "../scripts/players.js"
-import { moveProfile,padIndex,ownerOfMoveKey } from "../scripts/devices.js"
+import { playerMoveKeys,padIndex,ownerOfMoveKey } from "../scripts/devices.js"
 //V56: сет «Доблестный небожитель» (6 надетых): скорость перемещения героя ×1.05
 import { setHeroSpeedMult } from "../scripts/sets.js"
 //V75: благословения шкафчика — Сын ветра +10%, Громила/Заучка по -10% к скорости перемещения
@@ -80,27 +80,47 @@ function syncHeroAnim(hero) {
 function heroMove (P) {
     !P && (P = status.players[0])
     setContext(P)
-    const prof = moveProfile(P.device)
-    const kb = n => prof[n].some(c => pressedKeys.has(c))
+    //V126: раскладка из привязок (devices.js, панель «Управление») — коды клавиш игрока
+    //по ЕГО устройству (solo объединяет обе половины клавиатуры)
+    const keys = playerMoveKeys(P.idx || 0, P.device)
+    const kb = n => keys[n].some(c => pressedKeys.has(c))
     let left, right, up, down
     const padIdx = padIndex(P.device)
     if(padIdx >= 0 && navigator.getGamepads()[padIdx]) {
         let pad = navigator.getGamepads()[padIdx]
         let but = pad.buttons
         left = but[14] && but[14].pressed
-        right = but[15] && but[15].pressed    
+        right = but[15] && but[15].pressed
         up = but[12] && but[12].pressed
         down = but[13] && but[13].pressed
-        //направление взгляда — по последней НАЖАТОЙ кнопке крестовины (edge-детект по маске)
-        let padMask = (up?1:0)+(down?2:0)+(left?4:0)+(right?8:0)
-        if(padMask !== P.padMaskPrev) {
-            up && !(P.padMaskPrev&1) && (P.lastDir = 0)
-            down && !(P.padMaskPrev&2) && (P.lastDir = 1)
-            left && !(P.padMaskPrev&4) && (P.lastDir = 2)
-            right && !(P.padMaskPrev&8) && (P.lastDir = 3)
-            P.padMaskPrev = padMask
+        //V126 (решение юзера, поправка 2): ЛЕВЫЙ СТИК дублирует перемещение героя
+        //(как крестовина); курсор переехал на ПРАВЫЙ стик (gameLoop gamepad).
+        //Мёртвая зона 0.35 — дрейф лежащего стика не двигает героя
+        if (pad.axes.length > 1) {
+            const lx = pad.axes[0], ly = pad.axes[1], DZ = 0.35
+            lx < -DZ && (left = true)
+            lx > DZ && (right = true)
+            ly < -DZ && (up = true)
+            ly > DZ && (down = true)
         }
         !left && !right && !up && !down && status.start === 1 && status.hero.obj.currentAnim.once !== 1 && (status.hero.obj.stop = 1)
+    }
+    //V126 (репорт юзера: на паде не работала диагональ): ЭФФЕКТИВНЫЕ направления —
+    //клавиатура + крестовина + левый стик вместе. Кардинальные ветки ниже обязаны
+    //исключать диагональ по эффективным направлениям: раньше исключение было только
+    //по kb(), и крестовина вверх+вправо проваливалась в ветку «вверх» (право игнор).
+    const iUp = up || kb('up'), iDown = down || kb('down'), iLeft = left || kb('left'), iRight = right || kb('right')
+    if(padIdx >= 0 && navigator.getGamepads()[padIdx]) {
+        //направление взгляда — по последней НАЖАТОЙ кнопке/оси (edge-детект по маске);
+        //маска из эффективных направлений — диагональ стиком тоже задаёт взгляд
+        let padMask = (iUp?1:0)+(iDown?2:0)+(iLeft?4:0)+(iRight?8:0)
+        if(padMask !== P.padMaskPrev) {
+            iUp && !(P.padMaskPrev&1) && (P.lastDir = 0)
+            iDown && !(P.padMaskPrev&2) && (P.lastDir = 1)
+            iLeft && !(P.padMaskPrev&4) && (P.lastDir = 2)
+            iRight && !(P.padMaskPrev&8) && (P.lastDir = 3)
+            P.padMaskPrev = padMask
+        }
     }
         let moveSpeed = status.moveSpeed + status.moveSpeed*(status.info.stats[3].dops[0].value2.slice(0,-1)/100)
         //увеличение скорости в Скрытности с Теневым скольжением
@@ -124,35 +144,35 @@ function heroMove (P) {
     //V34 «очарование» суккуба: герой теряет управление движением — ввод игнорируется
     //(вся забота ниже — комнаты/кислота/синхронизация status.hero.x — продолжается)
     if (!status.info.dash && !status.info.charm) {
-    if(collision(x,y,data.scenes[num],0)&&!kb('down')&&(up||kb('up'))&&(!kb('right')&&!kb('left'))) {
+    if(collision(x,y,data.scenes[num],0)&&!iDown&&iUp&&(!iRight&&!iLeft)) {
         moveSprite(hero.img, 0, -moveSpeed)
         hero.currentAnim = basicData.data.heroes[status.hero.class].anims[0].move[0]
         status.hero.direction = 0
         hero.stop = 0
         status.hero.waitTime = 0
     }
-    else if(collision(x,y,data.scenes[num],1)&&!kb('left')&&(right||kb('right'))&&(!kb('up')&&!kb('down'))) {
+    else if(collision(x,y,data.scenes[num],1)&&!iLeft&&iRight&&(!iUp&&!iDown)) {
         moveSprite(hero.img, moveSpeed, 0)
         hero.currentAnim = basicData.data.heroes[status.hero.class].anims[0].move[3]
         status.hero.direction = 3
         hero.stop = 0
         status.hero.waitTime = 0
     }
-    else if(collision(x,y,data.scenes[num],2)&&!kb('up')&&(down||kb('down'))&&(!kb('right')&&!kb('left'))) {
+    else if(collision(x,y,data.scenes[num],2)&&!iUp&&iDown&&(!iRight&&!iLeft)) {
         moveSprite(hero.img, 0, moveSpeed)
         hero.currentAnim = basicData.data.heroes[status.hero.class].anims[0].move[1]
         status.hero.direction = 1
         hero.stop = 0
         status.hero.waitTime = 0
     }
-    else if(collision(x,y,data.scenes[num],3)&&!kb('right')&&(left||kb('left'))&&(!kb('up')&&!kb('down'))) {
+    else if(collision(x,y,data.scenes[num],3)&&!iRight&&iLeft&&(!iUp&&!iDown)) {
         moveSprite(hero.img, -moveSpeed, 0)
         hero.currentAnim = basicData.data.heroes[status.hero.class].anims[0].move[2]
         status.hero.direction = 2
         hero.stop = 0
         status.hero.waitTime = 0
     }
-    else if (collision(x,y,data.scenes[num],4)&&(up||kb('up'))&&(right||kb('right'))) {
+    else if (collision(x,y,data.scenes[num],4)&&iUp&&iRight) {
         //V15: движение через moveSprite — rect и img.x с сохранением кадрового смещения
         moveSprite(hero.img, moveSpeed*0.8, -moveSpeed*0.8)
         let moveAnim = basicData.data.heroes[status.hero.class].anims[0].move[P.lastDir]
@@ -162,7 +182,7 @@ function heroMove (P) {
         status.hero.waitTime = 0
     }
     //скольжение 1
-    else if ((up||kb('up'))&&(right||kb('right'))) {
+    else if (iUp&&iRight) {
         if(collision(x,y,data.scenes[num],0) && !collision(x,y,data.scenes[num],1)) {
             moveSprite(hero.img, 0, -moveSpeed)
             hero.currentAnim = basicData.data.heroes[status.hero.class].anims[0].move[0]
@@ -178,7 +198,7 @@ function heroMove (P) {
             status.hero.waitTime = 0
         }
     }
-    else if (collision(x,y,data.scenes[num],5)&&(up||kb('up'))&&(left||kb('left'))) {
+    else if (collision(x,y,data.scenes[num],5)&&iUp&&iLeft) {
         moveSprite(hero.img, -moveSpeed*0.8, -moveSpeed*0.8)
         let moveAnim = basicData.data.heroes[status.hero.class].anims[0].move[P.lastDir]
         hero.currentAnim = moveAnim
@@ -187,7 +207,7 @@ function heroMove (P) {
         status.hero.waitTime = 0
     }
     //скольжение 2
-    else if ((up||kb('up'))&&(left||kb('left'))) {
+    else if (iUp&&iLeft) {
         if(collision(x,y,data.scenes[num],0) && !collision(x,y,data.scenes[num],3)) {
             moveSprite(hero.img, 0, -moveSpeed)
             hero.currentAnim = basicData.data.heroes[status.hero.class].anims[0].move[0]
@@ -203,7 +223,7 @@ function heroMove (P) {
             status.hero.waitTime = 0
         }
     }
-    else if (collision(x,y,data.scenes[num],6)&&(down||kb('down'))&&(right||kb('right'))) {
+    else if (collision(x,y,data.scenes[num],6)&&iDown&&iRight) {
         moveSprite(hero.img, moveSpeed*0.8, moveSpeed*0.8)
         let moveAnim = basicData.data.heroes[status.hero.class].anims[0].move[P.lastDir]
         hero.currentAnim = moveAnim
@@ -212,7 +232,7 @@ function heroMove (P) {
         status.hero.waitTime = 0
     }
     //скольжение 3
-    else if ((down||kb('down'))&&(right||kb('right'))) {
+    else if (iDown&&iRight) {
         if(collision(x,y,data.scenes[num],2) && !collision(x,y,data.scenes[num],1)) {
             moveSprite(hero.img, 0, moveSpeed)
             hero.currentAnim = basicData.data.heroes[status.hero.class].anims[0].move[1]
@@ -228,7 +248,7 @@ function heroMove (P) {
             status.hero.waitTime = 0
         }
     }
-    else if (collision(x,y,data.scenes[num],7)&&(down||kb('down'))&&(left||kb('left'))) {
+    else if (collision(x,y,data.scenes[num],7)&&iDown&&iLeft) {
         moveSprite(hero.img, -moveSpeed*0.8, moveSpeed*0.8)
         let moveAnim = basicData.data.heroes[status.hero.class].anims[0].move[P.lastDir]
         hero.currentAnim = moveAnim
@@ -237,7 +257,7 @@ function heroMove (P) {
         status.hero.waitTime = 0
     }
     //скольжение 4
-    else if ((down||kb('down'))&&(left||kb('left'))) {
+    else if (iDown&&iLeft) {
         if(collision(x,y,data.scenes[num],2) && !collision(x,y,data.scenes[num],3)) {
             moveSprite(hero.img, 0, moveSpeed)
             hero.currentAnim = basicData.data.heroes[status.hero.class].anims[0].move[1]

@@ -1,7 +1,7 @@
 import { dataGeneric } from "../scripts/sceneGenerate.js"
 import { status } from "../scripts/start.js"
 //V115: полосы ХП/опыта — суффиксы по игроку (players.js)
-import { ctxBar,ctxTx } from "../scripts/players.js"
+import { ctxBar,ctxTx,nextLvlExp } from "../scripts/players.js"
 import { T } from "../scripts/localization.js"
 import { svgArr,image,worldImage,rect,picById } from "../scripts/svg.js"
 import { screenPic } from "../scripts/del.js"
@@ -160,7 +160,9 @@ function actionsObject(obj) {
         //V96: порог «ровно до следующего уровня» — ТА ЖЕ формула, что в checkExp (damage.js):
         //((1+20/lvl)^(lvl/20)−1)/(e−1)·100. Прежняя ((1+30/(lvl+3))^((lvl+3)/30)) совпадала
         //с ней только на 6 уровне: выше 6-го алтарь недоливал опыт, ниже — переливал.
-        case 10: status.info.hp -= checkStoneSkin(Math.trunc(2*status.info.hp/3));let nextLvl = Math.trunc(((1 + 20/(status.info.lvl))**((status.info.lvl)/20) - 1) / (Math.exp(1) - 1) * 100)-status.info.exp;status.info.exp += nextLvl;checkExp(nextLvl);changeHP(ctxBar("hp"),ctxTx("hp"),"hp")
+        //V126: порог через nextLvlExp — в коопе он ×2 (V122), иначе алтарь недоливал
+        //до реального порога и уровень за жертву не приходил
+        case 10: status.info.hp -= checkStoneSkin(Math.trunc(2*status.info.hp/3));let nextLvl = nextLvlExp(status.info.lvl)-status.info.exp;status.info.exp += nextLvl;checkExp(nextLvl);changeHP(ctxBar("hp"),ctxTx("hp"),"hp")
         break
         case 11: encounters(obj);drop(obj);drop(obj);drop(obj)
         break

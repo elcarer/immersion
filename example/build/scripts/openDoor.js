@@ -30,7 +30,13 @@ function openDoor () {
         if (!href) continue
         let length2 = walls.length
         for (let i2 = 0; i2 < length2; i2++) {
-            if (href === walls[i2][0]&&checkCollision(pic.x.animVal.value,status.hero.x,pic.width.animVal.value,32,pic.y.animVal.value,status.hero.y+19,pic.height.animVal.value,32)) {
+            if (href !== walls[i2][0]) continue
+            //V126 (репорт юзера: второй герой не открывал закрытые двери): дверь открывал
+            //только контекстный герой — openDoor зовётся из тика ОДИН раз после
+            //пер-игроковой фазы, контекст там уже players[0]. Проверяем ВСЕХ живых
+            for (let pi = 0; pi < status.players.length; pi++) {
+                const P = status.players[pi]
+                if (!checkCollision(pic.x.animVal.value,P.x,pic.width.animVal.value,32,pic.y.animVal.value,P.y+19,pic.height.animVal.value,32)) continue
                 pic.setAttribute("href",walls[i2][1])
                 //E-9: navMatrix ИИ врагов (enemyAI) перестраивается — дверь проходима
                 status.navVersion = (status.navVersion || 0) + 1
@@ -45,6 +51,7 @@ function openDoor () {
                      walls[i2][1] === "./images/dungeon/walls/88.png")) {
                     wallsOverlay.push(pic)
                 }
+                break
             }
         }
     }

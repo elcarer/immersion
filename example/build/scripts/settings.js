@@ -8,6 +8,9 @@ import { save,saveSettings } from "../scripts/save.js"
 import { applyGroundShadows } from "../scripts/groundShadow.js"
 //V58: тексты — ключи локализации; блок выбора языка (русский/english)
 import { T,setLang,getLang } from "../scripts/localization.js"
+//V126: кнопка «Управление» — панель переназначения кнопок (обратная связь — хук, без цикла)
+import { openControls, controlsHooks } from "../scripts/controls.js"
+controlsHooks.toSettings = () => settings()
 
 let settingsTemp = []
 let musicPoint
@@ -125,13 +128,16 @@ function settings() {
 
     //V60: нижняя кнопка панели. Со стартового экрана — ОТМЕНА (просто закрыть настройки),
     //иначе — ГЛАВНОЕ МЕНЮ: из забега (status.start===1) с окном предупреждения ДА/НЕТ
-    //(решение пользователя), из лобби — сразу (забег не идёт, предупреждение не нужно)
+    //(решение пользователя), из лобби — сразу (забег не идёт, предупреждение не нужно).
+    //V126: слева добавлена кнопка «УПРАВЛЕНИЕ» — панель переназначения кнопок (controls.js)
+    settingsTemp.push(image(svgArr[2],560,810,420,73,"./images/UI/panels/buttonUp.png",{"glow":1,"func":()=>{playback(strike[14].vol,0,0,3*status.settings.soundVolume);settingsDel(1);openControls()}}))
+    settingsTemp.push(text(svgArr[2],770,861,"0pt","50pt","black","2px",`rgb(204, 153, 102)`,T("settings.controls"),{"id":"delItemText","size":42,"font":"baseFont4","anchor":"middle"}))
     if (status.startScreen === 1) {
-        settingsTemp.push(image(svgArr[2],710,810,500,73,"./images/UI/panels/buttonUp.png",{"glow":1,"func":()=>{playback(strike[14].vol,0,0,3*status.settings.soundVolume);settingsDel(1)}}))
-        settingsTemp.push(text(svgArr[2],960,861,"0pt","50pt","black","2px",`rgb(204, 153, 102)`,T("settings.cancel"),{"id":"delItemText","size":48,"font":"baseFont4","anchor":"middle"}))
+        settingsTemp.push(image(svgArr[2],1000,810,420,73,"./images/UI/panels/buttonUp.png",{"glow":1,"func":()=>{playback(strike[14].vol,0,0,3*status.settings.soundVolume);settingsDel(1)}}))
+        settingsTemp.push(text(svgArr[2],1210,861,"0pt","50pt","black","2px",`rgb(204, 153, 102)`,T("settings.cancel"),{"id":"delItemText","size":42,"font":"baseFont4","anchor":"middle"}))
     } else {
-        settingsTemp.push(image(svgArr[2],710,810,500,73,"./images/UI/panels/buttonUp.png",{"glow":1,"func":()=>{playback(strike[14].vol,0,0,3*status.settings.soundVolume);status.start === 1 ? exitConfirm() : goMainMenu()}}))
-        settingsTemp.push(text(svgArr[2],960,861,"0pt","50pt","black","2px",`rgb(204, 153, 102)`,T("settings.mainmenu"),{"id":"delItemText","size":48,"font":"baseFont4","anchor":"middle"}))
+        settingsTemp.push(image(svgArr[2],1000,810,420,73,"./images/UI/panels/buttonUp.png",{"glow":1,"func":()=>{playback(strike[14].vol,0,0,3*status.settings.soundVolume);status.start === 1 ? exitConfirm() : goMainMenu()}}))
+        settingsTemp.push(text(svgArr[2],1210,861,"0pt","50pt","black","2px",`rgb(204, 153, 102)`,T("settings.mainmenu"),{"id":"delItemText","size":42,"font":"baseFont4","anchor":"middle"}))
     }
 
     sliderDrag(musicPoint, setMusicFromX, playMusicFeedback)
