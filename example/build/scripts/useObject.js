@@ -201,6 +201,9 @@ let dropArr = []
 //«оружие» (itemGenerate(rarity, {type: 11})). WeakMap: неподобранные кучки не
 //держат память — хэндлы умирают при разборе сцены, записи собирает GC
 const bossWeaponDrops = new WeakMap()
+//V123 (решение юзера): предметы, выброшенные на пол через «УДАЛИТЬ» (кооп) —
+//кучка несёт КОНКРЕТНЫЙ предмет; подбор вернёт его же, без генерации
+const itemDrops = new WeakMap()
 
 function drop(obj,lvl=0) {
     //E-15: сундук босса (тип 9 с меткой obj[10]=1, ставится newGame в самой большой
@@ -283,4 +286,4 @@ function checkConsumable() {
     if (rand < 99) return lootTable[6]
     return lootTable[5]
 }
-export {useObject,stopUseObject,bars,dropArr,bossWeaponDrops}
+export {useObject,stopUseObject,bars,dropArr,bossWeaponDrops,itemDrops}

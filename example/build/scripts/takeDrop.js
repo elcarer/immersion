@@ -1,6 +1,6 @@
 import { status } from "../scripts/start.js"
 //E-15: bossWeaponDrops — кучки из сундука босса: подбор генерирует предмет с фильтром
-import { dropArr, bossWeaponDrops } from "../scripts/useObject.js"
+import { dropArr, bossWeaponDrops, itemDrops } from "../scripts/useObject.js"
 import { checkCollision } from "../scripts/damage.js"
 import { floatText } from "../scripts/floatText.js"
 import { itemGenerate } from "../scripts/itemGenerate.js"
@@ -64,8 +64,12 @@ function takeDropFor() {
             }
             //E-15: кучка из сундука босса — случайное ОРУЖИЕ фиксированной редкости
             //(фильтр в itemGenerate); href-цепочка ниже — обычные кучки
-            let bossRarity = bossWeaponDrops.get(dropArr[i])
-            if (bossRarity !== undefined) {
+            //V123: конкретный предмет с «УДАЛИТЬ» (кооп) — подбор без генерации
+            const exact = itemDrops.get(dropArr[i])
+            if (exact !== undefined) {
+                useDrop = takeExactItem(exact)
+                useDrop && itemDrops.delete(dropArr[i])
+            } else if (bossRarity !== undefined) {
                 useDrop = takeItem(bossRarity, {"type": 11})
                 useDrop && bossWeaponDrops.delete(dropArr[i])
             } else {
@@ -133,6 +137,24 @@ function takeFood() {
         }
     }
     return false
+}
+//V123: подбор КОНКРЕТНОГО предмета, выброшенного на пол через «УДАЛИТЬ» (кооп) —
+//никакой генерации: в инвентарь ложится тот же объект с теми же свойствами
+function takeExactItem(item) {
+    let countInv = 0
+    let length = status.inventory.inv.length
+    for (let i = 0; i < length; i++) {
+        status.inventory.inv[i] && (countInv++)
+    }
+    if (countInv >= 24) return false
+    for (let i = 0; i < length; i++) {
+        if (!status.inventory.inv[i]) { status.inventory.inv[i] = item; break }
+    }
+    changeDopStat()
+    showItemTip(item)
+    const rarity = (item.img.match("/items/(\d)/") || [])[1]
+    journalAdd(T("journal.gotitem", itemName(item)), J_RARITY[rarity] || J_STD)
+    return true
 }
 function takeItem(rarity, filter) {
     let countInv = 0

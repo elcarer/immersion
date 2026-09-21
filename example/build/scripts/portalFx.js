@@ -883,6 +883,22 @@ function teleportHero(cellX, cellY) {
     status.hero.x = px
     status.hero.y = py
     setWorldViewBox(px - worldViewW() / 2, py - worldViewH() / 2)
+    //V123 (решение юзера): портал переносит ОБОИХ — партнёр появляется рядом
+    teleportPartners(dataGeneric.scenes[status.levelFloor], cellX, cellY)
+}
+
+//V123 (решение юзера): совместный телепорт — остальные живые игроки встают на
+//свободные клетки вокруг точки высадки (freeCellNear; порознь — кто успел)
+function teleportPartners(level, cellX, cellY) {
+    for (let i = 0; i < status.players.length; i++) {
+        const P = status.players[i]
+        if (P === status.hero || P.obj.type !== "hero") continue
+        const cell = freeCellNear(level, cellX, cellY)
+        if (!cell) continue
+        P.x = cell[0] * 32 - 4
+        P.y = cell[1] * 32 - 28
+        spritePos(P.obj.img, P.x, P.y)
+    }
 }
 
 //смена сцены (del.js): связка этажа и арены не переживают del()
@@ -892,4 +908,4 @@ function resetPortalFx() {
 
 //V109: setObjectState/freeCellNear/teleportHero — экспортированы для квеста
 //«Голос в портале» (portalQuest.js: синий квест-портал, телепорты сети, зачистка)
-export {configPortal, portalUse, portalArenaKill, resetPortalFx, placeRoomObject, puzzleButtonUse, shellTick, shellCupUse, shellCupReady, shellState, setObjectState, freeCellNear, teleportHero, PORTAL_TYPE, LEVER_TYPE, PORTAL_SPRITE_W, PORTAL_SPRITE_H}
+export {configPortal, portalUse, portalArenaKill, resetPortalFx, placeRoomObject, puzzleButtonUse, shellTick, shellCupUse, shellCupReady, shellState, setObjectState, freeCellNear, teleportHero, teleportPartners, PORTAL_TYPE, LEVER_TYPE, PORTAL_SPRITE_W, PORTAL_SPRITE_H}

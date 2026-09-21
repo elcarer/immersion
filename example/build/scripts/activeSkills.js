@@ -25,6 +25,8 @@ import { tip,tipDel } from "../scripts/tip.js"
 //E-22: телепорт — снап камеры по фактическим половинам окна зума; открытие посадки
 //через checkNewRoom (комнаты/коридор вокруг точки высадки рисуются сразу)
 import { worldViewW, worldViewH } from "../scripts/zoomFx.js"
+//V123: совместный телепорт
+import { teleportPartners } from "../scripts/portalFx.js"
 import { checkNewRoom } from "../scripts/heroMove.js"
 
 let activeSkillsTemp = []
@@ -370,6 +372,8 @@ function useSkill(skill) {
         status.hero.x = target[0] * 32 - 4
         status.hero.y = target[1] * 32 - 28
         spritePos(status.hero.obj.img, status.hero.x, status.hero.y)
+        //V123 (решение юзера): телепорт Волшебницы переносит ОБОИХ — партнёр рядом
+        teleportPartners(dataGeneric.scenes[status.levelFloor], target[0], target[1])
         //E-22 (репорт «камера медленно доезжает»): прежний снап вычитал 960/540 —
         //половину 1920×1080; при зуме по умолчанию 2 окно камеры всего 960×540, герой
         //оставался в правом нижнем квадранте, и экран довозила медленная прокрутка

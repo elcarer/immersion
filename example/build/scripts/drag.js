@@ -1,11 +1,14 @@
 import { inventory,inventoryDel,inventoryTemp } from "../scripts/inventory.js"
 import { checkCollision } from "../scripts/damage.js"
-import { svgArr,image } from "../scripts/svg.js"
+import { svgArr,image,worldImage } from "../scripts/svg.js"
 import { doll,dollDel,dollTemp,cellPickArr,viewStats } from "../scripts/doll.js"
 import { status } from "../scripts/start.js"
 //V115: полосы ХП/опыта — суффиксы по игроку (players.js)
 import { ctxBar,ctxTx } from "../scripts/players.js"
 import { screenPic } from "../scripts/del.js"
+//V123: дроп удаляемого предмета на пол (кооп)
+import { dropArr,itemDrops } from "../scripts/useObject.js"
+import { placeDrop,dropFly } from "../scripts/dropSafe.js"
 import * as basicData from "../scripts/data.js"
 import { countDopStats } from "../scripts/countDopStats.js"
 import { beltChange } from "../scripts/belt.js"
@@ -142,6 +145,17 @@ function drag (e,item,x,y) {
                 //V67 «Вечный сапфир»: выброшен предмет инвентаря — inv[0] мог опустеть, копия
                 //пересчитывается (сdoll-ветки unEquip пересчитал сам)
                 changeDopStat()
+            }
+            //V123 (решение юзера): в коопе «УДАЛИТЬ» не уничтожает — предмет падает
+            //на пол у владельца панели; подобрать его может этот или другой игрок,
+            //и вернётся РОВНО этот же предмет (кучка несёт его в itemDrops)
+            if (status.players.length > 1) {
+                const P = status.hero
+                const el = worldImage(svgArr[1], P.x + 16, P.y + 40, 28, 32, item.img, {"id": screenPic.length - 1})
+                screenPic.push(el)
+                placeDrop(el, P.x + 16, P.y + 40, 28, 32)
+                dropFly(el, P.x + 16, P.y + 25)
+                itemDrops.set(el, item)
             }
             e.target.remove()
             //V95: полная перерисовка — рамка редкости не остаётся на пустой ячейке
