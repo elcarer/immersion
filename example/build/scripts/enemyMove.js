@@ -1,6 +1,11 @@
 // enemyMove.js — тонкая обёртка над машиной состояний врагов (enemyAI.js):
 // тикает всех врагов/питомцев в камере + эмоции обнаружения.
 import { objectValues } from "../scripts/del.js"
+//V120 (репорт юзера): импорта status не было — строка setContext(status.players[0])
+//видела ГЛОБАЛЬНЫЙ window.status (пустая строка) и кидала TypeError КАЖДЫЙ тик;
+//тип обрывался до damageHero (вражеские снаряды не наносили урон) и до enemyHpBarTick
+//(полоски ХП умерших врагов не удалялись), а runGameTick глотал исключение
+import { status } from "../scripts/start.js"
 import { svgArr,rectPos } from "../scripts/svg.js"
 import { emoFxTick, enemyTick } from "../scripts/enemyAI.js"
 //V115: контекст игрока
