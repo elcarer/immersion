@@ -115,8 +115,8 @@ function gameLoop() {
             if(P.obj.stop&&status.move===1) {P.waitTime++; checkWait()}
             status.move===1&&checkAttack()
             P.noStunTime > 0 && P.noStunTime--
-            //иконки кулдаунов рисуются только для игрока 0 (ряд UI — V117 per-owner)
-            activeSkillsCD(pi === 0)
+            //V122: у каждого игрока свой ряд иконок над своими полосками — тикаем UI всем
+            activeSkillsCD()
             //V115: герой-часть бафов (яд/невидимость/автокасты/щит), горение,
             //бафы статуи (иконки над своим героем), ачивка «Ловкач» — per player
             checkBuffs()

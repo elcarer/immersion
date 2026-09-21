@@ -34,33 +34,50 @@ let activeSkillsTemp = []
 let sectorCache = []
 function activeSkills() {
     activeSkillsDel()
-    let lengthActiveSkills = status.info.activeSkills.length
-    for (let i = 0; i < lengthActiveSkills; i++) {
-        let yUp = 0
-        i >= 5 && (yUp = 110)
+    //V122 (репорт юзера): ряд иконок активных способностей — у КАЖДОГО игрока, НАД
+    //ЕГО полосками ХП/опыта (сдвиг блока bx — как в checkHP: P1 -460, P2 +460).
+    //Раньше ряд был один, справа внизу, и только у игрока 1.
+    for (let pi = 0; pi < status.players.length; pi++) {
+        const P = status.players[pi]
+        if (!P.obj || P.obj.type !== "hero") continue
+        const bx = pi === 0 ? -460 : 460
+        sectorCache[pi] = sectorCache[pi] || []
+        let lengthActiveSkills = P.info.activeSkills.length
+        for (let i = 0; i < lengthActiveSkills; i++) {
         //V83: чужая активная способность (portalFx.grantForeignSkill) может стать шестой —
-        //ряд продолжается ВТОРОЙ СТРОКОЙ над первой (прежде i=5 рисовал x=1920 — за экраном)
-        let xIcon = 1370 + (i >= 5 ? i - 5 : i) * 110
+        //ряд продолжается ВТОРОЙ СТРОКОЙ над первой
         //E-19: подсказка при наведении — как в дереве способностей (skillTree tip);
-        //особенно важна для чужих способностей, полученных через портал с головоломкой.
         //skill захватываем в константу: массив activeSkills может переиндексироваться
         //к моменту наведения (смена этажа перерисовывает ряд)
-        const sk = status.info.activeSkills[i].skill
-        activeSkillsTemp.push(image(svgArr[2],xIcon,970 - yUp,96,96,sk.img,
-            {"funcShow":e => tip(e,sk),"funcShowOut":tipDel}))
+        const sk = P.info.activeSkills[i].skill
+        let yUp = 0
+        i >= 5 && (yUp = 110)
+        let xIcon = 960 + bx - 268 + (i >= 5 ? i - 5 : i) * 110
+        let yIcon = 806 - yUp // нижний ряд вплотную над lvlBack полосок (910)
+        const ic = image(svgArr[2],xIcon,yIcon,96,96,sk.img,
+            {"funcShow":e => tip(e,sk),"funcShowOut":tipDel})
+        activeSkillsTemp.push(ic)
         //R4.4: нативный сектор (Graphics) вместо path()+clipPath. V110: радиус 46 —
-        //вписанная в иконку 96×96 окружность; прежний r=64 с маской-окном жил на
-        //неработающей маске (тёмный круг вылезал за иконку — репорт юзера).
-        //_sx/_sy/_sr проставляет сам createNativeSector — прежние строки кэша ниже
-        //перезаписывали _sr назад на 64, и круг снова вылезал за иконку
-        let sector = nativeSector(svgArr[2], xIcon + 48, 970 + 48 - yUp, 46, 96, {"id": i})
-        sectorCache[i] = sector
+        //вписанная в иконку 96×96 окружность. V122 (репорт юзера: «круг затемнения
+        //не обрезается по размеру иконки»): затемнение = ТЁМНАЯ КОПИЯ иконки (tint 0,
+        //alpha 0.65), маскированная сектором-«пирогом». Паттерн — как у полос ХП
+        //(спрайт под Graphics-маской — единственная работающая маска бэкенда:
+        //Graphics-под-маской не клипует — V110, спрайт-маска гасит маскируемое — V122).
+        //Сектор сам становится маской и потому нигде не виден: тёмный силуэт арта
+        //«наедется» ровно по форме иконки и по углу пирога кулдауна
+        let sector = nativeSector(svgArr[2], xIcon + 48, yIcon + 48, 46, 96, {"id": pi + "_" + i})
+        const dark = image(svgArr[2],xIcon,yIcon,96,96,sk.img,{})
+        dark.node.tint = 0
+        dark.node.alpha = 0.65
+        sector.setMasked(dark)
+        activeSkillsTemp.push(dark)
+        sectorCache[pi][i] = sector
         //V45: стартовое состояние сектора — по фактическому кулдауну/длительности. Раньше
         //сектор всегда рисовался ПОЛНЫМ тёмным кругом: способность, уже готовая (cooldown 0)
         //в момент пересборки иконок (смена этажа, изучение новой активной способности),
         //оставалась с тёмной иконкой навсегда — при cooldown===0 activeSkillsCD сектор
         //не перерисовывает, само по себе тёмное пятно не снималось.
-        let skillEntry = status.info.activeSkills[i]
+        let skillEntry = P.info.activeSkills[i]
         if(skillEntry.cooldown > 0) {
             updateCooldown(skillEntry.cooldown,0,sector,skillEntry.skill.cooldown)
         } else if(skillEntry.duration > 0) {
@@ -69,6 +86,7 @@ function activeSkills() {
             sector.setSector(0)
         }
         activeSkillsTemp.push(sector)
+        }
     }
 }
 function activeSkillsDel() {
@@ -99,10 +117,13 @@ function activeSkillsCD(withUI = true) {
         //V16: узел из кэша; fallback getElementById — если скилл добавили без пересборки UI
         let sector = null
         if (withUI) {
-            sector = sectorCache[i]
+            //V122: сектора пер-игроковые — индекс контекстного игрока (status.hero.idx)
+            const pi = status.hero.idx || 0
+            sectorCache[pi] = sectorCache[pi] || []
+            sector = sectorCache[pi][i]
             if (!sector) {
-                sector = document.getElementById(i+"P")
-                sectorCache[i] = sector
+                sector = document.getElementById(pi + "_" + i)
+                sectorCache[pi][i] = sector
             }
         }
         if(status.info.activeSkills[i].cooldown > 0) {

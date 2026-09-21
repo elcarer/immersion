@@ -1598,7 +1598,23 @@ function createNativeSector(place, cx, cy, r, clipW, obj = {}) {
     const ws = createNativeGraphics(place)
     if (num(r) > clipW / 2 - 2) r = clipW / 2 - 2 // страховка: круг не покидает окно иконки
     ws._sx = num(cx); ws._sy = num(cy); ws._sr = num(r)
+    //V122: режим маски (setMasked) — «пирог кулдауна» рисуется в RAW PIXI.Graphics,
+    //прицепленный маской к спрайту затемнения (активные скиллы). Паттерн worldBar —
+    //единственная работающая маска бэкенда: Graphics бэкенда под маской не клипует
+    //(V110), спрайт-маска гасит маскируемый узел (V122)
+    let mg = null
+    ws.setMasked = (target) => {
+        mg = new PIXI.Graphics()
+        place.node.addChild(mg)
+        if (target.node) target.node.mask = mg
+    }
     ws.setSector = (angleDeg, clockwise = false) => {
+        if (mg) {
+            mg.clear()
+            const mpts = pathPoints(getSectorPath(+angleDeg || 0, ws._sx, ws._sy, ws._sr, clockwise))
+            if (mpts.length >= 6) mg.poly(mpts).fill({ color: 0xffffff })
+            return
+        }
         const g = ws.node
         g.clear()
         const pts = pathPoints(getSectorPath(+angleDeg || 0, ws._sx, ws._sy, ws._sr, clockwise))

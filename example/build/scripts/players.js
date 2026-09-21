@@ -87,6 +87,13 @@ function forAlive(fn) {
     }
     setContext(status.players[0])
 }
+//V122 (решение юзера — баланс коопа): опыт для поднятия КАЖДОГО уровня — вдвое больше
+//соло-нормы (выдача опыта при этом обычная). lvl передаётся явно: checkHP считает по
+//P.info каждого игрока вне контекста
+function nextLvlExp(lvl) {
+    const base = Math.trunc(((1 + 20/lvl)**(lvl/20) - 1) / (Math.exp(1) - 1) * 100)
+    return status.players.length > 1 ? base * 2 : base
+}
 //суффиксы DOM-id полос текущего контекста: полоса — base+"I"+idx (svg.image суффиксит
 //"I"), текст/уровень — base+"Text"+idx / "lvlText"+idx (svg.text пишет id дословно)
 function ctxBar(base) {
@@ -95,4 +102,4 @@ function ctxBar(base) {
 function ctxTx(base) {
     return document.getElementById(base + "Text" + (status.hero.idx || 0))
 }
-export {defaultInfo,defaultInventory,makePlayer,setContext,playerAlive,anyAlive,ownerPlayer,nearestPlayer,forAlive,ctxBar,ctxTx}
+export {defaultInfo,defaultInventory,makePlayer,setContext,playerAlive,anyAlive,ownerPlayer,nearestPlayer,forAlive,ctxBar,ctxTx,nextLvlExp}

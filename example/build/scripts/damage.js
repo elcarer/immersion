@@ -2,7 +2,7 @@ import { screenPic,objectValues } from "../scripts/del.js"
 import { floatText } from "../scripts/floatText.js"
 import { status } from "../scripts/start.js"
 //V115: полосы ХП/опыта — суффиксы по игроку (players.js)
-import { ctxBar,ctxTx,ownerPlayer,setContext } from "../scripts/players.js"
+import { ctxBar,ctxTx,ownerPlayer,setContext,nextLvlExp } from "../scripts/players.js"
 import { T } from "../scripts/localization.js"
 import { changeHP,changeLvl } from "../scripts/takeDamage.js"
 import { data } from "../scripts/data.js"
@@ -619,7 +619,8 @@ function reanimateCheck(enemy) {
     return true
 }
 function checkExp(exp=0) {
-    let nextLvl = Math.trunc(((1 + 20/(status.info.lvl))**((status.info.lvl)/20) - 1) / (Math.exp(1) - 1) * 100)
+    //V122: в коопе порог уровня x2 (nextLvlExp, players.js)
+    let nextLvl = nextLvlExp(status.info.lvl)
     exp > 0 && floatText(Math.trunc(Math.random() * 32) + status.hero.x,status.hero.y+8,exp,"#6666FF","12px","none")
     if(status.info.exp >= nextLvl){
         floatText(status.hero.x,status.hero.y+8,"+","#FFCC66","24px","none")

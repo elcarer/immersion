@@ -20,7 +20,7 @@ import { sapphireArmor, hasRelic } from "../scripts/relics.js"
 //V75: благословения шкафчика — «Стальная кожа» (кап 16) и «Второе дыхание» (спасение с 1 ХП)
 import { blessActive,spendBless } from "../scripts/blessFx.js"
 //V115: кооператив — суффиксы DOM-id полос по игроку (hpBarI0/lvlText1…)
-import { ctxBar,ctxTx } from "../scripts/players.js"
+import { ctxBar,ctxTx,nextLvlExp } from "../scripts/players.js"
 
 //V86: ЕДИНАЯ сумма брони — и для формулы урона, и для числа на кукле: своя броня
 //(щиты, очки рыцаря) + копия щита «Вечного сапфира» + сет «Турниры» (4 предмета) +
@@ -162,7 +162,7 @@ function checkHP() {
         screenPic.push(worldBar(svgArr[2],1007+bx,1007,315,24,"./images/UI/panels/hpBarCol2.png",{"id":"hp"+pi}))
         screenPic.push(worldBar(svgArr[2],598+bx,1007,315,24,"./images/UI/panels/hpBarCol1.png",{"id":"exp"+pi}))
         screenPic.push(text(svgArr[2],1164+bx,1026,"0pt","50pt","none","2px",`#FFCC66`,info.hp+"/"+info.stats[2].dops[0].value2.slice(0,-1),{"id":"hpText"+pi,"size":24,"font":"baseFont4","anchor":"middle"}))
-        screenPic.push(text(svgArr[2],760+bx,1026,"0pt","50pt","none","2px",`#FFCC66`,info.exp+"/"+Math.trunc(((1 + 20/(info.lvl))**((info.lvl)/20) - 1) / (Math.exp(1) - 1) * 100),{"id":"expText"+pi,"size":24,"font":"baseFont4","anchor":"middle"}))
+        screenPic.push(text(svgArr[2],760+bx,1026,"0pt","50pt","none","2px",`#FFCC66`,info.exp+"/"+nextLvlExp(info.lvl),{"id":"expText"+pi,"size":24,"font":"baseFont4","anchor":"middle"}))
         changeHP(document.getElementById("exp"+pi+"I"),document.getElementById("expText"+pi),"exp",pi)
         changeHP(document.getElementById("hp"+pi+"I"),document.getElementById("hpText"+pi),"hp",pi)
 
@@ -186,12 +186,12 @@ function changeHP(img,text,type,pi) {
     }    
     let lengthCol
     type==="hp"&&(lengthCol = Math.trunc(status.info.hp*315 / parseInt(status.info.stats[2].dops[0].value2.slice(0,-1))))
-    type==="exp"&&(lengthCol = Math.trunc(status.info.exp*315 / Math.trunc(((1 + 20/(status.info.lvl))**((status.info.lvl)/20) - 1) / (Math.exp(1) - 1) * 100)))
+    type==="exp"&&(lengthCol = Math.trunc(status.info.exp*315 / nextLvlExp(status.info.lvl)))
     //R4: окно маски полосы правится напрямую (ХП заполняется слева, опыт — справа);
     //никаких clipPath-пересозданий в defs на каждое изменение
     img.setBarProgress && img.setBarProgress(lengthCol, type==="hp" ? "left" : "right")
     type==="hp"?
         text.textContent = status.info.hp+"/"+status.info.stats[2].dops[0].value2.slice(0,-1):
-        text.textContent = status.info.exp+"/"+Math.trunc(((1 + 20/(status.info.lvl))**((status.info.lvl)/20) - 1) / (Math.exp(1) - 1) * 100)
+        text.textContent = status.info.exp+"/"+nextLvlExp(status.info.lvl)
 }
 export {takeDamage,checkHP,changeHP,changeLvl,checkFood,dollArmor}
