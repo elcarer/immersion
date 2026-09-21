@@ -146,15 +146,21 @@ function mapRender(level, tileX, tileY, layer) {
                 isPillar ? 81 : isPortal ? 84 : isLever ? 32 : isStatue ? statueH : isAncient ? 42 : o[4]*tileY,
                 objSrc))
         }
-        //5. иконка героя — doll-иконка класса с золотым свечением, позиция из мировых
+        //5. иконки героев — doll-иконка класса с золотым свечением, позиция из мировых
         //координат героя (hero.x/y в px, тайл поля 32px); свечение — style drop-shadow,
-        //нативный хэндл ведёт его той же glow-запекалкой (duck-typing)
-        const heroIcon = worldImage(layer,
-            (tileX/32)*status.hero.x,
-            (tileY/32)*status.hero.y,
-            20, 32, HERO_ICONS[status.hero.class])
-        heroIcon.setAttribute("style", "filter: drop-shadow(0 0 8px rgba(255, 255, 204, 1))")
-        nodes.push(heroIcon)
+        //нативный хэндл ведёт его той же glow-запекалкой (duck-typing).
+        //V120 (репорт юзера): в коопе на карте рисуются ОБА игрока — у второго
+        //бирюзовое свечение #4AD2FF, тем же цветом он помечен на миникарте
+        for (let pi = 0; pi < status.players.length; pi++) {
+            const P = status.players[pi]
+            if (!P.obj || P.obj.type !== "hero") continue
+            const heroIcon = worldImage(layer,
+                (tileX/32)*P.x,
+                (tileY/32)*P.y,
+                20, 32, HERO_ICONS[P.class])
+            heroIcon.setAttribute("style", "filter: drop-shadow(0 0 8px " + (pi === 0 ? "rgba(255, 255, 204, 1)" : "rgba(74, 210, 255, 1)") + ")")
+            nodes.push(heroIcon)
+        }
         //V113: убегающий Огнементаль квеста «Погоня за пламенем» — маркер на карте,
         //пока идёт погоня (state 2, npc жив) — wait-кадр листа + оранжевое свечение
         //(координаты — мировые px спрайта NPC, как у героя)
