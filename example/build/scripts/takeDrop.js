@@ -66,6 +66,10 @@ function takeDropFor() {
             //(фильтр в itemGenerate); href-цепочка ниже — обычные кучки
             //V123: конкретный предмет с «УДАЛИТЬ» (кооп) — подбор без генерации
             const exact = itemDrops.get(dropArr[i])
+            //V125 (репорт юзера: ReferenceError «bossRarity is not defined» в каждом тике
+            //подбора — дроп перестал подбираться): объявление потеряно при V123-вставке
+            //ветки exact; get по кучке не из сундука босса даёт undefined — ветка молчит
+            const bossRarity = bossWeaponDrops.get(dropArr[i])
             if (exact !== undefined) {
                 useDrop = takeExactItem(exact)
                 useDrop && itemDrops.delete(dropArr[i])

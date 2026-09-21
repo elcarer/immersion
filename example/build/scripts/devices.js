@@ -27,9 +27,14 @@ const DIR_NAMES = ["up","down","left","right"]
 function moveProfile(device) {
     return MOVE_KEYS[device] || MOVE_KEYS.solo
 }
-//индекс геймпада устройства (solo использует пад 0, как раньше; раскладки kb — без пада)
+//индекс геймпада устройства. V125 (репорт юзера: «второй джойстик не работает»):
+//в коопе клавиатурный профиль владеет падом СВОЕГО СЛОТА — пад 0 → игрок 1 (kb1),
+//пад 1 → игрок 2 (kb2); solo — пад 0, как раньше. Пад не подключён — getGamepads()[i]
+//равен null и ветка движения просто не срабатывает, раскладка живёт на клавиатуре
 function padIndex(device) {
-    return device === "pad0" ? 0 : device === "pad1" ? 1 : device === "solo" ? 0 : -1
+    if (device === "pad1" || device === "kb2") return 1
+    if (device === "pad0" || device === "kb1" || device === "solo") return 0
+    return -1
 }
 //чей код движения: {player, dir} первого игрока, в чей профиль код входит, или null.
 //В соло профиль один на единственного игрока; в коопе профили kb1/kb2 не пересекаются

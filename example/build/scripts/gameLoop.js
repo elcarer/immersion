@@ -257,24 +257,33 @@ let timePadButtons = 0
 let padDragPrev = false
 function checkGamepadMenu() {
     timePadButtons++
-    if(status.start === 1 && navigator.getGamepads()[0] && timePadButtons > 15) {
-        timePadButtons = 0
-        //V117: меню-кнопки пада 0 — от имени игрока 1 (pad0 назначен ему; в коопе
-        //pad1-меню добавляется вместе с назначением устройств в лобби — V118)
-        let but = navigator.getGamepads()[0].buttons
+    if(status.start !== 1 || timePadButtons <= 15) return
+    //V125 (репорт юзера: второй геймпад не работает): каждый подключённый пад
+    //обслуживает СВОЕГО игрока — пад k → players[k] (пад 0 → игрок 1, пад 1 →
+    //игрок 2), панели открываются per-owner (clickButton(n, ownerIdx), V117).
+    //Курсор/клики/drag (gamepad ниже) остаются за падом 0 — курсор на экране один,
+    //drag-машина синглтонна
+    const pads = navigator.getGamepads()
+    let handled = false
+    for (let pi = 0; pi < status.players.length; pi++) {
+        const pad = pads[pi]
+        if (!pad) continue
+        handled = true
+        let but = pad.buttons
         //карта
-        if (but[2] && but[2].pressed) {clickButton(1)}
+        if (but[2] && but[2].pressed) {clickButton(1,pi)}
         //отмена
         if (but[3] && but[3].pressed) {closePanels(0);playback(strike[14].vol,0,0,3*status.settings.soundVolume)}
         //экипировка
-        if (but[0] && but[0].pressed) {clickButton(0)}
+        if (but[0] && but[0].pressed) {clickButton(0,pi)}
         //журнал
-        if (but[6] && but[6].pressed) {clickButton(2)}
+        if (but[6] && but[6].pressed) {clickButton(2,pi)}
         //настройки
-        if (but[1] && but[1].pressed) {clickButton(3)}
+        if (but[1] && but[1].pressed) {clickButton(3,pi)}
         //библиотека
-        if (but[5] && but[5].pressed) {clickButton(4)}
+        if (but[5] && but[5].pressed) {clickButton(4,pi)}
     }
+    handled && (timePadButtons = 0)
 }
 function movePadCursor(x,y) {
     !status.newMouse && (status.newMouse = image(svgArr[2],0,0,23,32,"./images/UI/cur.png"))
