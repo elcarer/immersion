@@ -410,3 +410,16 @@
   — кучка ждёт на полу, возврат — подбор того же объекта, unit teleportPartners,
   __tickError пуст) + регресс v114–v118/v122 ALL_OK. Ловушка теста: itemGenerate
   автонадевает предмет на куклу (V102) — для инвентарной копии генерить циклом.
+- ПЛАН V124 (следующая волна, из заметок юзера; НЕ начата): раздельная мета в коопе +
+  последовательные экраны. (а) metaCoop: у каждого игрока СВОИ points/inv (сундук)/
+  metaInvLen/metaPageNum/invNum/startKey/dopHP/startStat/identLegends (прокачка и сундук),
+  общие остаются: page/pageMax/achievements/library/libraryObjects/killedEnemes/bossesSlain/
+  diedClasses/obtainedRelics/quests; статус-указатель: status.meta = мета АКТИВНОГО игрока
+  (setContext переключает), сейв пишет оба профиля. (б) Лобби-поток: coopLobby(step) вместо
+  голых карточек показывает ПОЛНОЕ лобби (lobby) от меты текущего игрока с его выбором героя
+  и своей кнопкой «Далее»; после ДАЛЕЕ P1 — экран меты P2, после ДАЛЕЕ P2 — comix.
+  (в) Финал этажа: экран очков (endGame) и экран выбора предметов (metaItems) показывать
+  ДВАЖДЫ — по разу на игрока (свой points/предметы). (г) Баг «второму не дают выбрать героя
+  при возврате в лобби» — часть потока (б): повторный вход обязан снова пройти оба шага.
+  Файлы: save.js (формат+normMeta+load), lobby.js (coopLobby/lobby/takeSelected), endGame.js,
+  metaItems.js, nextFloor.js, sceneGenerate.js (стартовые статы из меты игрока).
