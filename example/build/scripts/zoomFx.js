@@ -15,6 +15,8 @@
 // viewBox.animVal.width/height напрямую вместо литералов 1920/1080.
 import { svgArr } from "../scripts/svg.js"
 import { status } from "../scripts/start.js"
+//V116: кооп-камера — живые игроки как цель
+import { playerAlive } from "../scripts/players.js"
 // МИГРАЦИЯ: windowSize переехал в pixiBackend (index.js с top-level await не может
 // быть в цикле импортов) — значение то же (окно 16:9)
 import { windowSize } from "../scripts/pixiBackend.js"
@@ -56,12 +58,70 @@ export function resetWorldView() {
     setWorldViewBox(0, 0)
 }
 //Сброс зума к ZOOM_START при нажатии на колесо мыши и центрирование на герое
+//V116: в коопе зум программный — колесо/СКМ не мешают
 document.addEventListener('mousedown', (event) => {
-  if (event.button === 1) {
+  if (event.button === 1 && status.players.length === 1) {
     zoom = ZOOM_START
     setWorldViewBox(status.hero.x-480, status.hero.y-270)
   }
 })
+
+// ---------------------------------------------------------------------------
+// V116: кооп-камера. Оба игрока всегда в кадре: цель = midpoint живых героев,
+// зум = минимальный, при котором оба помещаются с запасом CAMERA_PAD на игрока,
+// кламп [ZOOM_MIN..ZOOM_START], плавный лерп (приезжает/отъезжает без рывков).
+// maxW/maxH — габариты сцены в px: окно камеры клампится к границам этажа, поэтому
+// игрок у края карты упирается в край экрана (ограничение скролла — по ТЗ коопа).
+// Возвращает true, если камеру тикнул кооп-режим (соло — false, там мёртвая зона).
+// ---------------------------------------------------------------------------
+const CAMERA_PAD = 140
+const CAMERA_LERP = 0.08
+export function coopMode() {
+    return status.players.length > 1
+}
+export function coopCameraTick(maxW, maxH) {
+    const alive = status.players.filter(playerAlive)
+    if (status.players.length < 2 || alive.length === 0) return false
+    let cx = 0, cy = 0
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
+    for (let i = 0; i < alive.length; i++) {
+        cx += alive[i].x
+        cy += alive[i].y
+        minX = Math.min(minX, alive[i].x)
+        minY = Math.min(minY, alive[i].y)
+        maxX = Math.max(maxX, alive[i].x)
+        maxY = Math.max(maxY, alive[i].y)
+    }
+    cx /= alive.length
+    cy /= alive.length
+    //требуемое окно: габарит разлёта + запас по 140px в обе стороны; не меньше кадра
+    //стандартного зума — стоящие рядом герои не вызывают отъезда
+    const needW = Math.max((maxX - minX) + CAMERA_PAD * 2, 1920 / ZOOM_START)
+    const needH = Math.max((maxY - minY) + CAMERA_PAD * 2, 1080 / ZOOM_START)
+    const targetZoom = Math.max(ZOOM_MIN, Math.min(ZOOM_START, Math.min(1920 / needW, 1080 / needH)))
+    zoom += (targetZoom - zoom) * CAMERA_LERP
+    //центр клампится к сцене: у края карты один из игроков ограничен краем экрана
+    let wx = cx - worldViewW() / 2
+    let wy = cy - worldViewH() / 2
+    wx = Math.max(0, Math.min(maxW - worldViewW(), wx))
+    wy = Math.max(0, Math.min(maxH - worldViewH(), wy))
+    setWorldViewBox(wx, wy)
+    updatePixelatedCoop()
+    return true
+}
+//pixelated-логика zoomFx недоступна снаружи (замыкание) — дублируем применение
+//после программного зума (та же формула целочисленного масштаба)
+function updatePixelatedCoop() {
+    //зум меняется плавно — пересчёт каждый тик дешёв (одно сравнение по кэшу)
+    const scale = (windowSize.wt / 1920) * zoom
+    const r = scale >= 1 ? scale : 1 / scale
+    const pixelated = Math.abs(r - Math.round(r)) < 0.02
+    if (pixelated === lastPixelated) return
+    lastPixelated = pixelated
+    for (let i = 0; i < 2; i++) {
+        svgArr[i].style.imageRendering = pixelated ? "pixelated" : "auto"
+    }
+}
 //Правило V15 из svg.js с учётом зума: pixelated только при целочисленном ИТОГОВОМ
 //масштабе рендера (размер окна × зум), при дробном — обычное сглаживание.
 //Логика повторена локально, а не импортирована: svg.js не должен тянуть цикл zoomFx↔svg.
@@ -85,6 +145,8 @@ document.addEventListener("wheel", (e) => {
     if (e.ctrlKey || e.metaKey || e.altKey) return
     //только в активном забеге без открытых панелей
     if (status.start !== 1 || status.pause !== 0) return
+    //V116: в коопе зум программный (автоотъезд/приезд) — колесо не мешает
+    if (coopMode()) return
     //страница не скроллится, но дефолтное поведение браузера страхуем
     e.preventDefault()
     //нормировка события: клэмп величины на один wheel (трекпад шлёт много мелких),

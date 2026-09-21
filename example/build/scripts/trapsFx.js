@@ -35,6 +35,8 @@ import { applyFlame } from "../scripts/flameFx.js"
 import { applyEnemyBurn } from "../scripts/buffFx.js"
 import { trapSpriteSrc } from "../scripts/trapSprite.js"
 import { playback, strike } from "../scripts/sound.js"
+//V116: кооператив — ловушки бьют КАЖДОГО живого игрока
+import { forAlive } from "../scripts/players.js"
 
 const STATE_TICKS = 125  //фаза состояния шипов/огня: 2с (~62.5 тика/с)
 const CLOUD_TICKS = 64   //жизнь облака кислоты ~1с (анимация 4 кадра × 16 тиков, speed 3.75)
@@ -82,11 +84,12 @@ function tickState(obj) {
 //от центра ловушки — герою applyFlame (горение, урон за удар), врагам маркер burnT
 function fireBurst(obj) {
     const cx = obj[0]*32 + 16, cy = obj[1]*32 + 16
-    if(status.hero.obj && status.hero.obj.type === "hero") {
-        let r = status.hero.obj.rect
+    //V116: ожог — каждому живому игроку в радиусе (applyFlame пишет в его info)
+    forAlive(P => {
+        let r = P.obj.rect
         let p = rectPos(r)
         inRadius(p[0] + r._w/2, p[1] + r._h/2, cx, cy) && applyFlame(2)
-    }
+    })
     let lengthEnemy = objectValues.length
     for (let i = 0; i < lengthEnemy; i++) {
         let e = objectValues[i]
@@ -103,6 +106,10 @@ function inRadius(x, y, cx, cy) {
 //герой: наступание на кислотную ловушку выпускает облако; стояние на активных шипах и на
 //огненной (в ЛЮБОЙ фазе) — урон тиками, как раньше
 function trapHeroTick(traps) {
+    //V116: прогон подбора ловушек — у КАЖДОГО живого игрока свой (trapTime — в его info)
+    forAlive(() => trapHeroTickFor(traps))
+}
+function trapHeroTickFor(traps) {
     if(status.hero.obj.type !== "hero") return
     let rect = status.hero.obj.rect
     let heroPos = rectPos(rect)
@@ -235,10 +242,12 @@ function tickClouds(level) {
 //старой кислоты (1-3). Журнал — одна строка на облако.
 function cloudDamage(obj) {
     const ax = (obj[0]-1)*32, ay = (obj[1]-1)*32
-    if(status.hero.obj && status.hero.obj.type === "hero" && !(wingsActive() || dashInvulnActive())) {
+    //V116: облако бьёт каждого живого игрока в зоне (одна журнальная строка на облако)
+    forAlive(() => {
         let rect = status.hero.obj.rect
         let p = rectPos(rect)
-        if(checkCollision(p[0]+13, ax, 14, 96, p[1]+37, ay, 14, 96)) {
+        if(status.hero.obj.type === "hero" && !(wingsActive() || dashInvulnActive()) &&
+           checkCollision(p[0]+13, ax, 14, 96, p[1]+37, ay, 14, 96)) {
             let damage = Math.trunc(Math.random() * 3) + 1
             status.info.hp -= damage
             status.info.hp <= 0 && (status.info.hp = 0)
@@ -250,7 +259,7 @@ function cloudDamage(obj) {
             checkFood()
             status.info.hp <= 0 && endGame()
         }
-    }
+    })
     let lengthEnemy = objectValues.length
     for (let i = 0; i < lengthEnemy; i++) {
         let enemy = objectValues[i]

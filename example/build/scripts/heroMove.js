@@ -13,7 +13,7 @@ import { shellCupReady } from "../scripts/portalFx.js"
 import { checkCollision } from "../scripts/damage.js"
 import { dashPress,updateRazgon,wingsActive,dashInvulnActive } from "../scripts/valkyrie.js"
 //R2.6: единый писатель камеры (плавное следование в scroll) — см. комментарий в scroll
-import { setWorldViewBox } from "../scripts/zoomFx.js"
+import { setWorldViewBox,coopMode,coopCameraTick } from "../scripts/zoomFx.js"
 //V49 баф скорости (статуя): перемещение героя ×1.5
 import { buffActive } from "../scripts/buffFx.js"
 //V111: квест «Погоня за пламенем» — свежая клетка коридора получает лаву (режим «лава в коридорах»)
@@ -282,9 +282,12 @@ function heroMove (P) {
     !P.wasMoving && moved && status.panels === 10 && !lvlFlashActive() && topMenuClose()
     P.wasMoving = moved
     //скролл экрана
-    //V114: камера следует только за игроком 0 (кооп-камера midpoint/автозум — V116);
-    //второй игрок за кадром не увозит камеру
+    //V114: камера следует только за игроком 0; V116: в коопе — кооп-камера
+    //(midpoint живых героев + автозум 1..2 + кламп к сцене, колесо отключено)
     if (P === status.players[0]) {
+    if (coopMode() && coopCameraTick(data.scenes[num].w * 32, data.scenes[num].h * 32)) {
+        //кооп-камера отработала — мёртвая зона не нужна
+    } else {
     //V31: мёртвая зона слежения масштабируется под ОКНО камеры: при зуме видимая
     //область уже (1920/zoom × 1080/zoom). Прежние литералы 500/1420/450/630 были
     //зеркальными маржами 500/450 px от краёв кадра 1920×1080 — соотношение сохранено.
@@ -314,6 +317,7 @@ function heroMove (P) {
             //В старом SVG у слоёв были независимые строки viewBox — потому там не прыгало.
             setWorldViewBox(nx, ny)
         }
+    }
     }
     }
     //детект обьекта

@@ -56,9 +56,10 @@ const BTN_STROKE = 3                      // V30a: толще — уголок �
 let btnNodes = []
 let winNodes = []     // фон окна
 let runNodes = []     // прямоугольники комнат/коридоров текущего рендера
-let dotEl = null      // кружок героя (живёт поверх прямоугольников)
-let dotX = -1         // последние записанные координаты кружка (ноль лишних записей)
-let dotY = -1
+//V115/V116: кружок НА КАЖДОГО игрока (живёт поверх прямоугольников); P1 — жёлтый, P2 — бирюзовый
+const MM_HERO_FILL2 = "#4AD2FF"
+let dotEls = []       // [кружок P1, кружок P2]
+let dotXY = []        // последние записанные координаты кружков (ноль лишних записей)
 let miniOpen = false
 let renderAnchor = null // клетка героя, относительно которой построен текущий РЕНДЕР
 
@@ -170,12 +171,17 @@ function openMinimap () {
     frameEl.setAttribute("x", frameEl.__mmX + mmDx())
     winNodes.push(frameEl)
     //ВНИМАНИЕ: хелпер circle() НЕ ставит obj.id (игнорирует поле) — вешаем вручную
-    dotEl = circle(svgArr[2], -100, -100, 4, "#1c150f", "1px", MM_HERO_FILL)
-    dotEl.setAttribute("id", "minimapHero")
+    dotEls = []
+    dotXY = []
+    for (let pi = 0; pi < status.players.length; pi++) {
+        const d = circle(svgArr[2], -100, -100, 4, "#1c150f", "1px", pi === 0 ? MM_HERO_FILL : MM_HERO_FILL2)
+        d.setAttribute("id", "minimapHero" + pi)
+        dotEls.push(d)
+        dotXY.push([-1, -1])
+    }
     //E-12: после закрытия dedup mmPlaceDot держал координаты прошлого кружка —
     //переоткрытие на той же клетке героя оставляло НОВЫЙ кружок на (−100,−100)
-    dotX = -1
-    dotY = -1
+    dotXY = dotXY.map(() => [-1, -1])
     //мгновенная отрисовка даже под паузой панелей: следующий тик мог бы не наступить
     if (status.start === 1 && status.matrixLevel) {
         status.matrixLevel !== floorRef && mmPrepare()
@@ -191,8 +197,8 @@ function closeMinimap () {
         const n = runNodes.pop()
         n && n.remove && n.remove()
     }
-    dotEl && dotEl.remove()
-    dotEl = null
+    for (let i = 0; i < dotEls.length; i++) dotEls[i] && dotEls[i].remove()
+    dotEls = []
     while (winNodes.length > 0) {
         const n = winNodes.pop()
         n && n.remove && n.remove()
@@ -233,27 +239,31 @@ function mmRebuild (hx, hy) {
             }
         }
     }
-    dotEl && svgArr[2].appendChild(dotEl) //кружок — строго ПОВЕРХ прямоугольников
+    for (let i = 0; i < dotEls.length; i++) dotEls[i] && svgArr[2].appendChild(dotEls[i]) //кружки — строго ПОВЕРХ прямоугольников
 }
 //плавное положение кружка из точных мировых координат героя (+16 к центру клетки);
 //без клэмпа кружок у кромки карты уезжал бы в темное поле окна
 function mmPlaceDot () {
-    if (!dotEl || !renderAnchor) return
+    if (!dotEls.length || !renderAnchor) return
     const scale = MM_CELL / 32
     const edge = MM_X + mmDx()
-    let cx = edge + MM_PAD + (status.hero.x + 16 - (renderAnchor.x - MM_N) * 32) * scale
-    let cy = MM_Y + MM_PAD + (status.hero.y + 16 - (renderAnchor.y - MM_N) * 32) * scale
-    cx < edge + MM_PAD + 3 && (cx = edge + MM_PAD + 3)
-    cy < MM_Y + MM_PAD + 3 && (cy = MM_Y + MM_PAD + 3)
-    cx > edge + MM_PAD + MM_INNER - 3 && (cx = edge + MM_PAD + MM_INNER - 3)
-    cy > MM_Y + MM_PAD + MM_INNER - 3 && (cy = MM_Y + MM_PAD + MM_INNER - 3)
-    cx = Math.round(cx)
-    cy = Math.round(cy)
-    if (cx !== dotX || cy !== dotY) {
-        dotX = cx
-        dotY = cy
-        dotEl.setAttribute("cx", cx)
-        dotEl.setAttribute("cy", cy)
+    for (let pi = 0; pi < dotEls.length; pi++) {
+        const P = status.players[pi]
+        if (!P) break
+        let cx = edge + MM_PAD + (P.x + 16 - (renderAnchor.x - MM_N) * 32) * scale
+        let cy = MM_Y + MM_PAD + (P.y + 16 - (renderAnchor.y - MM_N) * 32) * scale
+        //кламп к окну: игрок у кромки окна карты не уезжает в тёмное поле
+        cx < edge + MM_PAD + 3 && (cx = edge + MM_PAD + 3)
+        cy < MM_Y + MM_PAD + 3 && (cy = MM_Y + MM_PAD + 3)
+        cx > edge + MM_PAD + MM_INNER - 3 && (cx = edge + MM_PAD + MM_INNER - 3)
+        cy > MM_Y + MM_PAD + MM_INNER - 3 && (cy = MM_Y + MM_PAD + MM_INNER - 3)
+        cx = Math.round(cx)
+        cy = Math.round(cy)
+        if (cx !== dotXY[pi][0] || cy !== dotXY[pi][1]) {
+            dotXY[pi] = [cx, cy]
+            dotEls[pi].setAttribute("cx", cx)
+            dotEls[pi].setAttribute("cy", cy)
+        }
     }
 }
 //тик из gameLoop (блок живого героя): пересборка при смене клетки/этажа/ОТКРЫТОСТИ
