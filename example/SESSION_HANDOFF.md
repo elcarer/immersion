@@ -410,16 +410,36 @@
   — кучка ждёт на полу, возврат — подбор того же объекта, unit teleportPartners,
   __tickError пуст) + регресс v114–v118/v122 ALL_OK. Ловушка теста: itemGenerate
   автонадевает предмет на куклу (V102) — для инвентарной копии генерить циклом.
-- ПЛАН V124 (следующая волна, из заметок юзера; НЕ начата): раздельная мета в коопе +
-  последовательные экраны. (а) metaCoop: у каждого игрока СВОИ points/inv (сундук)/
-  metaInvLen/metaPageNum/invNum/startKey/dopHP/startStat/identLegends (прокачка и сундук),
-  общие остаются: page/pageMax/achievements/library/libraryObjects/killedEnemes/bossesSlain/
-  diedClasses/obtainedRelics/quests; статус-указатель: status.meta = мета АКТИВНОГО игрока
-  (setContext переключает), сейв пишет оба профиля. (б) Лобби-поток: coopLobby(step) вместо
-  голых карточек показывает ПОЛНОЕ лобби (lobby) от меты текущего игрока с его выбором героя
-  и своей кнопкой «Далее»; после ДАЛЕЕ P1 — экран меты P2, после ДАЛЕЕ P2 — comix.
-  (в) Финал этажа: экран очков (endGame) и экран выбора предметов (metaItems) показывать
-  ДВАЖДЫ — по разу на игрока (свой points/предметы). (г) Баг «второму не дают выбрать героя
-  при возврате в лобби» — часть потока (б): повторный вход обязан снова пройти оба шага.
-  Файлы: save.js (формат+normMeta+load), lobby.js (coopLobby/lobby/takeSelected), endGame.js,
-  metaItems.js, nextFloor.js, sceneGenerate.js (стартовые статы из меты игрока).
+- V124: РАЗДЕЛЬНАЯ МЕТА КООПА + ПОСЛЕДОВАТЕЛЬНЫЕ ЭКРАНЫ (все пункты заметок юзера
+  закрыты; план из записи ниже выполнен). (1) Двухуровневая мета: ПЕР-ИГРОКОВЫЕ поля
+  points/inv/metaInvLen/metaPageNum/invNum/startKey/dopHP/startStat/identLegends
+  (прокачка и сундук каждого) живут в P.meta; общие (page/pageMax/openPage/achievements/
+  library/libraryObjects/killedEnemes/bossesSlain/diedClasses/obtainedRelics/quests) — в
+  НОВОМ status.metaShared. status.meta в коопе = Proxy-УКАЗАТЕЛЬ (players.makeMetaView,
+  кэш p.metaView): пер-игроковые поля форвардятся в p.meta, остальные в metaShared —
+  ~50 потребителей status.meta.* не тронуты (та же схема, что hero/info/inventory);
+  setContext подменяет мету ПЯТЫМ указателем только при players.length>1. В соло
+  status.meta — обычный объект как раньше. Правило «P.info = {...} → setContext(P)»
+  применить ДВАЖДЫ в sceneGenerate (контекст до инициализации — для чтения startStat/
+  startKey СВОЕЙ меты — и снова после замены P.info, иначе countDopStats писал в старый
+  объект и .slice(value2) ронял newGame). (2) Сейв metaCoop: общий flat + players:[{class,
+  ...пер-игроковые}]; normMeta расщеплён на normShared+normInvItems (миграции путей вещей —
+  на КАЖДЫЙ сундук); applyCoopProfile понимает и старый flat V118 (поля → P1, P2 с
+  шаблона) и соло-файл, загруженный в кооп-сессии; saveToFile в коопе пишет coopPayload.
+  (3) Лобби-поток: coopLobby(step,lose,next) = setContext(players[step]) + lobby() —
+  ПОЛНОЕ лобби (мета/сундук/прокачка) ТЕКУЩЕГО игрока + подзаголовок «Игрок N»
+  (lobby.coop.step1/2) + на шаге P2 класс P1 затемнён; «Далее» лобби: takeSelected →
+  idx 0 ? coopLobby(1) : (save()+comix()). Шаг хранить негде — он и есть status.hero.idx.
+  (4) Экраны финала ×2: endScreen=endScreenBuild(chapterStep) и metaItems=metaItemsBuild
+  (miCoopIdx/endCoopIdx): после очков/предметов P1 «Далее» перестраивает экран в
+  контексте P2; инкремент глав и levelFloor++ — один раз на цепочку (guard chapterStep);
+  золото на экране очков — ТЕКУЩЕГО игрока (V119-сумма снята); metaItems в конце чистит
+  куклы/рюкзаки ОБОИХ и зовёт coopLobby(0,lose,next). Подпись «ИГРОК N» — ключ coop.pn.
+  (5) КРИТИЧЕСКИЙ ФИКС del(): контекст возвращается ВХОДЯЩИМ игроком (было жёстко
+  players[0]) — del() внутри lobby()/endScreenBuild() иначе сбрасывал контекст и ломал
+  и лобби-поток, и P2-экраны. Ловушка verify: после клика «ДАЛЕЕ» ждать rectShadow
+  ~1600мс (переход 68 тиков + 200мс таймаут). Verify: v124 (48 проверок: статика,
+  юнит-мета/прокси-кэш/общие поля, сейв-формат + миграция flat, спуск с экранами ×2 —
+  очки СВОЕМУ игроку, полная цепочка до лобби, повторное лобби P1→P2→комикс→забег,
+  стартовые статы из меты каждого (dopHP 4 → «29x» vs «25x»), pageErrors/__tickError
+  пусты) + регресс v114–v118/v122/v123 ALL_OK. Заметки юзера закрыты целиком.

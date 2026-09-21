@@ -4,30 +4,45 @@ import { lobby } from "../scripts/lobby.js"
 //keyByRu — миграция текстовых полей вещей старых сейвов на ключи локализации
 import { setLang,keyByRu } from "../scripts/localization.js"
 //V118: кооп-профиль — фабрика второго игрока при загрузке
-import { makePlayer } from "../scripts/players.js"
+//V124: раздельная мета коопа — пер-игроковые поля, шаблон, общая часть
+import { makePlayer,META_PLAYER_FIELDS,playerMetaTemplate,sharedMetaPart,setContext } from "../scripts/players.js"
 
-//V118: два профиля — соло (ключ "meta", как всегда) и кооп ("metaCoop": те же поля
-//меты + mode:"coop" + players:[{class},{class}]). Активный режим — settings.lastMode;
-//сейв одного режима другим не грузится (несовместимость — по ТЗ коопа)
+//V118: два профиля — соло (ключ "meta", как всегда) и кооп ("metaCoop"). Активный
+//режим — settings.lastMode; сейв одного режима другим не грузится (несовместимость —
+//по ТЗ коопа).
+//V124: формат metaCoop — двухуровневый: общие поля (главы, ачивки, библиотека, квесты…)
+//лежат рядом с players, а прокачка/сундук КАЖДОГО игрока — внутри players[i] вместе
+//с его классом. Старый flat-формат V118 (все поля рядом, players только с классами)
+//мигрируется при загрузке: пер-игроковые поля → игроку 1, игрок 2 начинает с шаблона
 function save() {
     if (status.settings.lastMode === "coop") {
-        const coopMeta = JSON.parse(JSON.stringify(status.meta))
-        coopMeta.mode = "coop"
-        coopMeta.players = status.players.map(P => ({"class":P.class}))
-        localStorage.setItem("metaCoop",JSON.stringify(coopMeta))
+        localStorage.setItem("metaCoop",JSON.stringify(coopPayload()))
     } else {
         localStorage.setItem("meta",JSON.stringify(status.meta))
     }
     localStorage.setItem("settings",JSON.stringify(status.settings))
 }
+//V124: снимок кооп-профиля для localStorage/файла — плоский объект с общими полями
+//+ players:[{class + пер-игроковые поля}]
+function coopPayload() {
+    const payload = {"mode":"coop"}
+    const sh = JSON.parse(JSON.stringify(status.metaShared))
+    for (let k in sh) payload[k] = sh[k]
+    payload.players = status.players.map(P => {
+        const o = JSON.parse(JSON.stringify(P.meta))
+        o.class = P.class
+        return o
+    })
+    return payload
+}
 //V118: есть ли запись любого режима (кнопка «Продолжить» на заставке)
 function hasAnySave() {
     return !!localStorage.getItem("meta") || !!localStorage.getItem("metaCoop")
 }
-//V35/V36: нормализация меты старых сохранений — слоты killedEnemes добиваем до 21 (у монстров
-//3-го этажа теперь свои id 14-20); зачёт библиотеки meta.library появился в V36 — у старых
-//сохранений его нет, создаём/добиваем до 21 слота
-function normMeta(meta) {
+//V35/V36: нормализация меты старых сохранений. V124: расщеплена на normShared (общие
+//поля/зачёты) и normInvItems (миграции путей/ключей вещей) — в коопе сундука ДВА
+//(у каждого игрока), а общие поля нормализуются один раз
+function normShared(meta) {
     if (Array.isArray(meta.killedEnemes) && meta.killedEnemes.length < 21) {
         meta.killedEnemes.push(...new Array(21 - meta.killedEnemes.length).fill(0))
     }
@@ -92,33 +107,78 @@ function normMeta(meta) {
     } else if (meta.openPage.length < 3) {
         meta.openPage.push(...new Array(3 - meta.openPage.length).fill(0))
     }
-    //V56: спрайты оружия/левой руки переехали в подпапки — старые пути вещей сундука
-    //…/items/<редкость>/11|12/<n>.png переводим в …/items/<редкость>/11|12/<n>/0.png
-    //(вариант 0 — базовый спрайт; у старых легендарок он и был «Великим вором»).
-    //Слоты 0-10 не трогаем — их пути не менялись
-    if (Array.isArray(meta.inv)) {
-        let lengthInv = meta.inv.length
-        for (let i = 0; i < lengthInv; i++) {
-            let obj = meta.inv[i]
-            obj && typeof obj.img === "string" && (obj.img = obj.img.replace(/(\/items\/[1-4]\/1[12]\/\d+)\.png$/, "$1/0.png"))
+}
+//V56: спрайты оружия/левой руки переехали в подпапки — старые пути вещей сундука
+//…/items/<редкость>/11|12/<n>.png переводим в …/items/<редкость>/11|12/<n>/0.png
+//(вариант 0 — базовый спрайт; у старых легендарок он и был «Великим вором»).
+//Слоты 0-10 не трогаем — их пути не менялись.
+//V58: текстовые поля вещей старых сейвов (русские слова) → ключи локализации. Поля,
+//для которых пары нет (целиком склеенный title, неизвестные слова), остаются как есть —
+//T()/itemName() показывают их дословно. Повторный прогон безопасен: ключ не найдётся
+//как RU-значение и останется собой
+function normInvItems(inv) {
+    if (!Array.isArray(inv)) return
+    let lengthInv = inv.length
+    for (let i = 0; i < lengthInv; i++) {
+        let obj = inv[i]
+        obj && typeof obj.img === "string" && (obj.img = obj.img.replace(/(\/items\/[1-4]\/1[12]\/\d+)\.png$/, "$1/0.png"))
+    }
+    for (let i = 0; i < lengthInv; i++) {
+        let obj = inv[i]
+        if (!obj || typeof obj !== "object") continue
+        obj.type && typeof obj.type.desc1 === "string" && (obj.type.desc1 = keyByRu(obj.type.desc1) || obj.type.desc1)
+        obj.type && typeof obj.type.desc2 === "string" && (obj.type.desc2 = keyByRu(obj.type.desc2) || obj.type.desc2)
+        obj.abil && typeof obj.abil.desc === "string" && (obj.abil.desc = keyByRu(obj.abil.desc) || obj.abil.desc)
+        obj.abil && typeof obj.abil.desc2 === "string" && (obj.abil.desc2 = keyByRu(obj.abil.desc2) || obj.abil.desc2)
+        typeof obj.desc === "string" && (obj.desc = keyByRu(obj.desc) || obj.desc)
+    }
+}
+function normMeta(meta) {
+    normShared(meta)
+    normInvItems(meta.inv)
+}
+//V124: разбор кооп-профиля → status.metaShared + P.meta + прокси-мета игрока 1.
+//Новый формат: players[i] несут пер-игроковые поля. Старый flat (V118) или соло-файл,
+//загруженный в кооп-сессии: пер-игроковые поля → игроку 1, игрок 2 начинает с шаблона
+function applyCoopProfile(raw) {
+    const playersArr = Array.isArray(raw.players) && raw.players.length === 2 ? raw.players : null
+    const isNew = !!playersArr && typeof playersArr[0].points === "number"
+    const flat = {...raw}
+    delete flat.mode
+    delete flat.players
+    let pm
+    if (isNew) {
+        pm = playersArr.map(p => {
+            const f = {...p}
+            delete f.class
+            for (let k in f) {
+                !META_PLAYER_FIELDS.includes(k) && delete f[k]
+            }
+            const t = playerMetaTemplate()
+            for (let k in t) {
+                f[k] === undefined && (f[k] = t[k])
+            }
+            return f
+        })
+    } else {
+        pm = [playerMetaTemplate(), playerMetaTemplate()]
+        for (let k in flat) {
+            if (META_PLAYER_FIELDS.includes(k)) {
+                pm[0][k] = flat[k]
+                delete flat[k]
+            }
         }
     }
-    //V58: текстовые поля вещей старых сейвов (русские слова) → ключи локализации. Поля,
-    //для которых пары нет (целиком склеенный title, неизвестные слова), остаются как есть —
-    //T()/itemName() показывают их дословно. Повторный прогон безопасен: ключ не найдётся
-    //как RU-значение и останется собой
-    if (Array.isArray(meta.inv)) {
-        let lengthInv = meta.inv.length
-        for (let i = 0; i < lengthInv; i++) {
-            let obj = meta.inv[i]
-            if (!obj || typeof obj !== "object") continue
-            obj.type && typeof obj.type.desc1 === "string" && (obj.type.desc1 = keyByRu(obj.type.desc1) || obj.type.desc1)
-            obj.type && typeof obj.type.desc2 === "string" && (obj.type.desc2 = keyByRu(obj.type.desc2) || obj.type.desc2)
-            obj.abil && typeof obj.abil.desc === "string" && (obj.abil.desc = keyByRu(obj.abil.desc) || obj.abil.desc)
-            obj.abil && typeof obj.abil.desc2 === "string" && (obj.abil.desc2 = keyByRu(obj.abil.desc2) || obj.abil.desc2)
-            typeof obj.desc === "string" && (obj.desc = keyByRu(obj.desc) || obj.desc)
-        }
+    normShared(flat)
+    normInvItems(pm[0].inv)
+    normInvItems(pm[1].inv)
+    status.metaShared = flat
+    if (!status.players[1]) status.players.push(makePlayer("kb2",1,1))
+    for (let i = 0; i < 2; i++) {
+        status.players[i].meta = pm[i]
+        status.players[i].metaView = null //прокси обязан смотреть в новый metaShared
     }
+    setContext(status.players[0])
 }
 function load() {
     try {
@@ -135,16 +195,11 @@ function load() {
             raw.players.length === 2 &&
             typeof raw.players[0].class === "number" && typeof raw.players[1].class === "number" &&
             raw.players[0].class !== raw.players[1].class) {
-            const {players, ...metaFields} = raw
-            let meta = metaFields
-            normMeta(meta)
-            status.meta = meta
-            //второго игрока может не быть (players на старте — 1, solo-профиль)
-            if (!status.players[1]) status.players.push(makePlayer("kb2", players[1].class, 1))
-            status.players[0].class = players[0].class
-            status.players[1].class = players[1].class
+            applyCoopProfile(raw)
             status.players[0].device = "kb1"
             status.players[1].device = "kb2"
+            status.players[0].class = raw.players[0].class
+            status.players[1].class = raw.players[1].class
         } else {
             coop = false
             let meta = JSON.parse(localStorage.getItem("meta"))
@@ -183,7 +238,9 @@ function loadSettings() {
     }
 }
 function saveToFile() {
-    let data = new Blob([encryptGameState(JSON.stringify({"meta":status.meta,"settings":status.settings}))], {type: 'text/plain'})
+    //V124: кооп-профиль в файл идёт целиком (общие поля + оба игрока)
+    let metaOut = status.settings.lastMode === "coop" ? coopPayload() : status.meta
+    let data = new Blob([encryptGameState(JSON.stringify({"meta":metaOut,"settings":status.settings}))], {type: 'text/plain'})
     let a = document.createElement('a')
     a.href = URL.createObjectURL(data)
     a.download = 'save '+new Date().toISOString()+'.json'
@@ -199,8 +256,19 @@ function loadFromFile() {
         reader.onload = e1 => {
             let data = JSON.parse(decryptGameState(e1.target.result))
             if (data && data.meta) {
-                normMeta(data.meta)
-                status.meta = data.meta
+                //V124: кооп-файл разбирается по уровням профиля (applyCoopProfile); соло-файл,
+                //загруженный в кооп-сессии, идёт тем же путём — его поля становятся профилем
+                //игрока 1 (классы не трогаем). В соло-сессии файл заменяет мету целиком
+                if (data.meta.mode === "coop" || status.players.length > 1) {
+                    applyCoopProfile(data.meta)
+                    if (data.meta.mode === "coop" && Array.isArray(data.meta.players)) {
+                        status.players[0].class = data.meta.players[0].class
+                        status.players[1].class = data.meta.players[1].class
+                    }
+                } else {
+                    normMeta(data.meta)
+                    status.meta = data.meta
+                }
                 status.settings = {musicVolume:0.1, soundVolume:0.1, ...(data.settings || {})}
                 //V58: язык из файла сейва (нет поля — русский)
                 if (status.settings.lang !== "en") status.settings.lang = "ru"

@@ -8,7 +8,8 @@ import { playback,strike,playTrack,TRACK } from "../scripts/sound.js"
 import { clickButton } from "../scripts/topMenu.js"
 import { save,saveToFile,loadFromFile } from "../scripts/save.js"
 //V118: кооператив — фабрика игроков, сброс профиля
-import { makePlayer } from "../scripts/players.js"
+//V124: последовательное кооп-лобби — подмена контекста на игрока шага
+import { makePlayer,setContext } from "../scripts/players.js"
 import { freshProfile } from "../scripts/start.js"
 //V52: достижение «Открыватель» — все мета-улучшения (проверка после покупок).
 //V74: герои открыты сразу — покупка/затемнение героев удалены, проверка осталась на ветках прокачки
@@ -92,14 +93,16 @@ export function modeSelect() {
             playback(strike[14].vol,0,0,3*status.settings.soundVolume)
             modeTemp.forEach(n => n.remove && n.remove())
             modeTemp = []
-            //сброс профиля ВЫБРАННОГО режима (freshProfile пишет в слот lastMode)
+            //сброс профиля ВЫБРАННОГО режима (freshProfile пишет в слот lastMode).
+            //V124: игроки создаются ДО сброса — freshProfile в коопе вешает на них мету
             status.settings.lastMode = coop ? "coop" : "solo"
-            freshProfile()
             if (coop) {
                 status.players[0] = makePlayer("kb1", 0, 0)
                 status.players[1] = makePlayer("kb2", 1, 1)
+                freshProfile()
                 coopLobby(0)
             } else {
+                freshProfile()
                 if (status.players.length > 1) status.players.length = 1
                 status.players[0].device = "solo"
                 status.players[0].class = 0
@@ -111,36 +114,14 @@ export function modeSelect() {
     modeBtn(500,T("start.mode.solo"),false)
     modeBtn(640,T("start.mode.coop"),true)
 }
-//Двухшаговый выбор героев: шаг 0 — Игрок 1 (WASD), шаг 1 — Игрок 2 (стрелки);
-//класс, выбранный первым игроком, второму недоступен (правило коопа — классы разные)
-function coopLobby(step) {
-    del()
-    status.start = 0
-    playTrack(TRACK.tavern)
-    screenPic.push(image(svgArr[2],544,0,832,1080,"./images/lobby/1.png"))
-    screenPic.push(text(svgArr[2],1920/2,180,"0pt","50pt","black","4px",`rgb(204, 153, 102)`,T(step === 0 ? "lobby.coop.step1" : "lobby.coop.step2"),{"id":"delItemText","size":44,"font":"baseFont4","anchor":"middle","blur":"filter: drop-shadow(0 0 14px rgba(204, 153, 100, 1))"}))
-    const taken = status.players[0].class
-    for (let i = 0; i < heroesArr.length; i++) {
-        const isTaken = step === 1 && i === taken
-        screenPic.push(image(svgArr[2],heroesArr[i].x,heroesArr[i].y,heroesArr[i].w,heroesArr[i].h,"./images/UI/doll/T"+i+".png",
-            isTaken ? {"opacity":"0.22"} : {"func":e=>{svgArr[2].append(e.target);coopPick(step,i)},"funcShow":e=>heroTip(i,e),"funcShowOut":heroTipDel,"opacity":isTaken ? "0.22" : "0.01"}))
-        if (isTaken) {
-            screenPic.push(text(svgArr[2],heroesArr[i].x + heroesArr[i].w/2,heroesArr[i].y + heroesArr[i].h/2,"0pt","50pt","none","3px","#FF6644",T("lobby.coop.taken"),{"id":"delItemText","size":34,"font":"baseFont4","anchor":"middle"}))
-        }
-    }
-}
-function coopPick(step,i) {
-    if (step === 0) {
-        status.players[0].class = i
-        coopLobby(1)
-    } else {
-        status.players[1].class = i
-        //кооп-профиль собран: устройства и запись профиля; далее — обычное лобби
-        //(сундук, «Далее»), классы уже заданы
-        status.settings.lastMode = "coop"
-        save()
-        lobby(false,false)
-    }
+//V124: шаг кооп-лобби — ПОЛНОЕ лобби (сундук, прокачка, очки) меты ТЕКУЩЕГО игрока:
+//контекст (hero/info/inventory/meta) переключается на игрока step, дальше рисует
+//обычное lobby(). Экран определяется по status.hero.idx — отдельной state-машины нет.
+//lose/next пробрасываются явно из цепочки экранов (иначе взялись бы из settings прошлого входа)
+function coopLobby(step,lose,next) {
+    setContext(status.players[step])
+    lobby(lose === undefined ? status.settings.lose : lose,
+          next === undefined ? status.settings.next : next)
 }
 
 function lobby(lose,next,pageChest=0) {
@@ -182,15 +163,35 @@ function lobby(lose,next,pageChest=0) {
     pageText = screenPic[screenPic.length-1]
     screenPic.push(text(svgArr[2],1920/2,944,"0pt","50pt","black","2px",`rgb(204, 153, 102)`,T(heroesArr[status.hero.class].name),{"id":"delItemText","size":42,"font":"baseFont4","anchor":"middle"}))
     heroName = screenPic[screenPic.length-1]
+    //V124: кооп — подзаголовок шага («Игрок N … — выберите героя») под заголовком главы:
+    //экран лобби с сундуком/прокачкой показывается каждому игроку СВОИМ
+    if (status.players.length > 1) {
+        screenPic.push(text(svgArr[2],960,196,"0pt","50pt","black","3px",`rgb(204, 153, 102)`,T(status.hero.idx === 0 ? "lobby.coop.step1" : "lobby.coop.step2"),{"id":"delItemText","size":30,"font":"baseFont4","anchor":"middle","blur":"filter: drop-shadow(0 0 10px rgba(16,12,10,0.9)) drop-shadow(0 0 6px rgba(16,12,10,0.9))"}))
+    }
     //V74: все герои открыты сразу — силуэты UI/doll/0-3.png и проверка openHeroes удалены,
     //клик по любому герою выбирает его (спрайты UI/doll/T0-T3.png)
     //E-17: наведение на куклу открывает карточку героя (heroTip, как карточка врага в
     //enemyHover.js). hoverOpa здесь НЕ ставим: backend перезаписывает им funcShow/funcShowOut
+    //V124: на шаге игрока 2 класс игрока 1 недоступен (правило коопа — классы разные)
+    const isCoopStep2 = status.players.length > 1 && status.hero.idx === 1
     for (let i = 0; i < heroesArr.length; i++) {
-        screenPic.push(image(svgArr[2],heroesArr[i].x,heroesArr[i].y,heroesArr[i].w,heroesArr[i].h,"./images/UI/doll/T"+i+".png",{"func":e=>{svgArr[2].append(e.target);chengeHero(i)},"funcShow":e=>heroTip(i,e),"funcShowOut":heroTipDel,"opacity":"0.01"}))
+        const isTaken = isCoopStep2 && i === status.players[0].class
+        screenPic.push(image(svgArr[2],heroesArr[i].x,heroesArr[i].y,heroesArr[i].w,heroesArr[i].h,"./images/UI/doll/T"+i+".png",
+            isTaken ? {"opacity":"0.22"} : {"func":e=>{svgArr[2].append(e.target);chengeHero(i)},"funcShow":e=>heroTip(i,e),"funcShowOut":heroTipDel,"opacity":"0.01"}))
+        if (isTaken) {
+            screenPic.push(text(svgArr[2],heroesArr[i].x + heroesArr[i].w/2,heroesArr[i].y + heroesArr[i].h/2,"0pt","50pt","none","3px","#FF6644",T("lobby.coop.taken"),{"id":"delItemText","size":34,"font":"baseFont4","anchor":"middle"}))
+        }
     }
     //V59: спрайт кнопки — пустой emptyButton.png (341×96) вместо next.png с запечённым текстом
-    screenPic.push(image(svgArr[2],1920/2-341/2,960,341,96,"./images/UI/panels/buttons/button.png",{"glow":1,"func":()=>{status.rectShadow = 1;playback(strike[14].vol,0,0,3*status.settings.soundVolume);status.nextFunction = () => {takeSelected();comix()}}}))
+    //V124: «Далее» в коопе — двухшаговый поток: перенос отмеченного в инвентарь ТЕКУЩЕГО
+    //игрока → полное лобби игрока 2 → (запись профиля) → комикс. Баг «второму не дают
+    //выбрать героя» закрыт самим потоком: лобби всегда проходится обоими игроками
+    screenPic.push(image(svgArr[2],1920/2-341/2,960,341,96,"./images/UI/panels/buttons/button.png",{"glow":1,"func":()=>{status.rectShadow = 1;playback(strike[14].vol,0,0,3*status.settings.soundVolume);status.nextFunction = () => {
+        takeSelected()
+        if (status.players.length > 1 && status.hero.idx === 0) {coopLobby(1);return}
+        status.players.length > 1 && save()
+        comix()
+    }}}))
     //V58: подпись кнопки — локализованный SVG-текст поверх пустого спрайта
     screenPic.push(text(svgArr[2],1920/2,1020,"0pt","50pt","black","2px",`rgb(204, 153, 102)`,T("lobby.next"),{"id":"delItemText","size":48,"font":"baseFont4","anchor":"middle"}))
     screenPic.push(image(svgArr[2],1610,14,48,48,"./images/UI/point.png"))
@@ -695,4 +696,4 @@ function viewEnemy() {
 function changeChestPage(i) {
     lobby(status.settings.lose,status.settings.next,i)
 }
-export {lobby,heroTipDel}
+export {lobby,coopLobby,heroTipDel}

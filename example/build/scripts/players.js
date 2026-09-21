@@ -26,6 +26,41 @@ function defaultInfo() {
 function defaultInventory() {
     return {"doll":[,,,,,,,,,,,,,],"inv":[false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false]}
 }
+
+// ==================== V124: раздельная мета коопа ====================
+//Пер-игроковые поля меты — прокачка и сундук КАЖДОГО игрока (его очки, его апгрейды,
+//его сундук). Все остальные поля меты (главы, ачивки, библиотека, зачёты убийств/объектов,
+//боссы, реликвии, квесты) — ОБЩИЕ и живут в status.metaShared
+const META_PLAYER_FIELDS = ["points","inv","metaInvLen","metaPageNum","invNum","startKey","dopHP","startStat","identLegends"]
+//шаблон пер-игроковой части меты (числа каноничны defaultMeta в start.js)
+function playerMetaTemplate() {
+    return {"points":0,"inv":[null,null,null],"metaInvLen":3,"startKey":0,"dopHP":0,"startStat":0,"metaPageNum":1,"identLegends":0,"invNum":1}
+}
+//общая часть полного объекта меты: всё, кроме пер-игроковых полей
+function sharedMetaPart(full) {
+    const sh = {}
+    for (let k in full) {
+        !META_PLAYER_FIELDS.includes(k) && (sh[k] = full[k])
+    }
+    return sh
+}
+//status.meta в коопе — прокси-УКАЗАТЕЛЬ на мету активного игрока (та же схема, что
+//status.hero/info/inventory): пер-игроковые поля читаются/пишутся в p.meta, общие —
+//в status.metaShared. Все потребители продолжают читать status.meta.* как раньше.
+//Прокси кэшируется на игроке (metaView): setContext зовётся каждый тик — новая
+//обёртка не создаётся, а replace status.metaShared требует сброса metaView (save.js/start.js)
+function makeMetaView(p) {
+    return new Proxy(status.metaShared, {
+        get(t,k) { return META_PLAYER_FIELDS.includes(k) ? p.meta[k] : t[k] },
+        set(t,k,v) { if (META_PLAYER_FIELDS.includes(k)) p.meta[k] = v; else t[k] = v; return true },
+        has(t,k) { return k in p.meta || k in t },
+        deleteProperty(t,k) { return Reflect.deleteProperty(t,k) },
+        ownKeys(t) { return [...Reflect.ownKeys(t), ...Reflect.ownKeys(p.meta)] },
+        getOwnPropertyDescriptor(t,k) {
+            return META_PLAYER_FIELDS.includes(k) ? Object.getOwnPropertyDescriptor(p.meta,k) : Reflect.getOwnPropertyDescriptor(t,k)
+        }
+    })
+}
 //фабрика игрока. device — раскладка из devices.js: "solo" (вся клавиатура + пад 0,
 //поведение одиночной игры 1:1), "kb1" (WASD), "kb2" (стрелки), "pad0"/"pad1".
 //idx — номер игрока (0/1): суффикс DOM-id его полос ХП/опыта (hpBarI0/lvlText1…)
@@ -36,7 +71,9 @@ function makePlayer(device = "solo", cls = 0, idx = 0) {
         "use":0,
         //пер-игроковые кэши движения (бывшие module-vars heroMove.js)
         "lastDir":1,"padMaskPrev":0,"wasMoving":false,"lastCellX":-1,"lastCellY":-1,"lastAnim":null,
-        "info":defaultInfo(),"attack":{},"inventory":defaultInventory(),"device":device}
+        "info":defaultInfo(),"attack":{},"inventory":defaultInventory(),
+        //V124: своя мета (прокачка/сундук) у каждого игрока; metaView — кэш прокси
+        "meta":playerMetaTemplate(),"metaView":null,"device":device}
 }
 //подмена активного игрока: все четыре указателя всегда меняются ВМЕСТЕ
 function setContext(p) {
@@ -44,6 +81,9 @@ function setContext(p) {
     status.info = p.info
     status.attack = p.attack
     status.inventory = p.inventory
+    //V124: в коопе пятым указателем идёт мета (прокси активного игрока);
+    //в соло status.meta — обычный объект, его контекст не трогает
+    status.players.length > 1 && (status.meta = p.metaView || (p.metaView = makeMetaView(p)))
 }
 //жив ли игрок (type="hero"; после смерти obj.type="corpse" до конца забега)
 function playerAlive(p) {
@@ -102,4 +142,4 @@ function ctxBar(base) {
 function ctxTx(base) {
     return document.getElementById(base + "Text" + (status.hero.idx || 0))
 }
-export {defaultInfo,defaultInventory,makePlayer,setContext,playerAlive,anyAlive,ownerPlayer,nearestPlayer,forAlive,ctxBar,ctxTx,nextLvlExp}
+export {defaultInfo,defaultInventory,META_PLAYER_FIELDS,playerMetaTemplate,sharedMetaPart,makeMetaView,makePlayer,setContext,playerAlive,anyAlive,ownerPlayer,nearestPlayer,forAlive,ctxBar,ctxTx,nextLvlExp}

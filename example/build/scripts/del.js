@@ -99,12 +99,15 @@ function del() {
     doorPics.length = 0
     resetBossFight()
     //V114: пер-игроковые состояния валькирии (рывки/дротики/ауры живут в info) чистим
-    //у КАЖДОГО игрока, контекст затем возвращается игроку 1
+    //у КАЖДОГО игрока. V124: контекст возвращается ВХОДЯЩИМ игроком, а не players[0] —
+    //del() зовётся из coopLobby/цепочек экранов (очки/предметы ×2), где контекст уже
+    //переключён на нужного игрока, и перерисовка обязана остаться в его данных
+    const ctxHero = status.hero
     for (let i = 0; i < status.players.length; i++) {
         setContext(status.players[i])
         resetValkyrie()
     }
-    setContext(status.players[0])
+    setContext(ctxHero && status.players.includes(ctxHero) ? ctxHero : status.players[0])
     resetEmoFx()
     resetDashGhosts()
     resetCharmBullets()

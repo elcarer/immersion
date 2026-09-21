@@ -17,7 +17,8 @@ import { settings,settingsTemp,settingsDel } from "../scripts/settings.js"
 //оставался на герое — меню показывалось без фона и лого). Циклический импорт легален
 import { resetWorldView } from "../scripts/zoomFx.js"
 //V114: кооператив — фабрика игроков и подмена контекста (см. players.js)
-import { makePlayer,setContext } from "../scripts/players.js"
+//V124: раздельная мета коопа — шаблон пер-игроковой части и общая часть профиля
+import { makePlayer,setContext,playerMetaTemplate,sharedMetaPart } from "../scripts/players.js"
 //V118: кооператив — экран выбора режима и двухшаговое лобби
 import { modeSelect } from "../scripts/lobby.js"
 //МИГРАЦИЯ (M4): предзагрузка GPU-текстур Pixi (тот же resources.json, HTTP-кэш горячий)
@@ -163,11 +164,26 @@ function freshRunReset() {
 //V66c: «Новая игра» — ПОЛНЫЙ сброс профиля (решение пользователя): мета → эталонный шаблон,
 //герой → Рыцарь; save() сразу перезаписывает localStorage-слот, поэтому «Продолжить» после
 //сброса продолжает НОВЫЙ профиль. Прежний возвращаем только файлом («Сохранить»/«Загрузить»
-//в таверне) — потому перед сбросом подтверждение, пока в localStorage есть запись игры (V71)
+//в таверне) — потому перед сбросом подтверждение, пока в localStorage есть запись игры (V71).
+//V124: в коопе сброс собирает ДВУХУРОВНЕВЫЙ профиль: общая часть → status.metaShared,
+//прокачка/сундук (playerMetaTemplate) → каждому игроку, status.meta — прокси игрока 1
 function freshProfile() {
-    status.meta = defaultMeta()
-    //V114: класс игрока 1 (players[1] в соло не существует; кооп-сброс — V118)
-    status.players[0].class = 0
+    if (status.settings.lastMode === "coop") {
+        //players могут быть ещё соло-составом (вызов из newGameYes до modeSelect)
+        if (!status.players[1]) status.players.push(makePlayer("kb2",1,1))
+        status.metaShared = sharedMetaPart(defaultMeta())
+        for (let i = 0; i < status.players.length; i++) {
+            status.players[i].meta = playerMetaTemplate()
+            status.players[i].metaView = null //старые прокси держат прошлый metaShared
+        }
+        status.players[0].class = 0
+        status.players[1].class = 1
+        setContext(status.players[0])
+    } else {
+        status.meta = defaultMeta()
+        //V114: класс игрока 1 (players[1] в соло не существует; кооп-сброс — V118)
+        status.players[0].class = 0
+    }
     save()
 }
 let newGameConfirmTemp = []

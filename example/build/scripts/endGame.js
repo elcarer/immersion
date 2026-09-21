@@ -11,6 +11,8 @@ import { armSpaceNext, clearSpaceNext } from "../scripts/spaceNext.js"
 import { journalAdd, J_DEATH } from "../scripts/journal.js"
 //V52: достижение «Перебор» — класс гибели в мете
 import { achDeath } from "../scripts/achievements.js"
+//V124: кооп — экраны по очереди для каждого игрока (подмена контекста)
+import { setContext } from "../scripts/players.js"
 function endGame() {
     let hero = status.hero.obj
     if (hero.type === "corpse") return
@@ -35,7 +37,16 @@ let points
 let pointsLocal
 let loseRun
 let nextRun
+//V124: кооп — экран очков показывается ДВАЖДЫ, по игроку (свой points/своё золото).
+//endScreen — вход цепочки (игрок 1), endScreenBuild — отрисовка экрана ТЕКУЩЕГО
+//контекста. chapterStep=false на втором игроке: главы (page/pageMax) считаются один раз
+let endCoopIdx = 0
 function endScreen(lose,next) {
+    endCoopIdx = 0
+    status.players.length > 1 && setContext(status.players[0])
+    endScreenBuild(lose,next,true)
+}
+function endScreenBuild(lose,next,chapterStep) {
     del()
     //E-22: прошлый экран мог оставить взведённый Пробел — снимаем до сборки нового
     clearSpaceNext()
@@ -43,8 +54,9 @@ function endScreen(lose,next) {
     loseRun = lose
     nextRun = next
     status.start = 2
-    //V65: глава 4 — после её прохождения глав больше нет (зажим снят с 3 до 4)
-    if(!lose && !next && status.meta.page < 4) {
+    //V65: глава 4 — после её прохождения глав больше нет (зажим снят с 3 до 4).
+    //V124: инкремент глав один раз на цепочку (второй игрок смотрит без пересчёта)
+    if(!lose && !next && status.meta.page < 4 && chapterStep) {
         status.meta.pageMax++
         status.meta.page++
     }
@@ -56,6 +68,8 @@ function endScreen(lose,next) {
     //E-23 (репорт пробега): при смерти героя заголовок «УРОВЕНЬ ЗАВЕРШЁН» лгал —
     //забег прерван смертью. Отдельный заголовок для проигрыша
     screenPic.push(text(svgArr[2],1920/2,106,"0pt","50pt","black","2px",`rgb(204, 153, 102)`,T(lose ? "eg.lose" : "eg.level"),{"id":"delItemText","size":60,"font":"baseFont4","anchor":"middle"}))
+    //V124: кооп — подпись игрока на раздельном экране очков
+    status.players.length > 1 && screenPic.push(text(svgArr[2],590,106,"0pt","50pt","black","2px",`rgb(204, 153, 102)`,T("coop.pn",status.hero.idx+1),{"id":"delItemText","size":30,"font":"baseFont4","anchor":"middle"}))
     screenPic.push(image(svgArr[2],35,160,919,796,"./images/UI/panels/panel.png"))
     screenPic.push(text(svgArr[2],485,216,"0pt","50pt","black","2px",`rgb(204, 153, 102)`,T("eg.enemies"),{"id":"delItemText","size":60,"font":"baseFont4","anchor":"middle"}))
     screenPic.push(image(svgArr[2],965,160,919,796,"./images/UI/panels/panel.png"))
@@ -111,8 +125,9 @@ function endScreen(lose,next) {
     //собранное золото
     screenPic.push(image(svgArr[2],1200,300,64,64,"./images/UI/gold1.png"))
     screenPic.push(image(svgArr[2],1500,300,64,64,"./images/UI/point.png"))
-    //V119: кооп — на экране очков СУММА золота обоих игроков (золото пер-игроковое)
-    const totalGold = status.players.reduce((a,P) => a + (P.info.gold || 0), 0)
+    //V119: золото пер-игроковое. V124: экраны в коопе раздельные — на экране ТЕКУЩЕГО
+    //игрока его собственное золото (в соло players один — то же самое, что сумма)
+    const totalGold = status.info.gold || 0
     numbersArr.push({"input":text(svgArr[2],1310,345,"0pt","50pt","black","2px",`rgb(204, 153, 102)`,totalGold,{"id":"delItemText","size":42,"font":"baseFont4","anchor":"middle"}),"export":text(svgArr[2],1610,345,"0pt","50pt","black","2px",`rgb(204, 153, 102)`,totalGold,{"id":"delItemText","size":42,"font":"baseFont4","anchor":"middle"})})
     screenPic.push(numbersArr[numbersArr.length - 1].export)
     screenPic.push(numbersArr[numbersArr.length - 1].input)
@@ -151,9 +166,13 @@ function endScreen(lose,next) {
     let mm = String(min%60).padStart(2,"0")
     let ss = String(sec%60).padStart(2,"0")
     screenPic.push(text(svgArr[2],1400,745,"0pt","50pt","black","2px",`rgb(204, 153, 102)`,T("eg.time",hour+":"+mm+":"+ss),{"id":"delItemText","size":42,"font":"baseFont4","anchor":"middle"}))
-    next === true ? status.levelFloor++ : status.levelFloor = 0
-    lose === true && (status.levelFloor = 0)
-    status.meta.page === 1  && (status.levelFloor = 0)
+    //V124: сдвиг этажа/сброс — один раз на цепочку (на втором игроке не повторять,
+    //иначе спуск перескакивает через этаж)
+    if (chapterStep) {
+        next === true ? status.levelFloor++ : status.levelFloor = 0
+        lose === true && (status.levelFloor = 0)
+        status.meta.page === 1  && (status.levelFloor = 0)
+    }
 }
 let rollStart = 0
 let rollAccrued = 0
@@ -192,7 +211,17 @@ function rollNumbers(lose,next) {
         //V59: спрайт кнопки — пустой emptyButton.png вместо next.png с запечённым текстом;
         //надпись «Далее» — локализованный текст поверх (раньше текст был запечён в спрайте)
         //E-22: эффект кнопки дублируется Пробелом (spaceNext.js) — то же замыкание
-        const nextAction = () => {if(!lose && next){newGame(nextRun)} else {metaItems(lose,next)}}
+        //V124: кооп — после очков игрока 1 экран перестраивается для игрока 2
+        //(без пересчёта глав); после очков игрока 2 — общая цепочка
+        const nextAction = () => {
+            if (status.players.length > 1 && endCoopIdx === 0) {
+                endCoopIdx = 1
+                setContext(status.players[1])
+                endScreenBuild(lose,next,false)
+                return
+            }
+            if(!lose && next){newGame(nextRun)} else {metaItems(lose,next)}
+        }
         screenPic.push(image(svgArr[2],1920/2-341/2,960,341,96,"./images/UI/panels/buttons/button.png",{"glow":1,"func":nextAction}))
         armSpaceNext(nextAction)
         screenPic.push(text(svgArr[2],1920/2,1025,"0pt","50pt","black","2px",`rgb(204, 153, 102)`,T("lobby.next"),{"id":"delItemText","size":48,"font":"baseFont4","anchor":"middle"}))

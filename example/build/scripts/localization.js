@@ -1055,6 +1055,8 @@ const PAIRS = [
 ["lobby.coop.step1","Игрок 1 (WASD) — выберите героя","Player 1 (WASD) — pick a hero"],
 ["lobby.coop.step2","Игрок 2 (стрелки) — выберите героя","Player 2 (arrows) — pick a hero"],
 ["lobby.coop.taken","Занято игроком 1","Taken by player 1"],
+//V124: раздельные экраны коопа — подпись игрока (очки/предметы/лобби)
+["coop.pn","ИГРОК {0}","PLAYER {0}"],
 // === V58: END OF DICTIONARY (новые пары добавлять ВЫШЕ этой строки) ===
 ]
 

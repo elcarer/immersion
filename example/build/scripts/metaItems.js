@@ -4,13 +4,23 @@ import { screenPic,del } from "../scripts/del.js"
 import { svgArr,image,text,rect } from "../scripts/svg.js"
 import { tip,tipDel,rarityColor,itemFrameOn,itemGlowOn } from "../scripts/tip.js"
 import { cellPickArr } from "../scripts/doll.js"
-import { lobby } from "../scripts/lobby.js"
+import { lobby,coopLobby } from "../scripts/lobby.js"
 //E-22: Пробел дублирует кнопку «Далее» на экране взятия предметов
 import { armSpaceNext, clearSpaceNext } from "../scripts/spaceNext.js"
+//V124: кооп — экран предметов по очереди для каждого игрока
+import { setContext } from "../scripts/players.js"
 
 let invNumText
 let change
+//V124: кооп — экран показывается ДВАЖДЫ, по игроку (свои вещи, свой сундук, свой invNum).
+//metaItems — вход цепочки (игрок 1), metaItemsBuild — отрисовка экрана ТЕКУЩЕГО контекста
+let miCoopIdx = 0
 function metaItems(lose,next) {
+    miCoopIdx = 0
+    status.players.length > 1 && setContext(status.players[0])
+    metaItemsBuild(lose,next)
+}
+function metaItemsBuild(lose,next) {
     del()
     //E-22: экран очков мог оставить взведённый Пробел — снимаем до сборки своего
     clearSpaceNext()
@@ -24,6 +34,8 @@ function metaItems(lose,next) {
     change = status.meta.invNum
     screenPic.push(image(svgArr[2],520,50,919,73,"./images/UI/panels/endTop.png"))
     screenPic.push(text(svgArr[2],1920/2,106,"0pt","50pt","black","2px",`rgb(204, 153, 102)`,T("mi.title"),{"id":"delItemText","size":60,"font":"baseFont4","anchor":"middle"}))
+    //V124: кооп — подпись игрока на раздельном экране предметов
+    status.players.length > 1 && screenPic.push(text(svgArr[2],590,106,"0pt","50pt","black","2px",`rgb(204, 153, 102)`,T("coop.pn",status.hero.idx+1),{"id":"delItemText","size":30,"font":"baseFont4","anchor":"middle"}))
     if(next === false) {
         screenPic.push(image(svgArr[2],50,160,823,796,"./images/UI/panels/equip.png"))
         for (let i = 0; i < 13; i++) {
@@ -61,9 +73,23 @@ function metaItems(lose,next) {
     //V59: спрайт кнопки — пустой emptyButton.png вместо next.png с запечённым текстом;
     //надпись «Далее» — локализованный текст поверх (раньше текст был запечён в спрайте)
     //E-22: эффект кнопки дублируется Пробелом (spaceNext.js) — то же замыкание
+    //V124: кооп — после предметов игрока 1 экран перестраивается для игрока 2;
+    //после игрока 2 — чистка кукол/рюкзаков ОБОИХ и лобби (в коопе — шаг игрока 1)
     const miNext = () => {
-        if(next === false) {status.inventory.doll = [,,,,,,,,,,,,,];status.inventory.inv = [false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false]}
-        lobby(lose,next)}
+        if (status.players.length > 1 && miCoopIdx === 0) {
+            miCoopIdx = 1
+            setContext(status.players[1])
+            metaItemsBuild(lose,next)
+            return
+        }
+        if(next === false) {
+            for (let i = 0; i < status.players.length; i++) {
+                status.players[i].inventory.doll = [,,,,,,,,,,,,,]
+                status.players[i].inventory.inv = [false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false]
+            }
+        }
+        status.players.length > 1 ? coopLobby(0,lose,next) : lobby(lose,next)
+    }
     screenPic.push(image(svgArr[2],1920/2-341/2,960,341,96,"./images/UI/panels/buttons/button.png",{"glow":1,"func":miNext}))
     armSpaceNext(miNext)
     screenPic.push(text(svgArr[2],1920/2,1025,"0pt","50pt","black","2px",`rgb(204, 153, 102)`,T("lobby.next"),{"id":"delItemText","size":48,"font":"baseFont4","anchor":"middle"}))
