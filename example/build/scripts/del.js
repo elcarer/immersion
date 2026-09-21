@@ -32,6 +32,8 @@ import { questDel } from "../scripts/quest.js"
 import { portalQuestDel } from "../scripts/portalQuest.js"
 //V111: квест «Погоня за пламенем» — сброс состояния/трекера/лавы + этажный бафф огня
 import { flameQuestDel } from "../scripts/flameQuest.js"
+//V114: кооператив — контекст игрока (снос спрайтов всех героев, пер-игроковой resetValkyrie)
+import { setContext } from "../scripts/players.js"
 // МИГРАЦИЯ M5: objectValues — Proxy-список, синхронизирующий ECS-сущности zero_engine
 // (компоненты etype/posX/posY/cullPad, группа battle). Контракт массива прежний:
 // push/splice/length=0, индексы, порядок. Подробности — ecsBridge.js
@@ -64,9 +66,13 @@ function del() {
         }
     }
     objectValues.length = 0
-    if(svgArr[1].contains(status.hero.obj.img)) {
-        status.hero.obj.rect.remove()
-        status.hero.obj.img.remove()
+    //V114: героев несколько — сносим спрайты (rect+img) всех игроков
+    for (let i = 0; i < status.players.length; i++) {
+        const o = status.players[i].obj
+        if (o && o.img && svgArr[1].contains(o.img)) {
+            o.rect && o.rect.remove()
+            o.img.remove()
+        }
     }
 
     let lengthText = floattext.length
@@ -92,7 +98,13 @@ function del() {
     acidArr.length = 0
     doorPics.length = 0
     resetBossFight()
-    resetValkyrie()
+    //V114: пер-игроковые состояния валькирии (рывки/дротики/ауры живут в info) чистим
+    //у КАЖДОГО игрока, контекст затем возвращается игроку 1
+    for (let i = 0; i < status.players.length; i++) {
+        setContext(status.players[i])
+        resetValkyrie()
+    }
+    setContext(status.players[0])
     resetEmoFx()
     resetDashGhosts()
     resetCharmBullets()

@@ -64,6 +64,8 @@ import { portalQuestTick } from "../scripts/portalQuest.js"
 //огнементя, режимы лавы)
 import { flameQuestTick } from "../scripts/flameQuest.js"
 import { svgArr,image, text,gamepadDragStart,gamepadDragMove,gamepadDragEnd,isDragging,getCTM } from "../scripts/svg.js"
+//V114: кооператив — подмена контекста игрока + гварды живости
+import { setContext,anyAlive,playerAlive } from "../scripts/players.js"
 
 //отслеживание мыши
 //V16: mousemove приходит 100–1000 раз/сек — не работаем на КАЖДОЕ событие
@@ -95,13 +97,26 @@ function gameLoop() {
     if(status.start===1 && status.pause === 0) {
         status.time++
         animPlay()
-    if(status.hero.obj.type !== "corpse") {
-        status.move===1&&valkyrieTick()
-        status.move===1&&heroMove()
-        if(status.hero.obj.stop&&status.move===1) {status.hero.waitTime++; checkWait()}
+    //V114: мир тикает, пока жив хотя бы один игрок
+    if(anyAlive()) {
+        //V114: ПЕР-ИГРОКОВАЯ ФАЗА — у каждого игрока свои движение, рывок, простой,
+        //атаки, кулдаун способностей и нестан. Контекст (hero/info/attack/inventory)
+        //подменяется на игрока, после цикла возвращается на players[0]
+        for (let pi = 0; pi < status.players.length; pi++) {
+            const P = status.players[pi]
+            if (!playerAlive(P)) continue
+            setContext(P)
+            status.move===1&&valkyrieTick()
+            status.move===1&&heroMove(P)
+            if(P.obj.stop&&status.move===1) {P.waitTime++; checkWait()}
+            status.move===1&&checkAttack()
+            P.noStunTime > 0 && P.noStunTime--
+            //иконки кулдаунов рисуются только для игрока 0 (ряд UI — V117 per-owner)
+            activeSkillsCD(pi === 0)
+        }
+        setContext(status.players[0])
         moveBullet()
         moveMagicBullet()
-        status.move===1&&checkAttack()
         checkBars()
         //V13: checkBars может завершить этаж прямо в этом тике
         //(useObject case 13 → nextFloor → endScreen/comix → del()): сцена удалена,
@@ -115,13 +130,12 @@ function gameLoop() {
         takeDrop()
         destroyObjects()
         openDoor()
-        status.hero.obj.type !== "corpse"&&enemyMove()
+        anyAlive()&&enemyMove()
         //V28: расталкивание сблизившихся врагов — после всех шагов ИИ за тик
-        status.hero.obj.type !== "corpse"&&separateEnemiesTick()
+        anyAlive()&&separateEnemiesTick()
         //V80: наземные тени — после всех сдвигов спрайтов за тик (движение/отбросы/рывки)
         shadowTick()
         damageHero()
-        status.hero.noStunTime > 0 && status.hero.noStunTime--
         checkBuffs()
         //V26 горение: отсчёт времени эффекта + спрайт пламени над героем
         flameTick()
@@ -151,7 +165,7 @@ function gameLoop() {
         portalQuestTick()
         //V111: «Погоня за пламенем» — состояние квеста (flameQuest.js)
         flameQuestTick()
-        activeSkillsCD()
+        //V114: activeSkillsCD переехал в пер-игроковую фазу (кулдауны у каждого свои)
         }
     }
     //экран результатов
@@ -191,7 +205,11 @@ function checkBars() {
     for (let i = 0; i < lengthBars; i++) {
         bars[i].obj.setAttribute("width", bars[i].obj.width.animVal.value + bars[i].speed)
         if (bars[i].obj.width.animVal.value >= bars[i].fin) {
+            //V114: полоска юза объекта принадлежит конкретному игроку — завершение
+            //(ключи/лечение/эксп у владельца) исполняется в его контексте
+            bars[i].owner !== undefined && status.players[bars[i].owner] && setContext(status.players[bars[i].owner])
             bars[i].func(bars[i].obj)
+            setContext(status.players[0])
             bars.splice(i,1)}
     }
 }

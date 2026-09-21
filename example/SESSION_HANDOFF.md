@@ -67,6 +67,20 @@
     T() на месте показа. **keyByRu возвращает ПЕРВУЮ пару с таким RU** — сравнения
     локализуемых полей по НАБОРУ ключей (drag.js isTwoHand), не по строке.
     Сравнения по именам врагов запрещены: боссы = `class.boss`, Крыса/Паук = `class.id`.
+12. **Кооператив (V114, волны V114–V119)**: игроки — `status.players[]`
+    (players.js: класс/x/y/obj/info/attack/inventory/device/use/кэши движения).
+    `status.hero/info/attack/inventory` — УКАЗАТЕЛИ-КОНТЕКСТ на данные активного
+    игрока: gameLoop тикает пер-игроковую фазу (valkyrieTick/heroMove/checkAttack/
+    activeSkillsCD/noStun) с `setContext(P)`, после — возвращает players[0];
+    урон снарядами — по владельцу (damageHero ищет P по `bullet.target === P.obj`);
+    takeDrop — проход на каждого; полоски юза несут `owner` (checkBars вводит
+    контекст); `use` — пер-игроковой (status.hero.use). Ввод — devices.js:
+    профили kb1 (WASD), kb2 (стрелки), solo (обе половины + пад 0); рывок
+    маршрутизируется ownerOfMoveKey. Камера V114 — за players[0]; иконки
+    кулдаунов — ряд P1 (activeSkillsCD(withUI)). ПЛАН: V115 бой/ИИ на массив,
+    V116 кооп-камера (midpoint+автозум) и интеракции, V117 квесты/панели per-owner,
+    V118 лобби (2 шага, классы РАЗНЫЕ — запрет дублей!) + сейвы (meta vs metaCoop,
+    режим в сейве), V119 полировка/пробег.
 
 ## СТИЛЬ/КОНВЕНЦИИ (иначе сломается)
 - ES-модули, циклические импорты ок (биндинги — только внутри функций). Пути в
@@ -284,3 +298,11 @@
   и мимо ловушек (flameQuestMob + trapsFx ×3); мини-грибы hp/50, урон +14 (бонус);
   достижение «Я сделал!» = 4 этаж + все виды боссов (meta.bossesSlain; виды =
   enemes[18] filter boss===1 — там же квестовые 28/29 без boss).
+- V114: ФУНДАМЕНТ КООПЕРАТИВА — status.players (players.js: info/attack/inventory/use
+  и кэши движения на игроке; hero/info/attack/inventory = контекст-указатели);
+  devices.js (kb1/kb2/solo/pad0/pad1, ownerOfMoveKey для рывка); heroMove(P) — ввод
+  по профилю; gameLoop — пер-игроковая фаза + anyAlive; damageHero по владельцу
+  снаряда; takeDrop/useObject (owner полоски) per player; sceneGenerate — спавн
+  всех героев (второй — spawnCellNear); del.js сносит всех; activeSkillsCD(withUI).
+  Соло не тронут (players длиной 1). Verify: v114 (29 проверок — соло-регресс +
+  кооп: раздельная ходьба KeyW/ArrowUp, стеки атак обоих, 0 исключений).

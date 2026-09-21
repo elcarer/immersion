@@ -30,45 +30,55 @@ import { settings } from "../scripts/settings.js"
 import { objectShadow } from "../scripts/groundShadow.js"
 import { beltChange } from "../scripts/belt.js"
 import { journalAdd, J_FLOOR } from "../scripts/journal.js"
+//V114: кооператив — контекст игрока + спавн соседней клетки для второго героя
+import { setContext } from "../scripts/players.js"
+import { collision } from "../scripts/collision.js"
 
 let dataGeneric
 function sceneGenerate(data,next=false) {
     dataGeneric = data
     del()
     status.start = 1
-    let hero = basicData.data.heroes[status.hero.class]
-    //прочая очистка
+    //V114: инициализация забега — у КАЖДОГО игрока своя кукла/стек атак/статы.
+    //Классы у игроков РАЗНЫЕ (правило кооператива), поэтому мутация анимаций
+    //класса под оружие (hero.anims[...].new.anim[0]) не конфликтует между ними
     if(next === false) {
         //V69: новый забег — ручные зверьки прошлого забега не переносятся
         status.pets = []
-        let weapon = basicData.data.basicWeapons[hero.weapon]
-        status.hero.class === 0 ? status.inventory.doll = [,,,,,,,,,,,weapon,weapon,] : status.inventory.doll = [,,,,,,,,,,,weapon,,]
-        if(status.hero.class === 2) {
-            status.inventory.doll = [,,,,,,,,,,,weapon,basicData.data.basicWeapons[10],]
+        for (let pi = 0; pi < status.players.length; pi++) {
+            const P = status.players[pi]
+            const hero = basicData.data.heroes[P.class]
+            let weapon = basicData.data.basicWeapons[hero.weapon]
+            P.class === 0 ? P.inventory.doll = [,,,,,,,,,,,weapon,weapon,] : P.inventory.doll = [,,,,,,,,,,,weapon,,]
+            if(P.class === 2) {
+                P.inventory.doll = [,,,,,,,,,,,weapon,basicData.data.basicWeapons[10],]
+            }
+            if(P.class === 3) {
+                P.inventory.doll = [,,,,,,,,,,,weapon,basicData.data.basicWeapons[11],]
+            }
+            let attack = basicData.data.attacks[weapon.attack]
+            P.attack = {"img":attack.img,"target":undefined,"current":[],"stack":[{"timer":Math.trunc((attack.cooldown*1000)/16),"abil":attack}]}
+            let length = hero.anims[1].attack.length
+            for (let i = 0; i < length; i++) {
+                hero.anims[1].attack[i].new.anim[0] = weapon.attack
+            }
+            P.info = {"stats":JSON.parse(JSON.stringify(hero.stats)),"exp":0,"lvl":1,"abilPoints":0,"gold":0,"hp":0,"beltCell":0, "beltCellArr":[],"armor":0,"upStat":status.meta.startStat,"keys":status.meta.startKey,"skills":[],"poisonus":0,"poisonusMult":1,"expous":0,"lifeus":0,"viewus":1,"invisible":0,"invisibleTime":0,"activeSkills":[],"pins":0,"backStab":1,"cloudeTime":0,"multSpeed":1,"killHeal":0,"keyLock":0,"pinsAdd":0,"pinsStan":false,"bossKill":0,"time":0,"luckus":0,"fameus":0,"greedus":0,"poison":0,"poisonTime":0,"stoneCurse":0,"goldroom":0,"reflect":1,"energyShotCharge":0,"charm":0,"blesses":[],"log":[],"puzzleUsed":0,"shellUsed":0}
+            setContext(P)
+            countDopStats()
+            P.info.time = Date.now()
         }
-        if(status.hero.class === 3) {
-            status.inventory.doll = [,,,,,,,,,,,weapon,basicData.data.basicWeapons[11],]
-        }
-        let attack = basicData.data.attacks[weapon.attack]
-        status.attack = {"img":attack.img,"target":undefined,"current":[],"stack":[{"timer":Math.trunc((attack.cooldown*1000)/16),"abil":attack}]}
-        let length = basicData.data.heroes[status.hero.class].anims[1].attack.length
-        for (let i = 0; i < length; i++) {
-            basicData.data.heroes[status.hero.class].anims[1].attack[i].new.anim[0] = weapon.attack
-        }
-        status.info = {"stats":JSON.parse(JSON.stringify(hero.stats)),"exp":0,"lvl":1,"abilPoints":0,"gold":0,"hp":0,"beltCell":0, "beltCellArr":[],"armor":0,"upStat":status.meta.startStat,"keys":status.meta.startKey,"skills":[],"poisonus":0,"poisonusMult":1,"expous":0,"lifeus":0,"viewus":1,"invisible":0,"invisibleTime":0,"activeSkills":[],"pins":0,"backStab":1,"cloudeTime":0,"multSpeed":1,"killHeal":0,"keyLock":0,"pinsAdd":0,"pinsStan":false,"bossKill":0,"time":0,"luckus":0,"fameus":0,"greedus":0,"poison":0,"poisonTime":0,"stoneCurse":0,"goldroom":0,"reflect":1,"energyShotCharge":0,"charm":0,"blesses":[],"log":[],"puzzleUsed":0,"shellUsed":0}
-        countDopStats()
-        status.info.time = Date.now()
+        setContext(status.players[0])
     }
-    status.info.bossKill = 0
-    //V43: сценарий столбов/босса 3 этажа — один раз за этаж
-    status.info.finSummoned = 0
+    //отметки этажа — у каждого игрока (bossKill нужен юзу выхода, finSummoned — столбам)
+    for (let pi = 0; pi < status.players.length; pi++) {
+        status.players[pi].info.bossKill = 0
+        status.players[pi].info.finSummoned = 0
+    }
     //V37 журнал: отметка этажа (log живёт в info — весь забег, включая смены этажей)
     journalAdd(T("journ.floor",status.levelFloor + 1), J_FLOOR)
     status.spiderBossFight = 0
     status.move = 0
     status.moveSpeed = 2
-    status.use = 0
-    status.hero = {"class":status.hero.class,"x":0,"y":0,"direction":1,"obj":{},"waitTime":0,"noStunTime":0}
     let num = status.levelFloor
     let tileX = 32
     let tileY = 32
@@ -77,24 +87,39 @@ function sceneGenerate(data,next=false) {
     for (let i0 = 0; i0 < i0Max; i0++) {
         data.scenes[num].roomsArr[i0][3] === 1 && createRoom (data.scenes[num],i0,tileX,tileY)
     }
-    //create hero
-    objectValues.push({"id":status.oVcount,"type":"hero","animCounters":60/hero.anims[2].others[2].speed,"currentAnim":hero.anims[2].others[2],"currentStill":0,
-    "img":image(svgArr[1],
-        data.scenes[num].hero[0]*tileX,
-        data.scenes[num].hero[1]*tileY,
-        hero.anims[2].others[2].w,
-        hero.anims[2].others[2].h,
-        hero.anims[2].others[2].img,
-        {"times":hero.anims[2].others[2].times,"id":status.oVcount,"frame":1})})
-    status.oVcount++
-    status.hero.obj = objectValues[objectValues.length-1]
-    status.hero.obj.rect = status.hero.obj.img.clipRect
-    status.info.hp = parseInt(status.info.stats[2].dops[0].value2.slice(0,-1))
+    //create heroes — V114: спавн ВСЕХ игроков; первый — в штатной точке этажа,
+    //остальные — на свободной соседней клетке (spawnCellNear ниже)
+    for (let pi = 0; pi < status.players.length; pi++) {
+        const P = status.players[pi]
+        const hero = basicData.data.heroes[P.class]
+        const cell = pi === 0 ? data.scenes[num].hero : spawnCellNear(data.scenes[num], data.scenes[num].hero[0], data.scenes[num].hero[1])
+        objectValues.push({"id":status.oVcount,"type":"hero","animCounters":60/hero.anims[2].others[2].speed,"currentAnim":hero.anims[2].others[2],"currentStill":0,
+        "img":image(svgArr[1],
+            cell[0]*tileX,
+            cell[1]*tileY,
+            hero.anims[2].others[2].w,
+            hero.anims[2].others[2].h,
+            hero.anims[2].others[2].img,
+            {"times":hero.anims[2].others[2].times,"id":status.oVcount,"frame":1})})
+        status.oVcount++
+        P.obj = objectValues[objectValues.length-1]
+        P.obj.rect = P.obj.img.clipRect
+        P.info.hp = parseInt(P.info.stats[2].dops[0].value2.slice(0,-1))
+        P.x = cell[0]*tileX
+        P.y = cell[1]*tileY
+        P.direction = 1
+        P.waitTime = 0
+        P.noStunTime = 0
+        P.use = 0
+        P.lastCellX = -1
+        P.lastCellY = -1
+        P.lastAnim = null
+    }
     //V31: окно камеры (1920/zoom × 1080/zoom) подставляет setWorldViewBox; x/y прежние —
-    //центрирование на герое при входе на этаж. Зум переживает смену этажа внутри забега.
+    //центрирование на точке спавна при входе на этаж. Зум переживает смену этажа внутри забега.
+    //V114: камера — по точке спавна игрока 1 (кооп-камера — V116)
+    setContext(status.players[0])
     setWorldViewBox(data.scenes[num].hero[0]*tileX-480, data.scenes[num].hero[1]*tileY-270)
-    status.hero.x = data.scenes[num].hero[0]*tileX
-    status.hero.y = data.scenes[num].hero[1]*tileY
     status.move = 1
     checkHP()
     createMatrix()
@@ -106,10 +131,14 @@ function sceneGenerate(data,next=false) {
     //выполнялся и при сменах этажей — броня текущих щитов добавлялась заново каждый этаж,
     //число на кукле росло кумулятивно (к 3 этажу стартовый щит учитывался трижды).
     //Дальше броню меняют только equip/unEquip (drag.js) и «Сверхзащита» (skillTree.js).
+    //V114: у каждого игрока своя кукла и своя броня
     if(next === false) {
-        let length = status.inventory.doll.length
-        for (let i = 0; i < length; i++) {
-            status.inventory.doll[i] && status.inventory.doll[i].stat === 6 && (status.info.armor += status.inventory.doll[i].statCount)
+        for (let pi = 0; pi < status.players.length; pi++) {
+            const P = status.players[pi]
+            let length = P.inventory.doll.length
+            for (let i = 0; i < length; i++) {
+                P.inventory.doll[i] && P.inventory.doll[i].stat === 6 && (P.info.armor += P.inventory.doll[i].statCount)
+            }
         }
     }
     //V30: кнопка мини-карты — постоянный UI угла экрана; del() вычищает svgArr[2],
@@ -117,6 +146,18 @@ function sceneGenerate(data,next=false) {
     minimapBtn()
     //V75: ряд иконок-подсказок активных благословений (шкафчик) — тоже пересоздаётся на этаже
     renderBlessHints()
+}
+//V114: свободная соседняя клетка для спавна второго игрока: 4 стороны, затем диагонали;
+//критерий — свободны все 4 cardinal-направления (collision: true = можно идти); в стартовой
+//комнате candidate находится с первой попытки, fallback — клетка справа
+function spawnCellNear(scene,hx,hy) {
+    const offs = [[1,0],[0,1],[-1,0],[0,-1],[1,1],[-1,1],[1,-1],[-1,-1]]
+    for (let i = 0; i < offs.length; i++) {
+        const cx = hx + offs[i][0], cy = hy + offs[i][1]
+        const x = cx*32, y = cy*32
+        if (collision(x,y,scene,0)&&collision(x,y,scene,1)&&collision(x,y,scene,2)&&collision(x,y,scene,3)) return [cx,cy]
+    }
+    return [hx+1,hy]
 }
 function createMatrix() {
     let emptyArr = dataGeneric.scenes[status.levelFloor].floor

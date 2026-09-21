@@ -21,8 +21,21 @@ import { portalQuestTakePile } from "../scripts/portalQuest.js"
 import { flameQuestTakePile } from "../scripts/flameQuest.js"
 //V67: новый предмет мог встать в 1-ю ячейку инвентаря — пересчёт копии «Вечного сапфира»
 import { changeDopStat } from "../scripts/drag.js"
+//V114: кооператив — контекст игрока (кучку забирает наступивший)
+import { setContext, playerAlive } from "../scripts/players.js"
 
 function takeDrop() {
+    //V114: проход подбора — у КАЖДОГО живого игрока свой: золото/ключи/еда/предметы
+    //падают в его status.info/inventory (контекст), один тик = один подбор на игрока
+    for (let pi = 0; pi < status.players.length; pi++) {
+        const P = status.players[pi]
+        if (!playerAlive(P)) continue
+        setContext(P)
+        takeDropFor()
+    }
+    setContext(status.players[0])
+}
+function takeDropFor() {
     let length = dropArr.length
     for (let i = 0; i < length; i++) {
         let x1 = parseInt(dropArr[i].getAttribute('x'))

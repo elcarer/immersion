@@ -1,6 +1,6 @@
 {
   "name": "Immersion",
-  "version": "2.13",
+  "version": "2.14",
   "main": "main.js",
   "scripts": {
     "build-exe": "electron-packager . Immersion --platform=win32 --arch=x64 --icon=./favicon.ico --overwrite"

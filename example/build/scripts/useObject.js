@@ -33,8 +33,8 @@ import { openAncient,blessEcho } from "../scripts/blessFx.js"
 
 let bars = []
 function useObject(obj,i0) {
-    status.use === 1&&stopUseObject()
-    status.use = 1
+    status.hero.use === 1&&stopUseObject()
+    status.hero.use = 1
     //подсветка только если картинка объекта отрисована (защита от find===undefined: объект вне
     //отрисованных клеток комнаты не имеет спрайта, но геометрически находится checkObject'ом).
     //R3: поиск по id-ключу за O(1) (shimById), «надгробия» (null) в Map не попадают
@@ -43,7 +43,8 @@ function useObject(obj,i0) {
     screenPic.push(rect(svgArr[1],obj[0]*32+2+obj[3]*16-32,obj[1]*32-21,0,10,"none","0px","#cc9966"))
     //V53: сет «Великий вор» (4 надетых): -10% ко времени использования — полоска 60 → 54 тика
     //(V67: «Вечный берилл» удваивает численные бонусы сета — 48 тиков)
-    bars.push({"type":"use","fin":setUseTicks(),"speed":1,"obj":screenPic[screenPic.length - 1],"func":() => finishUsedObject(obj)})
+    //V114: owner — игрок, начавший юз (завершение в checkBars исполняется в его контексте)
+    bars.push({"type":"use","fin":setUseTicks(),"speed":1,"owner":status.players.indexOf(status.hero),"obj":screenPic[screenPic.length - 1],"func":() => finishUsedObject(obj)})
     screenPic.push(worldImage(svgArr[1],obj[0]*32+obj[3]*16-32,obj[1]*32-24,64,14,"./images/UI/panels/bar1mini.png",{"id":i0+"R"}))
     obj[5] = i0
 }
@@ -65,7 +66,7 @@ function stopUseObject() {
             level.objects[i0][5] = undefined
             let obj = picById(level.objects[i0][6]+"OI")
             obj && obj.setAttribute("style", 'filter: none')
-            status.use = 0
+            status.hero.use = 0
         }
     }
 }

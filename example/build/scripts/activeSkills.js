@@ -77,7 +77,10 @@ function activeSkillsDel() {
     activeSkillsTemp = []
     sectorCache.length = 0
 }
-function activeSkillsCD() {
+//V114: withUI — тикать ли UI-сектора кулдаунов. Ряд иконок рисуется по контексту
+//игрока 1 (sectorCache — его узлы), поэтому чужой контекст тикает ТОЛЬКО числа
+//(кулдауны/длительности в своём info), не трогая чужие сектора
+function activeSkillsCD(withUI = true) {
     let lengthActiveSkills = status.info.activeSkills.length
     //V46 аудит доп. статов: «Находчивость» (stats[3].dops[1], countLog%) сокращает время
     //перезарядки АКТИВНЫХ способностей — кулдаун тает на 1+нах% за тик, дробный остаток
@@ -92,10 +95,13 @@ function activeSkillsCD() {
     cdRate += setCdRateBonus()
     for (let i = 0; i < lengthActiveSkills; i++) {
         //V16: узел из кэша; fallback getElementById — если скилл добавили без пересборки UI
-        let sector = sectorCache[i]
-        if (!sector) {
-            sector = document.getElementById(i+"P")
-            sectorCache[i] = sector
+        let sector = null
+        if (withUI) {
+            sector = sectorCache[i]
+            if (!sector) {
+                sector = document.getElementById(i+"P")
+                sectorCache[i] = sector
+            }
         }
         if(status.info.activeSkills[i].cooldown > 0) {
             status.info.cdCarry = (status.info.cdCarry || 0) + cdRate

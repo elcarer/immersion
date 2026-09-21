@@ -21,6 +21,9 @@ import { flameQuestCorridorOpen } from "../scripts/flameQuest.js"
 //V43: попытка призыва босса 3 этажа при открытии новой комнаты (все столбы могли
 //уже стоять в состоянии 2 от генерации — тогда последнее условие выполняется именно здесь)
 import { tryFinSummon } from "../scripts/finPillars.js"
+//V114: кооператив — контекст игрока + профили устройств ввода
+import { setContext } from "../scripts/players.js"
+import { moveProfile,padIndex,ownerOfMoveKey } from "../scripts/devices.js"
 //V56: сет «Доблестный небожитель» (6 надетых): скорость перемещения героя ×1.05
 import { setHeroSpeedMult } from "../scripts/sets.js"
 //V75: благословения шкафчика — Сын ветра +10%, Громила/Заучка по -10% к скорости перемещения
@@ -30,19 +33,20 @@ import { topMenuClose } from "../scripts/topMenu.js"
 import { lvlFlashActive } from "../scripts/lvlFlashFx.js"
 
 let pressedKeys = new Set();
-//последнее нажатое направление движения (0-верх,1-низ,2-лево,3-право) — для выбора анимации на диагоналях
-let lastDir = 1
-//предыдущая маска кнопок крестовины геймпада (биты: 1-верх,2-низ,4-лево,8-право) для edge-детекта
-let padMaskPrev = 0
-//V90: двигалась ли героиня в прошлом тике — детект НАЧАЛА движения (курсор/полоса меню)
-let wasMoving = false
+//V114: lastDir/padMaskPrev/wasMoving/lastHeroCellX/Y — ПЕР-ИГРОКОВЫЕ, переехали в поля
+//игрока (players.js makePlayer): у каждого свои последнее направление, маска крестовины,
+//клетка для чека новых комнат и кэш анимации простоя
 document.addEventListener('keydown', (event) => {pressedKeys.add(event.code);
     //автоповтор клавиатуры не считается новым нажатием (иначе зажатая кнопка триггерила бы двойное нажатие рывка)
     if(event.repeat) return
-    if(event.code==="ArrowUp"||event.code==="KeyW") {lastDir = 0; dashPress(0)}
-    if(event.code==="ArrowDown"||event.code==="KeyS") {lastDir = 1; dashPress(1)}
-    if(event.code==="ArrowLeft"||event.code==="KeyA") {lastDir = 2; dashPress(2)}
-    if(event.code==="ArrowRight"||event.code==="KeyD") {lastDir = 3; dashPress(3)}
+    //V114: рывок (двойное нажатие направления) уходит ВЛАДЕЛЬЦУ кода: в соло профиль один
+    //на единственного героя (WASD+стрелки равноправны), в коопе WASD — игрок 1, стрелки — игрок 2
+    const hit = ownerOfMoveKey(event.code)
+    if (!hit) return
+    hit.player.lastDir = hit.dir
+    setContext(hit.player)
+    dashPress(hit.dir)
+    setContext(status.players[0])
 });
 //V90: возврат курсора на keyup убран — курсор появляется ТОЛЬКО при движении мыши
 //(gameLoop, блок pendingMouse), а прячется в heroMove на всё время движения героя
@@ -53,30 +57,35 @@ document.addEventListener('keyup', (event) => {pressedKeys.delete(event.code)});
 //возврат курсора здесь — страховка, обычно его возвращает движение мыши.
 window.addEventListener('blur', () => {
     pressedKeys.clear()
-    padMaskPrev = 0
+    for (let i = 0; i < status.players.length; i++) status.players[i].padMaskPrev = 0
     document.body.style.cursor = 'url("./images/UI/cur.png"), auto'
 });
 //V16: атрибуты img героя (href/times/width/height) пишем ОДИН раз в конце heroMove
 //и только при реальной смене анимации — раньше каждая ветка движения перезаписывала
-//их каждый тик (5 DOM-записей на тик бега).
-let lastHeroAnim = null
+//их каждый тик (5 DOM-записей на тик бега). V114: кэш последней анимации — на игроке
+//(status.hero к этому моменту указывает на контекстного игрока)
 function syncHeroAnim(hero) {
     const anim = hero.currentAnim
-    if (anim !== lastHeroAnim) {
-        lastHeroAnim = anim
+    if (anim !== status.hero.lastAnim) {
+        status.hero.lastAnim = anim
         hero.img.setAttribute("href", anim.img)
         hero.img.setAttribute("times", anim.times)
         hero.img.setAttribute("width", anim.w)
         hero.img.setAttribute("height", anim.h)
     }
 }
-//последняя клетка героя — комнаты/коридоры появляются только при переходе в новую клетку
-let lastHeroCellX = -1
-let lastHeroCellY = -1
-function heroMove () {
+//heroMove(P) — V114: движение ОДНОГО игрока (вызывается из gameLoop в цикле по
+//status.players с уже подменённым контекстом). Ввод читается по профилю устройства
+//игрока (devices.js): kb1 — WASD, kb2 — стрелки, solo — обе половины + пад 0.
+function heroMove (P) {
+    !P && (P = status.players[0])
+    setContext(P)
+    const prof = moveProfile(P.device)
+    const kb = n => prof[n].some(c => pressedKeys.has(c))
     let left, right, up, down
-    if(navigator.getGamepads()[0]) {
-        let pad = navigator.getGamepads()[0]
+    const padIdx = padIndex(P.device)
+    if(padIdx >= 0 && navigator.getGamepads()[padIdx]) {
+        let pad = navigator.getGamepads()[padIdx]
         let but = pad.buttons
         left = but[14] && but[14].pressed
         right = but[15] && but[15].pressed    
@@ -84,12 +93,12 @@ function heroMove () {
         down = but[13] && but[13].pressed
         //направление взгляда — по последней НАЖАТОЙ кнопке крестовины (edge-детект по маске)
         let padMask = (up?1:0)+(down?2:0)+(left?4:0)+(right?8:0)
-        if(padMask !== padMaskPrev) {
-            up && !(padMaskPrev&1) && (lastDir = 0)
-            down && !(padMaskPrev&2) && (lastDir = 1)
-            left && !(padMaskPrev&4) && (lastDir = 2)
-            right && !(padMaskPrev&8) && (lastDir = 3)
-            padMaskPrev = padMask
+        if(padMask !== P.padMaskPrev) {
+            up && !(P.padMaskPrev&1) && (P.lastDir = 0)
+            down && !(P.padMaskPrev&2) && (P.lastDir = 1)
+            left && !(P.padMaskPrev&4) && (P.lastDir = 2)
+            right && !(P.padMaskPrev&8) && (P.lastDir = 3)
+            P.padMaskPrev = padMask
         }
         !left && !right && !up && !down && status.start === 1 && status.hero.obj.currentAnim.once !== 1 && (status.hero.obj.stop = 1)
     }
@@ -115,45 +124,45 @@ function heroMove () {
     //V34 «очарование» суккуба: герой теряет управление движением — ввод игнорируется
     //(вся забота ниже — комнаты/кислота/синхронизация status.hero.x — продолжается)
     if (!status.info.dash && !status.info.charm) {
-    if(collision(x,y,data.scenes[num],0)&&!pressedKeys.has('ArrowDown')&&!pressedKeys.has('KeyS')&&(up||pressedKeys.has('ArrowUp')||pressedKeys.has('KeyW'))&&(!pressedKeys.has('ArrowRight')&&!pressedKeys.has('ArrowLeft')&&!pressedKeys.has('KeyA')&&!pressedKeys.has('KeyD'))) {
+    if(collision(x,y,data.scenes[num],0)&&!kb('down')&&(up||kb('up'))&&(!kb('right')&&!kb('left'))) {
         moveSprite(hero.img, 0, -moveSpeed)
         hero.currentAnim = basicData.data.heroes[status.hero.class].anims[0].move[0]
         status.hero.direction = 0
         hero.stop = 0
         status.hero.waitTime = 0
     }
-    else if(collision(x,y,data.scenes[num],1)&&!pressedKeys.has('ArrowLeft')&&!pressedKeys.has('KeyA')&&(right||pressedKeys.has('ArrowRight')||pressedKeys.has('KeyD'))&&(!pressedKeys.has('ArrowUp')&&!pressedKeys.has('ArrowDown')&&!pressedKeys.has('KeyS')&&!pressedKeys.has('KeyW'))) {
+    else if(collision(x,y,data.scenes[num],1)&&!kb('left')&&(right||kb('right'))&&(!kb('up')&&!kb('down'))) {
         moveSprite(hero.img, moveSpeed, 0)
         hero.currentAnim = basicData.data.heroes[status.hero.class].anims[0].move[3]
         status.hero.direction = 3
         hero.stop = 0
         status.hero.waitTime = 0
     }
-    else if(collision(x,y,data.scenes[num],2)&&!pressedKeys.has('ArrowUp')&&!pressedKeys.has('KeyW')&&(down||pressedKeys.has('ArrowDown')||pressedKeys.has('KeyS'))&&(!pressedKeys.has('ArrowRight')&&!pressedKeys.has('ArrowLeft')&&!pressedKeys.has('KeyA')&&!pressedKeys.has('KeyD'))) {
+    else if(collision(x,y,data.scenes[num],2)&&!kb('up')&&(down||kb('down'))&&(!kb('right')&&!kb('left'))) {
         moveSprite(hero.img, 0, moveSpeed)
         hero.currentAnim = basicData.data.heroes[status.hero.class].anims[0].move[1]
         status.hero.direction = 1
         hero.stop = 0
         status.hero.waitTime = 0
     }
-    else if(collision(x,y,data.scenes[num],3)&&!pressedKeys.has('ArrowRight')&&!pressedKeys.has('KeyD')&&(left||pressedKeys.has('ArrowLeft')||pressedKeys.has('KeyA'))&&(!pressedKeys.has('ArrowUp')&&!pressedKeys.has('ArrowDown')&&!pressedKeys.has('KeyS')&&!pressedKeys.has('KeyW'))) {
+    else if(collision(x,y,data.scenes[num],3)&&!kb('right')&&(left||kb('left'))&&(!kb('up')&&!kb('down'))) {
         moveSprite(hero.img, -moveSpeed, 0)
         hero.currentAnim = basicData.data.heroes[status.hero.class].anims[0].move[2]
         status.hero.direction = 2
         hero.stop = 0
         status.hero.waitTime = 0
     }
-    else if (collision(x,y,data.scenes[num],4)&&(up||pressedKeys.has('ArrowUp')||pressedKeys.has('KeyW'))&&(right||pressedKeys.has('ArrowRight')||pressedKeys.has('KeyD'))) {
+    else if (collision(x,y,data.scenes[num],4)&&(up||kb('up'))&&(right||kb('right'))) {
         //V15: движение через moveSprite — rect и img.x с сохранением кадрового смещения
         moveSprite(hero.img, moveSpeed*0.8, -moveSpeed*0.8)
-        let moveAnim = basicData.data.heroes[status.hero.class].anims[0].move[lastDir]
+        let moveAnim = basicData.data.heroes[status.hero.class].anims[0].move[P.lastDir]
         hero.currentAnim = moveAnim
-        status.hero.direction = lastDir
+        status.hero.direction = P.lastDir
         hero.stop = 0
         status.hero.waitTime = 0
     }
     //скольжение 1
-    else if ((up||pressedKeys.has('ArrowUp')||pressedKeys.has('KeyW'))&&(right||pressedKeys.has('ArrowRight')||pressedKeys.has('KeyD'))) {
+    else if ((up||kb('up'))&&(right||kb('right'))) {
         if(collision(x,y,data.scenes[num],0) && !collision(x,y,data.scenes[num],1)) {
             moveSprite(hero.img, 0, -moveSpeed)
             hero.currentAnim = basicData.data.heroes[status.hero.class].anims[0].move[0]
@@ -169,16 +178,16 @@ function heroMove () {
             status.hero.waitTime = 0
         }
     }
-    else if (collision(x,y,data.scenes[num],5)&&(up||pressedKeys.has('ArrowUp')||pressedKeys.has('KeyW'))&&(left||pressedKeys.has('ArrowLeft')||pressedKeys.has('KeyA'))) {
+    else if (collision(x,y,data.scenes[num],5)&&(up||kb('up'))&&(left||kb('left'))) {
         moveSprite(hero.img, -moveSpeed*0.8, -moveSpeed*0.8)
-        let moveAnim = basicData.data.heroes[status.hero.class].anims[0].move[lastDir]
+        let moveAnim = basicData.data.heroes[status.hero.class].anims[0].move[P.lastDir]
         hero.currentAnim = moveAnim
-        status.hero.direction = lastDir
+        status.hero.direction = P.lastDir
         hero.stop = 0
         status.hero.waitTime = 0
     }
     //скольжение 2
-    else if ((up||pressedKeys.has('ArrowUp')||pressedKeys.has('KeyW'))&&(left||pressedKeys.has('ArrowLeft')||pressedKeys.has('KeyA'))) {
+    else if ((up||kb('up'))&&(left||kb('left'))) {
         if(collision(x,y,data.scenes[num],0) && !collision(x,y,data.scenes[num],3)) {
             moveSprite(hero.img, 0, -moveSpeed)
             hero.currentAnim = basicData.data.heroes[status.hero.class].anims[0].move[0]
@@ -194,16 +203,16 @@ function heroMove () {
             status.hero.waitTime = 0
         }
     }
-    else if (collision(x,y,data.scenes[num],6)&&(down||pressedKeys.has('ArrowDown')||pressedKeys.has('KeyS'))&&(right||pressedKeys.has('ArrowRight')||pressedKeys.has('KeyD'))) {
+    else if (collision(x,y,data.scenes[num],6)&&(down||kb('down'))&&(right||kb('right'))) {
         moveSprite(hero.img, moveSpeed*0.8, moveSpeed*0.8)
-        let moveAnim = basicData.data.heroes[status.hero.class].anims[0].move[lastDir]
+        let moveAnim = basicData.data.heroes[status.hero.class].anims[0].move[P.lastDir]
         hero.currentAnim = moveAnim
-        status.hero.direction = lastDir
+        status.hero.direction = P.lastDir
         hero.stop = 0
         status.hero.waitTime = 0
     }
     //скольжение 3
-    else if ((down||pressedKeys.has('ArrowDown')||pressedKeys.has('KeyS'))&&(right||pressedKeys.has('ArrowRight')||pressedKeys.has('KeyD'))) {
+    else if ((down||kb('down'))&&(right||kb('right'))) {
         if(collision(x,y,data.scenes[num],2) && !collision(x,y,data.scenes[num],1)) {
             moveSprite(hero.img, 0, moveSpeed)
             hero.currentAnim = basicData.data.heroes[status.hero.class].anims[0].move[1]
@@ -219,16 +228,16 @@ function heroMove () {
             status.hero.waitTime = 0
         }
     }
-    else if (collision(x,y,data.scenes[num],7)&&(down||pressedKeys.has('ArrowDown')||pressedKeys.has('KeyS'))&&(left||pressedKeys.has('ArrowLeft')||pressedKeys.has('KeyA'))) {
+    else if (collision(x,y,data.scenes[num],7)&&(down||kb('down'))&&(left||kb('left'))) {
         moveSprite(hero.img, -moveSpeed*0.8, moveSpeed*0.8)
-        let moveAnim = basicData.data.heroes[status.hero.class].anims[0].move[lastDir]
+        let moveAnim = basicData.data.heroes[status.hero.class].anims[0].move[P.lastDir]
         hero.currentAnim = moveAnim
-        status.hero.direction = lastDir
+        status.hero.direction = P.lastDir
         hero.stop = 0
         status.hero.waitTime = 0
     }
     //скольжение 4
-    else if ((down||pressedKeys.has('ArrowDown')||pressedKeys.has('KeyS'))&&(left||pressedKeys.has('ArrowLeft')||pressedKeys.has('KeyA'))) {
+    else if ((down||kb('down'))&&(left||kb('left'))) {
         if(collision(x,y,data.scenes[num],2) && !collision(x,y,data.scenes[num],3)) {
             moveSprite(hero.img, 0, moveSpeed)
             hero.currentAnim = basicData.data.heroes[status.hero.class].anims[0].move[1]
@@ -251,9 +260,9 @@ function heroMove () {
     //весь список комнат/коридоров каждый тик)
     const cellX = Math.trunc((x + 16) / 32)
     const cellY = Math.trunc((y + 50) / 32)
-    if (cellX !== lastHeroCellX || cellY !== lastHeroCellY) {
-        lastHeroCellX = cellX
-        lastHeroCellY = cellY
+    if (cellX !== P.lastCellX || cellY !== P.lastCellY) {
+        P.lastCellX = cellX
+        P.lastCellY = cellY
         checkNewRoom (data,num,x,y)
     }
     //V16: позицию после движения читаем из кэша (rectPos), двинулась ли героиня — одним сравнением
@@ -269,10 +278,13 @@ function heroMove () {
     //V90: в момент НАЧАЛА движения героя полоса верхнего меню убирается (мешала обзору,
     //пока курсор стоял в верхней зоне). Меню, поднятое вспышкой левелапа, не трогаем —
     //оно закроется само (lvlFlashTick); закрытое меню при желании снова откроется
-    //наведением мыши на верх экрана.
-    !wasMoving && moved && status.panels === 10 && !lvlFlashActive() && topMenuClose()
-    wasMoving = moved
+    //наведением мыши на верх экрана. V114: полосу двигает только игрок 0
+    !P.wasMoving && moved && status.panels === 10 && !lvlFlashActive() && topMenuClose()
+    P.wasMoving = moved
     //скролл экрана
+    //V114: камера следует только за игроком 0 (кооп-камера midpoint/автозум — V116);
+    //второй игрок за кадром не увозит камеру
+    if (P === status.players[0]) {
     //V31: мёртвая зона слежения масштабируется под ОКНО камеры: при зуме видимая
     //область уже (1920/zoom × 1080/zoom). Прежние литералы 500/1420/450/630 были
     //зеркальными маржами 500/450 px от краёв кадра 1920×1080 — соотношение сохранено.
@@ -302,6 +314,7 @@ function heroMove () {
             //В старом SVG у слоёв были независимые строки viewBox — потому там не прыгало.
             setWorldViewBox(nx, ny)
         }
+    }
     }
     //детект обьекта
     checkObject (data.scenes[num],x,y)
@@ -336,7 +349,7 @@ function checkObject (level,x,y) {
         //стоя НА взведённой ловушке (тип 14) обезвреживание не запускается — только с соседней клетки.
         //x,y здесь уже смещены на +16/+50 от rect героя, поэтому хитбокс ног = x-3, y-13, 14x14
         if(obj[2] === 14 && obj[7] !== 1 && checkCollision(x-3,obj[0]*32,14,32,y-13,obj[1]*32,14,32)) {
-            status.use === 1 && stopUseObject()
+            status.hero.use === 1 && stopUseObject()
             find = 1
             continue
         }
@@ -351,15 +364,15 @@ function checkObject (level,x,y) {
         //V75: шкафчик (20) с взведённым obj[11] (меню открыто/закрыто без выбора) — мимо.
         //V83: кнопка загадки (21) с взведённым obj[11] — мимо; интерактивна в ОБЕИХ фазах.
         //V97: чаша (22) интерактивна только в фазе выбора «напёрстков» (shellCupReady)
-        if (obj[5] === undefined && obj[7] !== 1 && !((obj[2] === 15 || obj[2] === 17 || obj[2] === 18 || obj[2] === 19 || obj[2] === 20 || obj[2] === 21) && obj[11] === 1) && !((obj[2] === 18 || obj[2] === 19) && obj[10] !== 1) && !(obj[2] === 22 && !shellCupReady(obj)) && status.use === 0) {
-        status.use = 1
+        if (obj[5] === undefined && obj[7] !== 1 && !((obj[2] === 15 || obj[2] === 17 || obj[2] === 18 || obj[2] === 19 || obj[2] === 20 || obj[2] === 21) && obj[11] === 1) && !((obj[2] === 18 || obj[2] === 19) && obj[10] !== 1) && !(obj[2] === 22 && !shellCupReady(obj)) && status.hero.use === 0) {
+        status.hero.use = 1
         useObject(obj,i0)
         }
         find = 1
     }
-    if (status.use === 1&&find === 0)
+    if (status.hero.use === 1&&find === 0)
     {
-        status.use = 0
+        status.hero.use = 0
         stopUseObject()
     }
 }

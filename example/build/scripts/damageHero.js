@@ -20,6 +20,8 @@ import { setEliteDamageMult } from "../scripts/sets.js"
 import { blessActive } from "../scripts/blessFx.js"
 //V104: снаряды врагов задевают Волка-союзника (квест «Сопроводить Волка», quest.js)
 import { wolfHitBy } from "../scripts/quest.js"
+//V114: кооператив — контекст игрока-владельца снаряда
+import { setContext } from "../scripts/players.js"
 
 // E-3: перебор пуль из группы gbullet (маркер isBullet на спавне) со снимком на входе;
 // старый фильтр «type === bullet» заменён членством в группе, остальные условия — 1:1.
@@ -33,14 +35,23 @@ function damageHero() {
     const ents = world.queries.gbullet && world.queries.gbullet.entities
     if (!ents) return
     const snap = ents.slice()
-    //V16: позиция героя из кэша один раз за тик (не на каждый снаряд)
-    const heroPos = status.hero.obj.type === "hero" ? rectPos(status.hero.obj.rect) : null
     for (let j = 0; j < snap.length; j++) {
         const bullet = DATA.bag[snap[j]]
-        if (bullet && bullet.result !== 1 && (bullet.currentStill > 0 || bullet.stats.type === "magic") && bullet.target === status.hero.obj && status.hero.obj.type === "hero") {
-            let rectM = status.hero.obj.rect
+        if (!bullet || bullet.result === 1) continue
+        //V114: снаряд летит в КОНКРЕТНОГО героя — ищем владельца среди игроков.
+        //Весь хит (броня/ХП/стан/вампиризм) считается в контексте владельца
+        let owner = null
+        for (let pi = 0; pi < status.players.length; pi++) {
+            const P = status.players[pi]
+            if (bullet.target === P.obj && P.obj.type === "hero") { owner = P; break }
+        }
+        if (!(bullet.currentStill > 0 || bullet.stats.type === "magic") || !owner) continue
+        {
+            setContext(owner)
+            let rectM = owner.obj.rect
             let rectB = bullet.rect
             let bPos = rectPos(rectB)
+            let heroPos = rectPos(rectM)
             if (checkCollision(heroPos[0],bPos[0],
                 rectM._w,rectB._w,
                 heroPos[1],bPos[1],
@@ -75,6 +86,8 @@ function damageHero() {
             wolfHitBy(bullet)
         }
     }
+    //V114: контекст возвращается игроку 1
+    setContext(status.players[0])
 }
 //V75 «Зеркало» (шкафчик): разворот снаряда врага к стрелявшему — зеркальная копия
 //reflectMagic дварфа (damage.js, V66d). Клон anim с bullet:"all" (данные атак в data.js

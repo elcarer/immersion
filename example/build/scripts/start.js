@@ -16,6 +16,8 @@ import { settings,settingsTemp,settingsDel } from "../scripts/settings.js"
 //камеру этих слоёв надо вернуть к полному окну 1920×1080 (после выхода из забега viewBox
 //оставался на герое — меню показывалось без фона и лого). Циклический импорт легален
 import { resetWorldView } from "../scripts/zoomFx.js"
+//V114: кооператив — фабрика игроков и подмена контекста (см. players.js)
+import { makePlayer,setContext } from "../scripts/players.js"
 //МИГРАЦИЯ (M4): предзагрузка GPU-текстур Pixi (тот же resources.json, HTTP-кэш горячий)
 import { preloadGameTextures } from "../scripts/pixiBackend.js"
 
@@ -40,17 +42,20 @@ function defaultMeta() {
         "quests":{"wolf":0}
     }))
 }
-let status = {"mouseX":0,"mouseY":0,"start":0,"pause":0,"rectShadow":0,"nextFunction":{},"oVcount":0,"time":0,"inventory":{"doll":[,,,,,,,,,,,,,],"inv":[false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false]},
-"info":{"stats":[],"exp":0,"lvl":1,"abilPoints":0,"gold":0,"hp":0,"beltCell":0, "beltCellArr":[],"armor":0,"upStat":0,"keys":0,"skills":[],"poisonus":0,"poisonusMult":1,"expous":0,"lifeus":0,"viewus":1,"invisible":0,"invisibleTime":0,"activeSkills":[],"pins":0,"backStab":1,"cloudeTime":0,"multSpeed":1,"killHeal":0,"keyLock":0,"pinsAdd":0,"pinsStan":false,"bossKill":0,"time":0,"luckus":0,"fameus":0,"greedus":0,"poison":0,"poisonTime":0,"stoneCurse":0,"goldroom":0,"reflect":1,"energyShotCharge":0,"charm":0,"blesses":[]},
-"move":0,"moveSpeed":2,"use":0,
-"hero":{"class":0,"x":0,"y":0,"direction":1,"obj":{},"waitTime":0,"noStunTime":0},
+let status = {"mouseX":0,"mouseY":0,"start":0,"pause":0,"rectShadow":0,"nextFunction":{},"oVcount":0,"time":0,
+//V114: игроки (см. players.js). В соло players длиной 1 (device solo = вся клавиатура
+//+ пад 0); кооп-лобби (V118) добавляет второго. status.hero/info/attack/inventory —
+//УКАЗАТЕЛИ-КОНТЕКСТ на данные активного игрока (заполняются setContext ниже)
+"players":[],
+//V114: move/use — общие флаги мира; use переехал на игрока (P.use)
+"move":0,"moveSpeed":2,
 //V104: квесты («Сопроводить Волка», quest.js). state: 0 нет, 1 NPC предложен,
 //2 активен, 4 выполнен, 5 провален. Забеги не сохраняются — поле живёт в сессии
 "quest":{"state":0},
 //V109: квест «Голос в портале» (portalQuest.js) — состояние живёт в сессии:
 //state 1 NPC-портал предложен, 2 сбор частей, 3 сеть рычагов, 4 культист
 "questPortal":null,
-"levelFloor":0,"panels":0,"attack":{},
+"levelFloor":0,"panels":0,
 //V69: ручные зверьки (pet) текущего забега — снапшот {class, stats} для переноса на новый
 //этаж; наполняется в nextFloor (snapshotCarryPets), расходуется в newGame (spawnCarriedPets)
 "pets":[],
@@ -71,10 +76,15 @@ let status = {"mouseX":0,"mouseY":0,"start":0,"pause":0,"rectShadow":0,"nextFunc
 loadSettings()
 status.settings.lang = detectLang()
 setLang(status.settings.lang)
+//V114: игрок 1 (соло-профиль: вся клавиатура + пад 0). status.hero/info/attack/inventory —
+//указатели-контекст на его данные; стартовое оружие — в куклу игрока (слоты 11/12)
+status.players = [makePlayer("solo",0)]
+setContext(status.players[0])
 let weapon = data.basicWeapons[0]
-status.inventory.doll = [,,,,,,,,,,,weapon,weapon,]
+status.players[0].inventory.doll = [,,,,,,,,,,,weapon,weapon,]
 let attack = data.attacks[weapon.attack]
-status.attack = {"img":attack.img,"target":undefined,"current":[],"stack":[{"timer":Math.trunc((attack.cooldown*1000)/16),"abil":attack}]}
+status.players[0].attack = {"img":attack.img,"target":undefined,"current":[],"stack":[{"timer":Math.trunc((attack.cooldown*1000)/16),"abil":attack}]}
+setContext(status.players[0])
 // МИГРАЦИЯ (M4): rAF-цикл с аккумулятором удалён — тики игры идут из тикера ядра
 // zero_engine (index.js: gameTickSystem, тот же фиксированный шаг 16мс ~62.5Гц)
 function start() {
@@ -141,7 +151,10 @@ const BTN_TXT_HOVER = "rgb(231, 183, 134)"
 //кладёт отмеченные вещи сундука в inv до comix — поздний сброс безвозвратно терял бы их.
 function freshRunReset() {
     status.levelFloor = 0
-    status.inventory.inv = [false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false]
+    //V114: рюкзак сбрасывается у каждого игрока
+    for (let i = 0; i < status.players.length; i++) {
+        status.players[i].inventory.inv = [false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false]
+    }
 }
 //V66c: «Новая игра» — ПОЛНЫЙ сброс профиля (решение пользователя): мета → эталонный шаблон,
 //герой → Рыцарь; save() сразу перезаписывает localStorage-слот, поэтому «Продолжить» после
@@ -149,7 +162,8 @@ function freshRunReset() {
 //в таверне) — потому перед сбросом подтверждение, пока в localStorage есть запись игры (V71)
 function freshProfile() {
     status.meta = defaultMeta()
-    status.hero.class = 0
+    //V114: класс игрока 1 (players[1] в соло не существует; кооп-сброс — V118)
+    status.players[0].class = 0
     save()
 }
 let newGameConfirmTemp = []
@@ -221,7 +235,7 @@ function drawStartScreen(animate) {
     document.title = T("app.title")
     //1) фон — появляется сразу
     screenPic.push(image(svgArr[0],0,0,1920,1080,"./images/UI/start.png"))
-    screenPic.push(text(svgArr[1],10,1060,"0pt","50pt","none","3px","#FFFF66","build 2.13",{"id":"title","size":24,"font":"baseFont4","anchor":"start"}))
+    screenPic.push(text(svgArr[1],10,1060,"0pt","50pt","none","3px","#FFFF66","build 2.14",{"id":"title","size":24,"font":"baseFont4","anchor":"start"}))
     //2) логотип-название — картинка по языку
     const logo = image(svgArr[1],1920/2-LOGO_W/2,110,LOGO_W,LOGO_H,"./images/UI/" + (getLang() === "ru" ? "logoRus.png" : "logoIng.png"))
     screenPic.push(logo)
