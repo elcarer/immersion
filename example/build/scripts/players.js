@@ -55,7 +55,11 @@ function makeMetaView(p) {
         set(t,k,v) { if (META_PLAYER_FIELDS.includes(k)) p.meta[k] = v; else t[k] = v; return true },
         has(t,k) { return k in p.meta || k in t },
         deleteProperty(t,k) { return Reflect.deleteProperty(t,k) },
-        ownKeys(t) { return [...Reflect.ownKeys(t), ...Reflect.ownKeys(p.meta)] },
+        //V127 (репорт юзера: «ownKeys on proxy: trap returned duplicate entries» при
+        //загрузке из файла): ключ мог лежать И в metaShared, И в p.meta (после миграций
+        //старых сейвов) — дубликаты в ownKeys роняли JSON.stringify(status.meta).
+        //Дедупликация: пер-игроковое поле затеняет общее (как и в get)
+        ownKeys(t) { return [...new Set([...Reflect.ownKeys(t), ...Reflect.ownKeys(p.meta)])] },
         getOwnPropertyDescriptor(t,k) {
             return META_PLAYER_FIELDS.includes(k) ? Object.getOwnPropertyDescriptor(p.meta,k) : Reflect.getOwnPropertyDescriptor(t,k)
         }

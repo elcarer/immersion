@@ -110,11 +110,18 @@ function drag (e,item,x,y) {
                     }
                     //обмен предметов в массиве status.inventory.doll
                     if(checkTypes === 2) {
-                        //код на смену предметов
-                        status.inventory.doll[e.target.getAttribute("id").slice(0,-1)] = null
+                        //код на смену предметов: снятый с куклы предмет (item) уходит в
+                        //инвентарь (inv[dst] выше), а заменённый из инвентаря (changeItem2)
+                        //встаёт в ОСВОБОЖДАЕМЫЙ СЛОТ-ИСТОЧНИК куклы — checkTypes===2 здесь
+                        //означает «типы changeItem2 включают слот-источник» (V127: раньше
+                        //писали через id источника, для инвентарных источников это были
+                        //фантомные слоты doll[13+]; гвард отсекает мусорные записи)
+                        const srcSlot = parseInt(e.target.getAttribute("id").slice(0,-1))
                         unEquip (item)
-                        status.inventory.doll[e.target.getAttribute("id").slice(0,-1)] = changeItem2
-                        equip(changeItem2)
+                        if (srcSlot >= 0 && srcSlot < 13) {
+                            status.inventory.doll[srcSlot] = changeItem2
+                            equip(changeItem2)
+                        }
                     }
                     //V67 «Вечный сапфир»: обмен в инвентаре меняет состав inv[0] — копия пересчитывается
                     //сразу (при обмене «кукла↔инвентарь» equip/unEquip уже пересчитали, дубль безвреден)
@@ -270,7 +277,10 @@ function drag (e,item,x,y) {
 function equip(item) {
     if (status.attack.img === null && item.attack !== undefined) {
         status.attack.img = basicData.data.attacks[item.attack].img
-        screenPic.push(image(svgArr[2],931,988,58,58,status.attack.img))
+        //V127: иконка в окно типа атаки СВОЕГО игрока (bx-смещение блока) и со своим
+        //id — прежние 931,988 без смещения в коопе рисовали её в зазоре между блоками
+        const bx = (status.hero.idx || 0) === 0 ? -460 : 460
+        screenPic.push(image(svgArr[2],931+bx,988,58,58,status.attack.img,{"id":"atkIco"+(status.hero.idx || 0)}))
         status.attack.stack.push({"timer":Math.trunc((basicData.data.attacks[item.attack].cooldown*1000)/16),"abil":basicData.data.attacks[item.attack]})
         let length = basicData.data.heroes[status.hero.class].anims[1].attack.length
         for (let i = 0; i < length; i++) {
@@ -341,17 +351,16 @@ function unEquip(item) {
             status.inventory.doll[k] && status.inventory.doll[k].attack !== undefined && (check = true)
         }
         if (check === false) {
-            let length = screenPic.length
-            for (let i = 0; i < length; i++) {
-                //V55: null-защита — в screenPic бывают «надгробия» вместо удалённых спрайтов
-                if (screenPic[i] && screenPic[i].getAttribute("href") === status.attack.img) {
-                    screenPic[i].remove()
-                    //V55: «надгробие» вместо splice — стабильность индексов screenPic
-                    //(см. heroMove.acidTick): иначе destroyObjects после сдвига индексов
-                    //удаляет спрайт плитки пола вместо разрушенного атакой объекта
-                    screenPic[i] = null
-                    break
-                }
+            //V127 (репорт юзера: в окошках типа атаки пропали иконки): снимаем иконку
+            //по id СВОЕГО игрока — прежний поиск «первого совпадения href по screenPic»
+            //в коопе уносил иконку ДРУГОГО игрока с тем же оружием
+            const pi = status.hero.idx || 0
+            //id картинок хранится с суффиксом «I» (контракт svg.js) — ищем «atkIco0I»
+            const oldIcon = document.getElementById("atkIco" + pi + "I")
+            if (oldIcon) {
+                const idx = screenPic.indexOf(oldIcon)
+                idx !== -1 && (screenPic[idx] = null) //«надгробие» вместо splice — см. V55
+                oldIcon.remove()
             }
             status.attack.img = null
             let lengthCur = status.attack.current.length

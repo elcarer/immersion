@@ -168,7 +168,10 @@ function checkHP() {
 
         screenPic.push(image(svgArr[2],927+bx,910,64,101,"./images/UI/panels/lvlBack.png"))
         screenPic.push(image(svgArr[2],912+bx,969,96,96,"./images/UI/panels/portBack2.png"))
-        screenPic.push(image(svgArr[2],931+bx,988,58,58,P.attack.img))
+        //V127: окошко типа атаки — id с индексом игрока: unEquip/equip (drag.js) снимают
+        //иконку по id, а не первым совпадением href (при одинаковых иконках у игроков
+        //уносилась чужая), и рисуют новую в СВОЁТ смещение блока
+        screenPic.push(image(svgArr[2],931+bx,988,58,58,P.attack.img,{"id":"atkIco"+pi}))
         screenPic.push(text(svgArr[2],959+bx,967,"0pt","50pt","none","2px",`#FFCC66`,info.lvl,{"id":"lvlText"+pi,"size":24,"font":"baseFont4","anchor":"middle"}))
     }
 }

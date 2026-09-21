@@ -15,7 +15,10 @@ import { makePlayer,META_PLAYER_FIELDS,playerMetaTemplate,sharedMetaPart,setCont
 //с его классом. Старый flat-формат V118 (все поля рядом, players только с классами)
 //мигрируется при загрузке: пер-игроковые поля → игроку 1, игрок 2 начинает с шаблона
 function save() {
-    if (status.settings.lastMode === "coop") {
+    //V127 (репорт юзера: краш при загрузке из файла): маршрут выбирается и по ЧИСЛУ
+    //игроков, а не только по lastMode — в живой кооп-сессии status.meta это прокси,
+    //его стрингификация в соло-слот была и источником краша, и порчей соло-сейва
+    if (status.settings.lastMode === "coop" || status.players.length > 1) {
         localStorage.setItem("metaCoop",JSON.stringify(coopPayload()))
     } else {
         localStorage.setItem("meta",JSON.stringify(status.meta))
@@ -238,8 +241,8 @@ function loadSettings() {
     }
 }
 function saveToFile() {
-    //V124: кооп-профиль в файл идёт целиком (общие поля + оба игрока)
-    let metaOut = status.settings.lastMode === "coop" ? coopPayload() : status.meta
+    //V127: как в save() — живая кооп-сессия пишет кооп-профиль независимо от lastMode
+    let metaOut = (status.settings.lastMode === "coop" || status.players.length > 1) ? coopPayload() : status.meta
     let data = new Blob([encryptGameState(JSON.stringify({"meta":metaOut,"settings":status.settings}))], {type: 'text/plain'})
     let a = document.createElement('a')
     a.href = URL.createObjectURL(data)

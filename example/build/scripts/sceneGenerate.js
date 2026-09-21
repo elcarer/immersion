@@ -55,7 +55,11 @@ function sceneGenerate(data,next=false) {
             //СВОЕГО игрока (status.meta — прокси активного), countDopStats — тоже
             setContext(P)
             let weapon = basicData.data.basicWeapons[hero.weapon]
-            P.class === 0 ? P.inventory.doll = [,,,,,,,,,,,weapon,weapon,] : P.inventory.doll = [,,,,,,,,,,,weapon,,]
+            //V127 (репорт юзера: ножи Плута «копировались» по ячейкам и не возвращались
+            //во 2-ю руку): у Плута ОБА слота получали ОДИН объект weapon — правый клик
+            //снимал indexOf-первый слот (второй оставался), drag разносил ссылку по
+            //массивам. Вторая рука — своя КОПИЯ предмета
+            P.class === 0 ? P.inventory.doll = [,,,,,,,,,,,weapon,JSON.parse(JSON.stringify(weapon)),] : P.inventory.doll = [,,,,,,,,,,,weapon,,]
             if(P.class === 2) {
                 P.inventory.doll = [,,,,,,,,,,,weapon,basicData.data.basicWeapons[10],]
             }
