@@ -94,6 +94,8 @@ function gameLoop() {
         //V126: восстановление ОС-курсора на mousemove убрано — ОС-курсор над страницей
         //скрыт ВСЕГДА (единый курсор — спрайт cur.png, его двигают и мышь, и правый стик)
         checkMenu(mx, my)
+        //V130: реальное движение мыши возвращает курсор (снимает липкое скрытие)
+        cursorHeld = false
     }
     gamepad()
     cursorTick()
@@ -322,14 +324,19 @@ function movePadCursor(x,y) {
 //(меню/лобби/забег/панели/результаты): его двигают и мышь (checkMenu), и правый стик
 //(gamepad). ОС-курсор над страницей скрыт всегда — двойного курсора больше нет (репорт
 //V126: «два курсора на экране»). Пока любой герой бежит (в игре, без панелей и паузы)
-//курсор прячется (репорт V126: «перестал скрываться при движении героев»); возвращает
-//его любое движение мыши или стика. На blur ОС-курсор возвращает старый обработчик
+//курсор прячется (репорт V126: «перестал скрываться при движении героев»).
+//V130 (репорт юзера: «после отпускания кнопки перемещения скрытый курсор снова
+//появляется»): прежний пересчёт display по wasMoving каждый тик возвращал курсор сам
+//при отпускании. Теперь скрытие ЛИПКОЕ: ставится движением героя и держится, пока
+//курсор не сдвинули мышью (pendingMouse) или стиком (gamepad); панели/пауза, как и
+//раньше, всегда показывают курсор. На blur ОС-курсор возвращает старый обработчик
 //(heroMove) — при возврате фокуса прячем снова
+let cursorHeld = false
 function cursorTick() {
     ;(!status.newMouse || status.newMouse._dead) && movePadCursor(status.mouseX || 960, status.mouseY || 540)
-    const hide = status.start === 1 && status.pause === 0 && status.panels === 0 &&
-        (status.players || []).some(P => P.wasMoving)
-    const want = hide ? "none" : ""
+    const inGame = status.start === 1 && status.pause === 0 && status.panels === 0
+    inGame && (status.players || []).some(P => P.wasMoving) && (cursorHeld = true)
+    const want = inGame && cursorHeld ? "none" : ""
     if (status.newMouse.getAttribute("display") !== want) status.newMouse.setAttribute("display", want)
     //ОС-курсор скрыт всегда; возвращает его только blur-обработчик (уход с окна)
     document.body.style.cursor !== "none" && (document.body.style.cursor = "none")
@@ -350,6 +357,8 @@ function gamepad() {
             status.mouseX += ax * 8
             status.mouseY += ay * 8
             movePadCursor(status.mouseX, status.mouseY)
+            //V130: движение стика возвращает курсор (снимает липкое скрытие)
+            cursorHeld = false
             //V128: верхняя зона экрана открывает меню и для курсора пада
             menuHoverTick()
             //синтетический ховер: тултипы/подсветка под курсором пада (pixiBackend)

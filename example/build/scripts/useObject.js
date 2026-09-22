@@ -1,7 +1,8 @@
 import { dataGeneric } from "../scripts/sceneGenerate.js"
 import { status } from "../scripts/start.js"
 //V115: полосы ХП/опыта — суффиксы по игроку (players.js)
-import { ctxBar,ctxTx,nextLvlExp } from "../scripts/players.js"
+//V130: forAlive — опыт за обезвреживание ловушки обоим живым игрокам
+import { ctxBar,ctxTx,nextLvlExp,forAlive } from "../scripts/players.js"
 import { T } from "../scripts/localization.js"
 import { svgArr,image,worldImage,rect,picById } from "../scripts/svg.js"
 import { screenPic } from "../scripts/del.js"
@@ -170,7 +171,10 @@ function actionsObject(obj) {
         break
         case 13: nextFloor()
         break
-        case 14: status.info.exp += 1;checkExp(1)
+        //V130 (репорт юзера: «опыт за обезвреживание получает тот, кто обезвредил, а должны
+        //получать оба»): та же раздача, что при убийстве врагов (enemyDie → forAlive) —
+        //полный опыт каждому живому игроку, левелап у каждого свой
+        case 14: forAlive(P => { P.info.exp += 1;checkExp(1) })
         break
         //V49 статуя неизвестного героя: случайный 1 из 3 бафов на 60 секунд (бафы складываются)
         case 16: giveBuff()

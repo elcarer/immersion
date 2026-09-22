@@ -2341,6 +2341,11 @@ function acquirePooled(place, w, h, src, obj) {
         shim._shift = 0
         if (obj.id !== undefined) { shim.attrs.id = String(obj.id) + "I"; shimById.set(shim.attrs.id, shim) }
         place.appendChild(shim)
+        //V130 (репорт юзера: «спрайт врага из информационного окна не удалился»):
+        //реанимированный слот снова ПРИНАДЛЕЖИТ окну/модулю — без восстановления _slot
+        //следующий release уходил в идемпотентную ветку (_pooled) и не убирал шим с экрана
+        shim._slot = e
+        shim._pooled = 0
         return shim
     }
     const shim = createAnimImage(place, 0, 0, w, h, src, obj)
@@ -2357,12 +2362,22 @@ function releaseSprite(img) {
         img.node.visible = true
         const bucket = spritePool.get(slot.key)
         if (bucket && bucket.length >= POOL_CAP) { destroyShimNode(img); return }
+        //V130: мёртвый шим в бакет не возвращаем — слот-«надгробие» ломал пул: acquire
+        //дискардил его и создавал новый узел (churn + потеря переиспользования)
+        if (!img.node || img.node.destroyed) { destroyShimNode(img); return }
         bucket ? bucket.push(slot) : spritePool.set(slot.key, [slot])
         return
     }
     // ИДЕМПОТЕНТНОСТЬ: шим уже возвращён в пул (двойной release через реестры модулей —
-    // dashFx/charmFx и del.js) — уничтожать узел нельзя, слот в бакете ссылается на него
-    if (img._pooled) return
+    // dashFx/charmFx и del.js) — уничтожать узел нельзя, слот в бакете ссылается на него.
+    //V130 (репорт юзера: «спрайт врага из информационного окна не удалился, а продолжил
+    //отображаться на экране»): прикреплённый шим в этой ветке всё равно ОТКРЕПЛЯЕМ —
+    //после реанимации слота (acquirePooled reuse) release приходил сюда и молча оставлял
+    //спрайт висеть на экране; отсоединение без уничтожения идемпотентность сохраняет
+    if (img._pooled) {
+        if (img.parent) img.parent.removeChild(img)
+        return
+    }
     if (img.parent) img.parent.removeChild(img)
     destroyShimNode(img)
 }
