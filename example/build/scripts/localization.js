@@ -1016,6 +1016,11 @@ const PAIRS = [
     ["enemy.29.desc", "Живой огонёк из глубин лавовых этажей. Шалун и беглец: не даётся в руки и поджигает всё вокруг себя. В обычные главы не попадается.", "A living flame from the depths of the lava floors. A playful runaway: it won't be caught and scorches everything around it. Does not appear in regular chapters."],
     //V111: ближняя атака Огнементя (принцип mace, спрайт fireball)
     ["attack.25.name", "Огненный взмах", "Fire Swipe"],
+    //V132: Слаймэн — квестовый персонаж
+    ["enemy.30.name", "Слаймэн", "Slime man"],
+    ["enemy.30.desc", "Плотный комок живой зелёной слизи. Переваливается с ноги на ногу и шлёпает чужаков своей массой, а от урона сплющивается, но не лопается. В обычные главы не попадается.", "A dense blob of living green slime. It waddles from foot to foot and slaps intruders with its bulk; when hurt it squishes flat but does not burst. Does not appear in regular chapters."],
+    //V132: ближняя атака Слаймэна (шлепок, спрайт — брызги слизи)
+    ["attack.26.name", "Шлепок слизью", "Slime Slap"],
     //V111: квест «Погоня за пламенем» — диалоги, трекер, журнал
     ["quest.flame.title", "Погоня за пламенем", "Chase the Flame"],
     ["quest.flame.track", "Догони огонёк", "Catch the little flame"],

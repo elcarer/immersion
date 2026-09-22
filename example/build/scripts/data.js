@@ -691,6 +691,29 @@ let data = {"heroes":[
             {"speed":5,"times":4,"w":128,"h":48,"img":"./images/enemy/elemental/others/death.png","once":1},
             {"speed":5,"times":4,"w":112,"h":48,"img":"./images/enemy/elemental/others/wait.png"}
         ]}
+    ]},
+    //V132: Слаймэн — квестовый персонаж (лист images/sheets/slime_64.png, сборка
+    //forWork/slime_register.py). В пулы спавна глав не входит: в комнаты попадёт
+    //только через явный спавн квеста. Атака 26 — ближний шлепок (частицы слизи,
+    //images/attacks/slime/all.png). Ширины полос — окна строк листа
+    {"id":30,"name":"enemy.30.name","stats":{"hp":12,"dmg":[3,6],"exp":10,"speed":6,"range":7,"attacksCd":[],"noStunTime":50,"desc":"enemy.30.desc"},"attacks":[26],"effects":{"takeDamage":1},"anims":[
+        {"move":[
+            {"speed":5,"times":4,"w":136,"h":46,"img":"./images/enemy/slime/move/back.png"},
+            {"speed":5,"times":4,"w":128,"h":48,"img":"./images/enemy/slime/move/front.png"},
+            {"speed":5,"times":4,"w":104,"h":48,"img":"./images/enemy/slime/move/left.png"},
+            {"speed":5,"times":4,"w":104,"h":46,"img":"./images/enemy/slime/move/right.png"}
+        ]},
+        {"attack":[
+            {"speed":5,"times":4,"w":136,"h":46,"img":"./images/enemy/slime/attack/back.png","once":1,"attackNew":{"step":3,"anim":[26,0]}},
+            {"speed":5,"times":4,"w":120,"h":48,"img":"./images/enemy/slime/attack/front.png","once":1,"attackNew":{"step":3,"anim":[26,1]}},
+            {"speed":5,"times":4,"w":128,"h":46,"img":"./images/enemy/slime/attack/left.png","once":1,"attackNew":{"step":3,"anim":[26,2]}},
+            {"speed":5,"times":4,"w":128,"h":46,"img":"./images/enemy/slime/attack/right.png","once":1,"attackNew":{"step":3,"anim":[26,3]}}
+        ]},
+        {"others":[
+            {"speed":10,"times":4,"w":128,"h":42,"img":"./images/enemy/slime/others/damage.png","once":1,"stun":1},
+            {"speed":5,"times":4,"w":128,"h":42,"img":"./images/enemy/slime/others/death.png","once":1},
+            {"speed":5,"times":4,"w":120,"h":48,"img":"./images/enemy/slime/others/wait.png"}
+        ]}
     ]}],
 ],
 "attacks":[
@@ -844,6 +867,15 @@ let data = {"heroes":[
         {"img":"./images/attacks/fireball/all.png","once":1,"times":4,"speed":15,"w":128,"h":32,"x":0,"y":32},
         {"img":"./images/attacks/fireball/all.png","once":1,"times":4,"speed":15,"w":128,"h":32,"x":-32,"y":0},
         {"img":"./images/attacks/fireball/all.png","once":1,"times":4,"speed":15,"w":128,"h":32,"x":32,"y":0},
+    ]},
+    //V132: ближняя атака Слаймэна — шлепок (принцип mace): одноразовый взмах в
+    //соседней клетке; спрайт — брызги слизи (кадры частиц из сырых листов,
+    //сборка forWork/slime_register.py), смещения под кадр 128x32
+    {"name":"attack.26.name","base":1,"cooldown":0.8,"anims":[
+        {"img":"./images/attacks/slime/all.png","once":1,"times":4,"speed":15,"w":128,"h":32,"x":0,"y":-32},
+        {"img":"./images/attacks/slime/all.png","once":1,"times":4,"speed":15,"w":128,"h":32,"x":0,"y":32},
+        {"img":"./images/attacks/slime/all.png","once":1,"times":4,"speed":15,"w":128,"h":32,"x":-32,"y":0},
+        {"img":"./images/attacks/slime/all.png","once":1,"times":4,"speed":15,"w":128,"h":32,"x":32,"y":0},
     ]},
 ],
 "effects":[
