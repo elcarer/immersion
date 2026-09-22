@@ -29,6 +29,19 @@ function isTwoHand(item) {
     return !!item && !!item.type && TWO_HAND_DESC2.includes(item.type.desc2)
 }
 
+//V129 (репорт юзера: «предмет копируется при переносе с куклы в инвентарь»): циклы
+//визуальной хирургии dollTemp ниже обходят ВСЕ узлы панели, а узлы без id (рамка
+//редкости — rect, жёлтая подсветка слота) возвращают getAttribute("id") === null.
+//null.slice ронял funcDrag ПОСЛЕ записи данных, но ДО перерисовки панели: старый шим
+//куклы оставался жив (лежал над ячейкой инвентаря), и следующий жест тем же шимом
+//(одиночный клик/даблклик) проходил по ветке обмена с кукольным id-источником —
+//предмет возвращался на куклу, не очистив инвентарь = копия. Узлы без id дают NaN
+//(ни с каким слотом не совпадёт — узел просто пропускается)
+function slotNum(el) {
+    const v = el.getAttribute("id")
+    return v === null || v === undefined ? NaN : parseInt(v.slice(0, -1))
+}
+
 function drag (e,item,x,y) {
     let xBase = x
     let yBase = y
@@ -48,10 +61,10 @@ function drag (e,item,x,y) {
                         status.inventory.doll[parseInt(e.target.getAttribute("id").slice(0,-1))] = null
                         let length3 = dollTemp.length
                         for (let j = 0; j < length3; j++) {
-                            if(parseInt(dollTemp[j].getAttribute("id").slice(0,-1)) === parseInt(e.target.getAttribute("id").slice(0,-1)) && dollTemp[j].getAttribute("href") === "./images/UI/doll/empty.png") {
+                            if(slotNum(dollTemp[j]) === parseInt(e.target.getAttribute("id").slice(0,-1)) && dollTemp[j].getAttribute("href") === "./images/UI/doll/empty.png") {
                                 dollTemp[j].setAttribute("href", cellPickArr[parseInt(e.target.getAttribute("id").slice(0,-1))].href)
                             }
-                            if(parseInt(dollTemp[j].getAttribute("id").slice(0,-1)) === parseInt(e.target.getAttribute("id").slice(0,-1)) && dollTemp[j].getAttribute("href") ===e.target.getAttribute("href")) {
+                            if(slotNum(dollTemp[j]) === parseInt(e.target.getAttribute("id").slice(0,-1)) && dollTemp[j].getAttribute("href") ===e.target.getAttribute("href")) {
                                 dollTemp.splice(j,1)
                                 length3--
                                 j--
@@ -137,10 +150,10 @@ function drag (e,item,x,y) {
                 status.inventory.doll[parseInt(e.target.getAttribute("id").slice(0,-1))] = null
                 let length3 = dollTemp.length
                 for (let j = 0; j < length3; j++) {
-                    if(parseInt(dollTemp[j].getAttribute("id").slice(0,-1)) === parseInt(e.target.getAttribute("id").slice(0,-1)) && dollTemp[j].getAttribute("href") === "./images/UI/doll/empty.png") {
+                    if(slotNum(dollTemp[j]) === parseInt(e.target.getAttribute("id").slice(0,-1)) && dollTemp[j].getAttribute("href") === "./images/UI/doll/empty.png") {
                         dollTemp[j].setAttribute("href", cellPickArr[parseInt(e.target.getAttribute("id").slice(0,-1))].href)
                     }
-                    if(parseInt(dollTemp[j].getAttribute("id").slice(0,-1)) === parseInt(e.target.getAttribute("id").slice(0,-1)) && dollTemp[j].getAttribute("href") ===e.target.getAttribute("href")) {
+                    if(slotNum(dollTemp[j]) === parseInt(e.target.getAttribute("id").slice(0,-1)) && dollTemp[j].getAttribute("href") ===e.target.getAttribute("href")) {
                         dollTemp.splice(j,1)
                         length3--
                         j--
