@@ -1701,10 +1701,24 @@ function wirePixiEvents(shim) {
     n.on("pointerdown", e => {
         shim._down && shim._down(wrapEvt(e, shim))
         fire(shim, "mousedown", e, shim)
-        // dblclick-детект (Pixi v8 не эмитит dblclick сам)
+        // dblclick-детект (Pixi v8 не эмитит dblclick сам). V129: считаем клики ПО
+        // ПРЕДМЕТУ (shim._item), а не по шиму — панель между кликами пары перестраивается
+        // (перерисовка после drag-жеста/обмена ячеек пересоздаёт шимы, второй клик
+        // попадал на новый шим с чистым _lastTap и даблклик терялся). Интервал — как в
+        // Windows: от ОТПУСКАНИЯ первого клика до нажатия второго, 500мс (системное
+        // время двойного клика). Прежний детект (350мс от нажатия до нажатия) был
+        // строже системного: обычный (не ускоренный) даблклик не засчитывался —
+        // предмет «отскакивал» и оставался в инвентаре вместо экипировки (репорт V129).
+        // Первый клик пары — нажатие, не переросшее в drag (увод > DRAG_TAP_PX,
+        // гасится в moveDragShim): иначе быстрый drag + даблклик давал
+        // экипировку на первом клике и снятие на втором
         const now = performance.now()
-        if (now - (shim._lastTap || 0) < 350) fire(shim, "dblclick", e, shim)
-        shim._lastTap = now
+        const item = shim._item
+        if (item) {
+            const last = lastTapByItem.get(item)
+            if (last !== undefined && now - last < 500) fire(shim, "dblclick", e, shim)
+            pendingTap = { item }
+        }
     })
     n.on("pointerup", e => {
         shim._up && shim._up(wrapEvt(e, shim))
@@ -1791,6 +1805,7 @@ function createImage(place, x, y, w, h, src, obj = {}) {
     shim.setAttribute("id", idVal !== undefined ? String(idVal) + "I" : "")
     // двойной клик/правый клик — надеть/снять предмет (doubleClickItem из drag.js);
     // в SVG это были addEventListener("dblclick"/"contextmenu") на элементе
+    if (obj.item !== undefined) shim._item = obj.item
     if (obj.funcDbl) {
         shim.addEventListener("dblclick", () => obj.funcDbl(obj.item))
         shim.addEventListener("contextmenu", () => obj.funcDbl(obj.item))
@@ -1919,6 +1934,10 @@ function createPath(place, obj, fill) {
 let dragSelected = null
 let dragData = null
 const dragMap = new WeakMap()
+//V129: состояние dblclick-детекта — время последнего «кликанного» (не drag) нажатия
+//по каждому предмету; WeakMap по объекту предмета — переживает перерисовку панели
+let pendingTap = null
+const lastTapByItem = new WeakMap()
 function draggableShim(shim, funcDrag, item) {
     dragMap.set(shim, { funcDrag, item })
     shim.addEventListener("mousedown", e => {
@@ -1955,6 +1974,15 @@ function findRarityFrame(shim) {
     }
     return null
 }
+//V129: фиксация нажатия как «клика» пары dblclick — в момент ОТПУСКАНИЯ (интервал пары
+//меряется как в Windows: от отпускания первого клика; жест, переросший в drag и
+//погашенный в moveDragShim, кликом не считается и сюда не дойдёт — pendingTap сброшен)
+function commitTap() {
+    if (pendingTap) {
+        lastTapByItem.set(pendingTap.item, performance.now())
+        pendingTap = null
+    }
+}
 function beginDragShim(shim, funcDrag, item, clientX, clientY) {
     // E-20 (репорт: «предметы копируются при частых перетаскиваниях»): мёртвый шим не
     // захватываем — его панель уже перерисована, funcDrag со старым id кладёт предмет
@@ -1962,7 +1990,7 @@ function beginDragShim(shim, funcDrag, item, clientX, clientY) {
     if (shim._dead) return
     // незавершённый жест (pointerup потерян за окном) — завершаем
     // «где висит», как это делает gamepadDragEnd, иначе прежний спрайт замирает в воздухе
-    if (dragSelected) endDragShim(dragSelected)
+    if (dragSelected) { commitTap(); endDragShim(dragSelected) }
     dragSelected = shim
     const pos = dragClientToView(clientX, clientY)
     const ox = +shim.attrs.x || 0, oy = +shim.attrs.y || 0
@@ -1974,6 +2002,9 @@ function beginDragShim(shim, funcDrag, item, clientX, clientY) {
     applyDropShadow(shim, "filter: drop-shadow(0 0 6px rgba(255, 255, 204, 0.8))")
     if (backendHooks.tipDel) backendHooks.tipDel()
 }
+//V129: увод жеста дальше этого (viewBox px) от точки захвата — это drag, а не клик:
+//такое нажатие не считается первым кликом dblclick-пары
+const DRAG_TAP_PX = 20
 function moveDragShim(cx, cy) {
     if (!dragSelected) return
     // E-20: панель перестроилась под жестом (даблклик надел предмет и перерисовал слои) —
@@ -1985,6 +2016,10 @@ function moveDragShim(cx, cy) {
         dragData.lifted = true
     }
     const pos = dragClientToView(cx, cy)
+    if (pendingTap && dragData) {
+        const dx = pos.x - dragData.origX, dy = pos.y - dragData.origY
+        dx * dx + dy * dy > DRAG_TAP_PX * DRAG_TAP_PX && (pendingTap = null)
+    }
     dragSelected.setAttribute("x", pos.x - dragData.offX)
     dragSelected.setAttribute("y", pos.y - dragData.offY)
 }
@@ -2050,7 +2085,12 @@ function installDragListeners() {
             moveDragShim(e.clientX, e.clientY)
         }
     })
-    cv.addEventListener("pointerup", e => { if (dragSelected) endDragShim(dragSelected, e.clientX, e.clientY) })
+    cv.addEventListener("pointerup", e => {
+        //V129: отпускание фиксирует клик пары dblclick (до гварда dragSelected —
+        //обычный клик без drag в endDragShim вообще не попадает)
+        commitTap()
+        if (dragSelected) endDragShim(dragSelected, e.clientX, e.clientY)
+    })
 }
 
 // ----------------------------------------------------------------------------
