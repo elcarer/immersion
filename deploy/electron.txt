@@ -1,30 +1,21 @@
-cd /d F:\elven_wood\build
-npm install electron electron-packager --save-dev
-npm run build-exe
+Сборка exe игры (Electron-обёртка). Фиксы игры живут в example/build — в exe попадает
+ТА КОПИЯ, которая лежит рядом с main.js в момент сборки, поэтому перед каждой сборкой
+СНАЧАЛА обнови содержимое папки, потом собирай:
 
-npm install electron-builder --save-dev
-package.json:
-{
-  "name": "my-web-app",
-  "version": "1.0.0",
-  "main": "main.js",
-  "scripts": {
-    "start": "electron .",
-    "dist": "electron-builder"
-  },
-  "build": {
-    "appId": "com.example.mywebapp",
-    "win": {
-      "target": "nsis" 
-    },
-    "nsis": {
-      "oneClick": false,
-      "allowToChangeInstallationDirectory": true
-    }
-  },
-  "devDependencies": {
-    "electron": "^30.0.0",
-    "electron-builder": "^24.0.0"
-  }
-}
-npm run dist
+1. Скопировать содержимое example/build (index.html, scripts/, images/, sounds/ и т.д.)
+   в ЭТУ папку (deploy/) рядом с main.js:
+   cp -r example/build/* deploy/
+2. Установить обёртку (один раз):
+   cd deploy
+   npm install
+3. Собрать exe:
+   npm run build-exe
+   → готовый пакет: deploy/Immersion-win32-x64/
+4. Запускать Immersion.exe из пакета.
+
+КАК УБЕДИТЬСЯ, ЧТO играешь в свежий билд: на заставке в левом нижнем углу написана
+версия (build 2.15 = актуальная). Если видишь старую версию — exe не пересобран
+или файлы не скопированы.
+
+Иконка favicon.ico отсутствует в репо: electron-packager упакует и без неё
+(предупреждение не критично), либо положи favicon.ico рядом с main.js.

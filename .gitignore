@@ -1,2 +1,12 @@
 shots/
 forWork/_data_tmp.*
+
+# Electron-сборка в deploy/: тягучие артефакты в git не попадают
+deploy/node_modules/
+deploy/Immersion-win32-x64/
+deploy/index.html
+deploy/scripts/
+deploy/images/
+deploy/sounds/
+deploy/resources.json
+deploy/favicon.ico
