@@ -84,6 +84,8 @@ const WOLF_AGGRO = 8 * 32        //радиус «враги напали на �
 const WOLF_BITE_RANGE = 52       //дистанция укуса (центр-центр)
 const BITE_CD = 25               //кулдаун укуса: attack.11 cooldown 0.4с ≈ 25 тиков
 const USE_TICKS = 45             //полоска взаимодействия с NPC (как у объектов, ~0.72с)
+//V131: сколько тиков Волк игнорирует врага, к которому не смог построить путь (~4.8с)
+const WOLF_FOE_SKIP_TICKS = 300
 //кольцо клеток вокруг данной для поиска свободной (как NEAR в pets.js)
 const NEAR = [[0,0],[0,-1],[1,-1],[-1,-1],[1,0],[-1,0],[1,1],[-1,1],[0,1]]
 
@@ -299,6 +301,9 @@ function findFoe(wolf) {
     const wy = wp[1] + 25
     let best = null
     let bestD = Infinity
+    //V131: недостижимая цель (3 пустых пути в combatTick) временно пропускается —
+    //иначе Волк вечно стоит над ней и не следует за героем
+    const skipLive = wolf.skippedFoe && status.time - (wolf.skippedT || 0) < WOLF_FOE_SKIP_TICKS
     const gE = world.queries.genemy && world.queries.genemy.entities
     if (!gE) return null
     const snap = gE.slice()
@@ -307,6 +312,7 @@ function findFoe(wolf) {
         if (!o || o.type !== "enemy" || o.lying !== undefined || o.stats.hp <= 0) continue
         //V113: мирный Огнементаль Волк не трогает (квест «Погоня за пламенем»)
         if (o.flameNpc === 1) continue
+        if (skipLive && o === wolf.skippedFoe) continue
         if (!(o.noticed || o.called || o.state === ENEMY_STATE.ATTACK || o.state === ENEMY_STATE.FLEE)) continue
         const p = rectPos(o.rect)
         const d = Math.hypot((p[0] + 16) - wx,(p[1] + 25) - wy)
@@ -384,7 +390,24 @@ function combatTick(wolf, foe) {
         wolf.pathTarget[0] === tc[0] && wolf.pathTarget[1] === tc[1]) return
     if (wolf.pathTarget === null && status.time % 20 !== wolf.id % 20) return
     wolf.path = buildChasePath(wc,tc,wolf)
-    wolf.pathTarget = wolf.path.length ? tc : null
+    //V131 (репорт юзера: «волк останавливался посреди комнаты и не следовал ни за каким
+    //игроком»): findFoe видит врагов «через стены» (aggro по радиусу, без LOS) — враг за
+    //закрытой дверью/в неоткрытой комнате давал ПУСТОЙ путь каждый ретрай, и Волк стоял
+    //над недостижимой целью вечно. Три неудачные попытки (~1с, ретрай раз в 20 тиков) —
+    //цель отпускается (findFoe пропускает её WOLF_FOE_SKIP_TICKS): Волк возвращается к
+    //герою; когда путь появится (дверь открыта), цель подхватится снова
+    if (wolf.path.length) {
+        wolf.pathFails = 0
+        wolf.pathTarget = tc
+    } else {
+        wolf.pathTarget = null
+        wolf.pathFails = (wolf.pathFails || 0) + 1
+        if (wolf.pathFails >= 3) {
+            wolf.skippedFoe = foe
+            wolf.skippedT = status.time
+            wolf.pathFails = 0
+        }
+    }
 }
 
 // ---------- урон по Волку ----------

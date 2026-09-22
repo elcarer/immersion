@@ -47,31 +47,33 @@ function useObject(obj,i0) {
     //V53: сет «Великий вор» (4 надетых): -10% ко времени использования — полоска 60 → 54 тика
     //(V67: «Вечный берилл» удваивает численные бонусы сета — 48 тиков)
     //V114: owner — игрок, начавший юз (завершение в checkBars исполняется в его контексте)
-    bars.push({"type":"use","fin":setUseTicks(),"speed":1,"owner":status.players.indexOf(status.hero),"obj":screenPic[screenPic.length - 1],"func":() => finishUsedObject(obj)})
+    //V131: lobj — объект, чей это юз («кто что использует»): stopUseObject гасит полоски
+    //только своего игрока и подчищает именно ИХ объекты (фон/подсветку/obj[5])
+    bars.push({"type":"use","fin":setUseTicks(),"speed":1,"owner":status.players.indexOf(status.hero),"lobj":obj,"obj":screenPic[screenPic.length - 1],"func":() => finishUsedObject(obj)})
     screenPic.push(worldImage(svgArr[1],obj[0]*32+obj[3]*16-32,obj[1]*32-24,64,14,"./images/UI/panels/bar1mini.png",{"id":i0+"R"}))
     obj[5] = i0
 }
-function stopUseObject() {
-    let level = dataGeneric.scenes[status.levelFloor]
-    let i0Max = level.objects.length
-    for (let i0 = 0; i0 < i0Max; i0++) {
-        if (level.objects[i0][5]!==undefined) {
-            let lengthBars = bars.length
-            for (let i = 0; i < lengthBars; i++) {
-                if (bars[i].type === "use") {
-                bars[i].obj.remove()
-                bars.splice(i,1)
-                break
-                }
-            }
-            let barBg = picById(level.objects[i0][5]+"RI")
+function stopUseObject(pi) {
+    //V131 (репорт юзера: «два игрока не могут одновременно использовать интерактивные
+    //объекты, старт юза другим игроком сбивает полоску первого»): полоски юза
+    //пер-игроковые — гасим ТОЛЬКО полоски игрока pi (по умолчанию — контекстного героя);
+    //чужие полоски (другой объект, другой игрок) не трогаем. pi.use сбрасывается свой
+    pi === undefined && (pi = status.players.indexOf(status.hero))
+    for (let i = bars.length - 1; i >= 0; i--) {
+        if (bars[i].type !== "use" || bars[i].owner !== pi) continue
+        const bar = bars[i]
+        bars.splice(i,1)
+        bar.obj.remove()
+        const lobj = bar.lobj
+        if (lobj && lobj[5] !== undefined) {
+            let barBg = picById(lobj[5]+"RI")
             barBg && barBg.remove()
-            level.objects[i0][5] = undefined
-            let obj = picById(level.objects[i0][6]+"OI")
-            obj && obj.setAttribute("style", 'filter: none')
-            status.hero.use = 0
+            lobj[5] = undefined
+            let hl = picById(lobj[6]+"OI")
+            hl && hl.setAttribute("style", 'filter: none')
         }
     }
+    status.players[pi] && (status.players[pi].use = 0)
 }
 function finishUsedObject(obj) {
     if(obj[2] === 9 && status.info.keys <= 0) {

@@ -216,16 +216,22 @@ function fpsCounter() {
     }
 }
 function checkBars() {
-    let lengthBars = bars.length
-    for (let i = 0; i < lengthBars; i++) {
-        bars[i].obj.setAttribute("width", bars[i].obj.width.animVal.value + bars[i].speed)
-        if (bars[i].obj.width.animVal.value >= bars[i].fin) {
+    //V131: полоски юза пер-игроковые — теперь их ДВЕ и более одновременно; обратный
+    //обход: func (finishUsedObject → stopUseObject владельца) сам снимает полоску,
+    //splice делаем только если полоска ещё жива — иначе снимали бы ЧУЖУЮ, вставшую
+    //на это место (старый безусловный splice(i,1) при двух полосках убивал вторую)
+    for (let i = bars.length - 1; i >= 0; i--) {
+        const bar = bars[i]
+        if (!bar) continue
+        bar.obj.setAttribute("width", bar.obj.width.animVal.value + bar.speed)
+        if (bar.obj.width.animVal.value >= bar.fin) {
             //V114: полоска юза объекта принадлежит конкретному игроку — завершение
             //(ключи/лечение/эксп у владельца) исполняется в его контексте
-            bars[i].owner !== undefined && status.players[bars[i].owner] && setContext(status.players[bars[i].owner])
-            bars[i].func(bars[i].obj)
+            bar.owner !== undefined && status.players[bar.owner] && setContext(status.players[bar.owner])
+            bar.func(bar.obj)
+            bars[i] === bar && bars.splice(i,1)
             setContext(status.players[0])
-            bars.splice(i,1)}
+        }
     }
 }
 function checkWait() {

@@ -89,9 +89,9 @@ function relicGenerate() {
 //------ «Вечный сапфир» (relic 2): живая копия параметров предмета из 1-й ячейки инвентаря ------
 //Источник — ЛЮБОЙ предмет (не реликвия) в inv[0]; ячейка пуста или там реликвия — копии нет.
 //Копия «живая»: читается в момент каждого расчёта, смена предмета в inv[0] меняет и копию.
-function sapphireSource() {
+function sapphireSource(inv) {
     if (!hasRelic(2)) return null
-    let src = status.inventory.inv[0]
+    let src = (inv || status.inventory).inv[0]
     return src && !isRelic(src) ? src : null
 }
 
@@ -124,9 +124,12 @@ function sapphireArmor() {
     return s && s.stat === 6 ? s.statCount * sapphireMult() : 0
 }
 
-//копия ячеек пояса (спец-стат 5) — читается в belt.js рядом с status.info.beltCell
-function sapphireBelt() {
-    let s = sapphireSource()
+//копия ячеек пояса (спец-стат 5) — читается в belt.js рядом с P.info.beltCell.
+//V131: пояс пер-игроковой — источник берётся из инвентаря КОНКРЕТНОГО игрока
+//(без аргумента — из контекстного, прежнее поведение)
+function sapphireBelt(pi) {
+    const inv = pi === undefined ? status.inventory : status.players[pi].inventory
+    let s = sapphireSource(inv)
     return s && s.stat === 5 ? s.statCount * sapphireMult() : 0
 }
 
