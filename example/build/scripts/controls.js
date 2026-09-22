@@ -28,7 +28,8 @@ let padPollPrev = null
 
 //зона прокрутки таблицы: клип кончается НАД кнопками «СБРОС»/«ОТМЕНА» (y=808)
 const VIEW_X = 560, VIEW_Y = 330, VIEW_W = 850, VIEW_H = 462
-const TRACK_X = VIEW_X + VIEW_W + 12
+//V128 (замечание юзера): полоса прокрутки на 20px левее — подальше от границы панели
+const TRACK_X = VIEW_X + VIEW_W - 8
 const TRACK_W = 14
 const ROW_H = 46
 let ctlGroup = null
@@ -340,7 +341,8 @@ function controlsProbe() {
         "scroll": scrollOff,
         "maxOff": maxOff,
         "firstY": ctlRows.length ? Number(ctlRows[0].node.getAttribute("y")) : null,
-        "firstBase": ctlRows.length ? ctlRows[0].baseY : null
+        "firstBase": ctlRows.length ? ctlRows[0].baseY : null,
+        "thumbX": thumbEl ? Number(thumbEl.getAttribute("x")) : null
     }
 }
 //V126: settings.js регистрирует здесь свой settings()-переоткрыватель (без цикла модулей:

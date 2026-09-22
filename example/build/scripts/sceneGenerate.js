@@ -55,16 +55,17 @@ function sceneGenerate(data,next=false) {
             //СВОЕГО игрока (status.meta — прокси активного), countDopStats — тоже
             setContext(P)
             let weapon = basicData.data.basicWeapons[hero.weapon]
-            //V127 (репорт юзера: ножи Плута «копировались» по ячейкам и не возвращались
-            //во 2-ю руку): у Плута ОБА слота получали ОДИН объект weapon — правый клик
-            //снимал indexOf-первый слот (второй оставался), drag разносил ссылку по
-            //массивам. Вторая рука — своя КОПИЯ предмета
-            P.class === 0 ? P.inventory.doll = [,,,,,,,,,,,weapon,JSON.parse(JSON.stringify(weapon)),] : P.inventory.doll = [,,,,,,,,,,,weapon,,]
+            //V127: у Плута ОБА слота получали ОДИН объект weapon — правый клик снимал
+            //indexOf-первый слот (второй оставался), drag разносил ссылку по массивам.
+            //V128: клоны — у ВСЕХ стартовых предметов (иначе BasicWeapons-прототип из
+            //data.js живёт на кукле, и любая мутация предмета портит данные всем забегам)
+            const cloneItem = it => it ? JSON.parse(JSON.stringify(it)) : undefined
+            P.class === 0 ? P.inventory.doll = [,,,,,,,,,,,cloneItem(weapon),cloneItem(weapon),] : P.inventory.doll = [,,,,,,,,,,,cloneItem(weapon),,]
             if(P.class === 2) {
-                P.inventory.doll = [,,,,,,,,,,,weapon,basicData.data.basicWeapons[10],]
+                P.inventory.doll = [,,,,,,,,,,,cloneItem(weapon),cloneItem(basicData.data.basicWeapons[10]),]
             }
             if(P.class === 3) {
-                P.inventory.doll = [,,,,,,,,,,,weapon,basicData.data.basicWeapons[11],]
+                P.inventory.doll = [,,,,,,,,,,,cloneItem(weapon),cloneItem(basicData.data.basicWeapons[11]),]
             }
             let attack = basicData.data.attacks[weapon.attack]
             P.attack = {"img":attack.img,"target":undefined,"current":[],"stack":[{"timer":Math.trunc((attack.cooldown*1000)/16),"abil":attack}]}

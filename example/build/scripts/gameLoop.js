@@ -80,6 +80,12 @@ let pendingMouse = null
 document.addEventListener('mousemove', e => {
     pendingMouse = [e.clientX, e.clientY]
   })
+//V128 (репорт юзера: после сворачивания/смены фокуса окна геймпад перестаёт работать):
+//Chrome замораживает выдачу Gamepad API, пока окно не в фокусе, и после возврата пады
+//появляются в getGamepads() не сразу. Фоновый опрос раз в 500мс держит состояние тёплым,
+//пульс на focus форсирует пере-перечисление сразу при возврате в окно
+setInterval(() => { navigator.getGamepads && navigator.getGamepads() }, 500)
+window.addEventListener("focus", () => { navigator.getGamepads && navigator.getGamepads() })
 function gameLoop() {
     if (pendingMouse) {
         const mx = pendingMouse[0]
@@ -250,8 +256,15 @@ function checkMenu(x,y) {
         if (svgArr[2].lastElementChild !== status.newMouse) svgArr[2].append(status.newMouse)
     }
 
-    y < 100&&status.start===1&&status.panels===0&&topMenu()
-    y > 100&&status.start===1&&status.panels===10&&topMenuClose()
+    menuHoverTick()
+}
+//V128 (репорт юзера: курсор пада в верхней части экрана не вызывает верхнее меню):
+//наведение меню раньше жило только в checkMenu (путь mousemove) — стик пада двигал
+//status.mouseY, но проверку верхней зоны не проходил. Теперь это общий тик для мыши
+//и пада: y<100 поднимает меню, y>100 закрывает (при открытой полосе)
+function menuHoverTick() {
+    status.mouseY < 100 && status.start === 1 && status.panels === 0 && topMenu()
+    status.mouseY > 100 && status.start === 1 && status.panels === 10 && topMenuClose()
 }
 let timePadButtons = 0
 let padDragPrev = false
@@ -322,6 +335,9 @@ function cursorTick() {
     document.body.style.cursor !== "none" && (document.body.style.cursor = "none")
 }
 function gamepad() {
+    //V128: кулдаун клика тикает и без пада — застрявший clickTime (смена фокуса на
+    //паде зажала его) не блокировал клики после возврата пада
+    status.clickTime && status.clickTime > 0 && status.clickTime--
     const pad = navigator.getGamepads()[0]
     if(!pad) return
     let but = pad.buttons
@@ -334,6 +350,8 @@ function gamepad() {
             status.mouseX += ax * 8
             status.mouseY += ay * 8
             movePadCursor(status.mouseX, status.mouseY)
+            //V128: верхняя зона экрана открывает меню и для курсора пада
+            menuHoverTick()
             //синтетический ховер: тултипы/подсветка под курсором пада (pixiBackend)
             const ctm = getCTM()
             ctm && backendHooks.padHover(status.mouseX * ctm.a + ctm.e, status.mouseY * ctm.d + ctm.f)
@@ -350,7 +368,6 @@ function gamepad() {
         gamepadDragEnd()
     }
     padDragPrev = dragPressed
-    status.clickTime && status.clickTime > 0 && status.clickTime--
     //клик курсором (V126: ЛТ — «левый нижний курок», кнопка 6, переназначается) =
     //клик курсором мыши во всех местах: тот же synthetic-click через хит-тест UI
     const clickBtn = padBtn("click")
