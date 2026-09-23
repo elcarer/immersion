@@ -1021,6 +1021,11 @@ const PAIRS = [
     ["enemy.30.desc", "Плотный комок живой зелёной слизи. Переваливается с ноги на ногу и шлёпает чужаков своей массой, а от урона сплющивается, но не лопается. В обычные главы не попадается.", "A dense blob of living green slime. It waddles from foot to foot and slaps intruders with its bulk; when hurt it squishes flat but does not burst. Does not appear in regular chapters."],
     //V132: ближняя атака Слаймэна (шлепок, спрайт — брызги слизи)
     ["attack.26.name", "Шлепок слизью", "Slime Slap"],
+    //V137: Древоброд — квестовый персонаж
+    ["enemy.31.name", "Древоброд", "Treant"],
+    ["enemy.31.desc", "Древний страж леса, что бродит по тропам на корнях-ногах. Скрипит корой, щурится янтарными глазами и тяжёлыми ветвями прогоняет всякого, кто подойдёт близко. В обычные главы не попадается.", "An ancient guardian of the forest who roams the trails on root-legs. Its bark creaks, its amber eyes glint, and it swings heavy branches to drive off anyone who comes close. Does not appear in regular chapters."],
+    //V137: ближняя атака Древоброда (удар ветвями, спрайт club)
+    ["attack.27.name", "Удар ветвями", "Branch Smash"],
     //V133: квест «Корм слизи» — трекер, диалоги, журнал
     ["quest.slime.title", "Корм слизи", "Feed the Slime"],
     ["quest.slime.found", "Найдено:", "Found:"],

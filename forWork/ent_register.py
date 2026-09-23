@@ -1,0 +1,251 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""V137: регистрация Древоброда (квестовый персонаж-энт, арт из 3 сырых AI-листов
+в forWork/sprites/src_ent/ — teal-градиент). Конвейер (по образцу slime_register):
+  A.png — 1696x2528, НЕРАВНОМЕРНАЯ сетка: ряд 0 — 4 стойки (idle, кадры 2-3 =
+  «моргание»), ряд 1 — 2 кадра опускания на колени (влево), ряд 2 — 2 кадра
+  разваливания (влево), ряд 3 — 2 спины + куча веток (останки);
+  B.png — 848x1264 (полрезинки), ходьба 4x4: r0 фронт, r1 влево, r2 вправо,
+  r3 спина — направления родные, без зеркал;
+  C.png — 1696x2528, атака 4x4: r0 фронт (замах -> разведение -> слэм с пылью ->
+  стойка), r1 влево / r2 вправо (дуги вписаны в кадры), r3 спина.
+  1) фон снимается подгонкой плоскости по рамке клетки (робастно, 2 прохода,
+     выбросы > 25); сетки у листов разные — ячейки задаются списком долей;
+  2) чистка маски: компоненты < 150 px и тонкие чёрточки-разделители выбрасываются;
+  3) нормализация: премультиплицированный BOX-даунскейл + NEAREST x2, якорь
+     центр-X / ступни y=62; рост стоя 48 px; КЛАМП ширины 62 (энт приземистый,
+     куча/развалившийся кадр шире клетки);
+  4) сборка листа 5x11 (64x64): wait/walk x4/attack x4/death/damage — раскладка
+     строк как у всех врагов;
+  5) полосы (окно = объединение альфа-bbox 4 кадров строки) в
+     forWork/legacy_strips/enemy/ent/..., манифест ent_64.json;
+  6) оверлей атаки НЕ строится: атака 27 в data.js использует готовый спрайт
+     images/attacks/club/all.png (дубина, принцип mace);
+  7) прогон штатного make_sheets_map.py (верификация + sheetsMap.js + копия листа
+     в билд + resources.json).
+Идемпотентно: повторный запуск перезаписывает те же файлы.
+"""
+import json, os, subprocess, sys
+from PIL import Image, ImageChops, ImageOps
+import numpy as np
+from scipy import ndimage
+
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+SPR = os.path.join(ROOT, 'forWork', 'sprites')
+SRC = os.path.join(SPR, 'src_ent')
+LEG = os.path.join(ROOT, 'forWork', 'legacy_strips', 'enemy', 'ent')
+GEN = os.path.join(ROOT, 'forWork', 'make_sheets_map.py')
+
+CELL, COLS, ROWS = 64, 5, 11
+STAND_H = 48.0               # рост стоя в клетке (у культиста/слаймэна 48)
+FEET_Y = 62                  # базовая линия ступней
+MAX_W = 62                   # клэмп ширины контента в клетке
+
+# сетки источников: список (y0, y1, x0, x1) в долях листа
+def grid_rows_a():
+    g = []
+    for ri, nc in enumerate([4, 2, 2, 3]):
+        for ci in range(nc):
+            g.append((ri / 4, (ri + 1) / 4, ci / nc, (ci + 1) / nc))
+    return g
+GRIDS = {'A': grid_rows_a(),
+         'B': [(r / 4, (r + 1) / 4, c / 4, (c + 1) / 4) for r in range(4) for c in range(4)],
+         'C': [(r / 4, (r + 1) / 4, c / 4, (c + 1) / 4) for r in range(4) for c in range(4)]}
+
+# (лист, строка, кадр) на каждый кадр анимации; строки листа — как у всех врагов
+PLAN = {
+    'wait':         [('A', 0, 0), ('A', 0, 1), ('A', 0, 0), ('A', 0, 2)],   # стойка + моргание
+    # у фронта в источнике только 3 ходовых кадра (4-й — вид со спины): зациклен c1
+    'walk_front':   [('B', 0, 0), ('B', 0, 1), ('B', 0, 2), ('B', 0, 1)],
+    'walk_back':    [('B', 3, 0), ('B', 3, 1), ('B', 3, 2), ('B', 3, 3)],
+    'walk_left':    [('B', 1, 0), ('B', 1, 1), ('B', 1, 2), ('B', 1, 3)],
+    'walk_right':   [('B', 2, 0), ('B', 2, 1), ('B', 2, 2), ('B', 2, 3)],
+    # фронт: замах -> разведение -> слэм с пылью -> стойка
+    'attack_front': [('C', 0, 0), ('C', 0, 1), ('C', 0, 2), ('C', 0, 3)],
+    # спина: занос -> взмах с дугой -> дуга уходит -> стойка
+    'attack_back':  [('C', 3, 0), ('C', 3, 1), ('C', 3, 2), ('C', 3, 3)],
+    # бока: полная последовательность удара (родные направления, без зеркал)
+    'attack_left':  [('C', 1, 0), ('C', 1, 1), ('C', 1, 2), ('C', 1, 3)],
+    'attack_right': [('C', 2, 0), ('C', 2, 1), ('C', 2, 2), ('C', 2, 3)],
+    # смерть: колени -> глубже -> разваливание -> куча-останки
+    'death':        [('A', 1, 0), ('A', 1, 1), ('A', 2, 0), ('A', 3, 2)],
+    # урон: вздрагивание на коленях (нейтрально к направлению)
+    'damage':       [('A', 1, 0), ('A', 1, 1), ('A', 1, 0), ('A', 1, 1)],
+}
+ROW_OF = {'wait': 0, 'walk_front': 1, 'walk_back': 2, 'walk_left': 3, 'walk_right': 4,
+          'attack_front': 5, 'attack_back': 6, 'attack_right': 7, 'attack_left': 8,
+          'death': 9, 'damage': 10}
+ANIMS = [  # (имя, строка, подкаталог полосы, имя файла)
+    ('wait', 0, 'others', 'wait.png'), ('death', 9, 'others', 'death.png'), ('damage', 10, 'others', 'damage.png'),
+    ('walk_front', 1, 'move', 'front.png'), ('walk_back', 2, 'move', 'back.png'),
+    ('walk_left', 3, 'move', 'left.png'), ('walk_right', 4, 'move', 'right.png'),
+    ('attack_front', 5, 'attack', 'front.png'), ('attack_back', 6, 'attack', 'back.png'),
+    ('attack_right', 7, 'attack', 'right.png'), ('attack_left', 8, 'attack', 'left.png'),
+]
+# кадры-эталоны роста стоя для масштаба источника (C: стойка r0c3)
+REF_FRAMES = {'A': (0, 0), 'B': (0, 0), 'C': (0, 3)}
+
+_keycache = {}
+_cells = {}
+
+def keyed(tag):
+    """RGBA клетки исходного листа с фоном, снятым подгонкой плоскости по рамке
+    каждой клетки (робастно: 2 прохода, выбросы канала > 25 отбрасываются)."""
+    if tag in _keycache:
+        return _keycache[tag]
+    im = Image.open(os.path.join(SRC, tag + '.png')).convert('RGB')
+    W, H = im.size
+    a = np.asarray(im).astype(np.float64)
+    alpha = np.zeros((H, W))
+    for (fy0, fy1, fx0, fx1) in GRIDS[tag]:
+        x0, x1 = int(fx0 * W), int(fx1 * W)
+        y0, y1 = int(fy0 * H), int(fy1 * H)
+        cell = a[y0:y1, x0:x1]
+        h, w = cell.shape[:2]
+        ring = np.zeros((h, w), bool)
+        m = max(4, min(h, w) // 40)
+        ring[:m, :] = ring[-m:, :] = True
+        ring[:, :m] = ring[:, -m:] = True
+        ys, xs = np.mgrid[0:h, 0:w]
+        pts = np.stack([np.ones(h * w), xs.ravel(), ys.ravel()], 1)
+        cols = cell.reshape(-1, 3)
+        ringf = ring.ravel()
+        pr, cr = pts[ringf], cols[ringf]
+        keep = np.ones(len(pr), bool)
+        for _ in range(2):
+            coef, *_ = np.linalg.lstsq(pr[keep], cr[keep], rcond=None)
+            keep = np.abs(cr - pr @ coef).max(1) < 25
+        d = np.abs(cols - pts @ coef).max(1)
+        al = np.zeros(len(d))
+        al[d > 46] = 255
+        mid = (d > 20) & (d <= 46)
+        al[mid] = (d[mid] - 20) * 255 / 26
+        alpha[y0:y1, x0:x1] = al.reshape(h, w)
+    out = Image.fromarray(np.dstack([a, alpha]).astype(np.uint8), 'RGBA')
+    _keycache[tag] = out
+    return out
+
+def cell(tag, r, c):
+    """клетка (лист, строка, кадр) с учётом неравномерной сетки A; в кадрах ряда 3
+    (вид со спины / куча) срезается нарисованная автором белёсая «дымка-тень»
+    (непрозрачный белый с хромой < 36; белые ядра дуг боковых атак в рядах 1-2
+    не задеваются — там хрома бежа ~50)"""
+    key = (tag, r, c)
+    if key not in _cells:
+        im = keyed(tag)
+        W, H = im.size
+        if tag == 'A':
+            nc = [4, 2, 2, 3][r]
+            box = (round(c * W / nc), round(r * H / 4), round((c + 1) * W / nc), round((r + 1) * H / 4))
+        else:
+            box = (round(c * W / 4), round(r * H / 4), round((c + 1) * W / 4), round((r + 1) * H / 4))
+        fr = im.crop(box)
+        if r == 3:
+            a = np.asarray(fr).copy()
+            chroma = a[:, :, :3].max(2).astype(np.int16) - a[:, :, :3].min(2).astype(np.int16)
+            white = (a[:, :, 3] > 0) & (a[:, :, :3].min(2) > 150) & (chroma < 36)
+            a[:, :, 3][white] = 0
+            fr = Image.fromarray(a, 'RGBA')
+        _cells[key] = fr
+    return _cells[key]
+
+def clean(fr, min_area=150):
+    """Чистка маски: связные компоненты-мусор (пятна ключа, чёрточки-разделители
+    строк источника) выбрасываются."""
+    a = np.asarray(fr).copy()
+    # блёклая дымка-«тень» из источника (светлая, полупрозрачная — верх альфа-рампы
+    # ключа 20..46) срезается: тёмные края и насыщенные дуги (alpha 255) не задеваются
+    haze = (a[:, :, 3] > 0) & (a[:, :, :3].min(2) > 140) & (a[:, :, 3] < 52)
+    if haze.any():
+        a[:, :, 3][haze] = 0
+    mask = a[:, :, 3] > 0
+    lab, n = ndimage.label(mask, structure=np.ones((3, 3), bool))
+    dropped = []
+    for i in range(1, n + 1):
+        comp = lab == i
+        area = int(comp.sum())
+        ys, xs = np.where(comp)
+        h, w = ys.max() - ys.min() + 1, xs.max() - xs.min() + 1
+        if area < min_area or (h <= 5 and w >= 12):
+            a[:, :, 3][comp] = 0
+            dropped.append(f'{area}px {w}x{h}')
+    if dropped:
+        print(f'    clean: -[{"; ".join(dropped)}]')
+    return Image.fromarray(a, 'RGBA')
+
+def norm(fr, scale):
+    """контент -> премультиплицированный BOX до логических, NEAREST x2 -> 64-клетка,
+    якорь: центр-X / ступни y=62; ширина клампится до MAX_W."""
+    b = fr.getchannel('A').getbbox()
+    if not b:
+        raise RuntimeError('пустой кадр')
+    content = fr.crop(b)
+    sc = scale
+    if content.width * sc > MAX_W:
+        sc = MAX_W / content.width
+    lw = max(1, round(content.width * sc / 2))
+    lh = max(1, round(content.height * sc / 2))
+    r, g, bl, a = content.split()
+    prem = Image.merge('RGBA', (ImageChops.multiply(r, a), ImageChops.multiply(g, a),
+                                ImageChops.multiply(bl, a), a))
+    small = prem.resize((lw, lh), Image.BOX)
+    # unpremultiply по логической сетке (крошечное изображение — питоний цикл дёшев)
+    sp = small.load()
+    for y in range(lh):
+        for x in range(lw):
+            r, g, bl, a = sp[x, y]
+            if a:
+                sp[x, y] = (min(255, (r * 255 + a // 2) // a),
+                            min(255, (g * 255 + a // 2) // a),
+                            min(255, (bl * 255 + a // 2) // a), a)
+    out = small.resize((lw * 2, lh * 2), Image.NEAREST)
+    cellim = Image.new('RGBA', (CELL, CELL), (0, 0, 0, 0))
+    cellim.paste(out, (32 - out.width // 2, FEET_Y - out.height))
+    return cellim
+
+def main():
+    # масштаб источника: эталонный рост стоя -> STAND_H
+    scale = {}
+    for tag, (r, c) in REF_FRAMES.items():
+        bb = clean(cell(tag, r, c)).getchannel('A').getbbox()
+        hs = bb[3] - bb[1]
+        scale[tag] = STAND_H / hs
+        print(f'  scale[{tag}] = {scale[tag]:.4f} (stand {hs}px)')
+
+    sheet = Image.new('RGBA', (CELL * COLS, CELL * ROWS), (0, 0, 0, 0))
+    for name, plan in PLAN.items():
+        row = ROW_OF[name]
+        for c, (tag, r, f) in enumerate(plan):
+            fr = clean(cell(tag, r, f))
+            sheet.paste(norm(fr, scale[tag]), (c * CELL, row * CELL))
+    sheet.save(os.path.join(SPR, 'ent_64.png'))
+
+    man = {'size': CELL, 'columns': COLS, 'fps': 8,
+           'animations': [{'name': n, 'row': r, 'frames': 4} for n, r, _, _ in ANIMS]}
+    with open(os.path.join(SPR, 'ent_64.json'), 'w', encoding='utf-8') as f:
+        json.dump(man, f, indent=2)
+
+    for name, row, sub, fname in ANIMS:
+        x0 = y0 = 10 ** 9
+        x1 = y1 = -1
+        for c in range(4):
+            b = sheet.crop((c * CELL, row * CELL, (c + 1) * CELL, (row + 1) * CELL)).getchannel('A').getbbox()
+            if not b:
+                continue
+            x0, y0 = min(x0, b[0]), min(y0, b[1])
+            x1, y1 = max(x1, b[2]), max(b[3], y1)
+        assert x1 > x0 and y1 > y0, f'пустая строка {name}'
+        fw, fh = x1 - x0, y1 - y0
+        strip = Image.new('RGBA', (fw * 4, fh), (0, 0, 0, 0))
+        for c in range(4):
+            strip.paste(sheet.crop((c * CELL + x0, row * CELL + y0, c * CELL + x1, row * CELL + y1)), (c * fw, 0))
+        d = os.path.join(LEG, sub)
+        os.makedirs(d, exist_ok=True)
+        strip.save(os.path.join(d, fname))
+        print(f'  ent {name}: row {row} window dx={x0} dy={y0} {fw}x{fh}')
+
+    r = subprocess.run([sys.executable, GEN], cwd=ROOT)
+    sys.exit(r.returncode)
+
+if __name__ == '__main__':
+    main()

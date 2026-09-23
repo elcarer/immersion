@@ -714,6 +714,29 @@ let data = {"heroes":[
             {"speed":5,"times":4,"w":128,"h":42,"img":"./images/enemy/slime/others/death.png","once":1},
             {"speed":5,"times":4,"w":120,"h":48,"img":"./images/enemy/slime/others/wait.png"}
         ]}
+    ]},
+    //V137: Древоброд — квестовый персонаж (лист images/sheets/ent_64.png, сборка
+    //forWork/ent_register.py). В пулы спавна глав не входит: в комнаты попадёт
+    //только через явный спавн квеста. Атака 27 — ближний удар ветвями (принцип
+    //mace, спрайт club). Ширины полос — окна строк листа
+    {"id":31,"name":"enemy.31.name","stats":{"hp":12,"dmg":[3,6],"exp":10,"speed":6,"range":7,"attacksCd":[],"noStunTime":50,"desc":"enemy.31.desc"},"attacks":[27],"effects":{"takeDamage":1},"anims":[
+        {"move":[
+            {"speed":5,"times":4,"w":128,"h":46,"img":"./images/enemy/ent/move/back.png"},
+            {"speed":5,"times":4,"w":120,"h":48,"img":"./images/enemy/ent/move/front.png"},
+            {"speed":5,"times":4,"w":104,"h":48,"img":"./images/enemy/ent/move/left.png"},
+            {"speed":5,"times":4,"w":96,"h":48,"img":"./images/enemy/ent/move/right.png"}
+        ]},
+        {"attack":[
+            {"speed":5,"times":4,"w":136,"h":48,"img":"./images/enemy/ent/attack/back.png","once":1,"attackNew":{"step":3,"anim":[27,0]}},
+            {"speed":5,"times":4,"w":128,"h":50,"img":"./images/enemy/ent/attack/front.png","once":1,"attackNew":{"step":3,"anim":[27,1]}},
+            {"speed":5,"times":4,"w":128,"h":50,"img":"./images/enemy/ent/attack/left.png","once":1,"attackNew":{"step":3,"anim":[27,2]}},
+            {"speed":5,"times":4,"w":136,"h":48,"img":"./images/enemy/ent/attack/right.png","once":1,"attackNew":{"step":3,"anim":[27,3]}}
+        ]},
+        {"others":[
+            {"speed":10,"times":4,"w":168,"h":48,"img":"./images/enemy/ent/others/damage.png","once":1,"stun":1},
+            {"speed":5,"times":4,"w":240,"h":48,"img":"./images/enemy/ent/others/death.png","once":1},
+            {"speed":5,"times":4,"w":120,"h":48,"img":"./images/enemy/ent/others/wait.png"}
+        ]}
     ]}],
 ],
 "attacks":[
@@ -876,6 +899,14 @@ let data = {"heroes":[
         {"img":"./images/attacks/slime/all.png","once":1,"times":4,"speed":15,"w":128,"h":32,"x":0,"y":32},
         {"img":"./images/attacks/slime/all.png","once":1,"times":4,"speed":15,"w":128,"h":32,"x":-32,"y":0},
         {"img":"./images/attacks/slime/all.png","once":1,"times":4,"speed":15,"w":128,"h":32,"x":32,"y":0},
+    ]},
+    //V137: ближняя атака Древоброда — удар ветвями (принцип mace): одноразовый
+    //взмах в соседней клетке; спрайт — готовый club (дубина), смещения под кадр 192x48
+    {"name":"attack.27.name","base":1,"cooldown":0.8,"anims":[
+        {"img":"./images/attacks/club/all.png","once":1,"times":4,"speed":15,"w":192,"h":48,"x":0,"y":-48},
+        {"img":"./images/attacks/club/all.png","once":1,"times":4,"speed":15,"w":192,"h":48,"x":0,"y":48},
+        {"img":"./images/attacks/club/all.png","once":1,"times":4,"speed":15,"w":192,"h":48,"x":-48,"y":0},
+        {"img":"./images/attacks/club/all.png","once":1,"times":4,"speed":15,"w":192,"h":48,"x":48,"y":0},
     ]},
 ],
 "effects":[
