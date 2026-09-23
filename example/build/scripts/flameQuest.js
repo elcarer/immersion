@@ -200,18 +200,21 @@ function npcUseBarTick(q, e) {
     const d = Math.hypot((HQ.x + 16) - (wp[0] + 16), (HQ.y + 25) - (wp[1] + 25))
     if (d > 56) {
         useT > 0 && (useT = 0)
-        useBarFill && useBarFill.setAttribute("width", 0)
+        //V136 (репорт юзера): при отходе полоска исчезает целиком, вместе с фреймом
+        useBarFill && (useBarFill.remove(), useBarFill = null)
+        useBarBack && (useBarBack.remove(), useBarBack = null)
         q.recharge = 0
         return
     }
     if (q.recharge) return
     useT++
     if (!useBarFill) {
-        useBarFill = rect(svgArr[1],wp[0] - 9,wp[1] - 16,0,6,"none","0px","#cc9966",{"id":"fqUseBar"})
+        //V136: геометрия как у полосок интерактивных объектов — fill 60×10 внутри фрейма 64×14
+        useBarFill = rect(svgArr[1],wp[0] - 9,wp[1] - 16,0,10,"none","0px","#cc9966",{"id":"fqUseBar"})
         //V133: задний фрейм bar1mini — как у полосок интерактивных объектов
         useBarBack = worldImage(svgArr[1],wp[0] - 11,wp[1] - 19,64,14,"./images/UI/panels/bar1mini.png",{"id":"fqUseBarR"})
     }
-    useBarFill.setAttribute("width", Math.trunc(50 * useT / USE_TICKS))
+    useBarFill.setAttribute("width", Math.trunc(60 * useT / USE_TICKS))
     if (useT >= USE_TICKS) {
         useBarFill.remove()
         useBarFill = null

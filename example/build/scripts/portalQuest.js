@@ -224,19 +224,26 @@ function portalUseBarTick() {
     //«тела» на 52px выше ноги, снизу/сбоку дистанция до героя больше
     if (d > 68) {
         useT > 0 && (useT = 0)
-        useBarFill && useBarFill.setAttribute("width", 0)
+        //V136 (репорт юзера): единый стандарт — при отходе полоска исчезает ЦЕЛИКОМ,
+        //вместе с фреймом (раньше гасился только fill, и фрейма вообще не было)
+        useBarFill && (useBarFill.remove(), useBarFill = null)
+        useBarBack && (useBarBack.remove(), useBarBack = null)
         qp.recharge = 0          //вышел из зоны — перезарядка снята
         return
     }
     if (qp.recharge) return
     useT++
     if (!useBarFill) {
-        useBarFill = rect(svgArr[1],px - 25,img.y.animVal.value - 6,0,6,"none","0px","#cc9966",{"id":"pqUseBar"})
+        //V136 (репорт юзера): единый стандарт полосок юза — фрейм bar1mini + fill 60×10,
+        //как у интерактивных объектов и NPC; смещение от верха спрайта то же (-19/-16)
+        useBarFill = rect(svgArr[1],px - 30,img.y.animVal.value - 16,0,10,"none","0px","#cc9966",{"id":"pqUseBar"})
+        useBarBack = worldImage(svgArr[1],px - 32,img.y.animVal.value - 19,64,14,"./images/UI/panels/bar1mini.png",{"id":"pqUseBarR"})
     }
-    useBarFill.setAttribute("width", Math.trunc(50 * useT / USE_TICKS))
+    useBarFill.setAttribute("width", Math.trunc(60 * useT / USE_TICKS))
     if (useT >= USE_TICKS) {
         useBarFill.remove()
         useBarFill = null
+        useBarBack && (useBarBack.remove(), useBarBack = null)
         useT = 0
         qp.recharge = 1
         qp.portal[11] = 1        //и ванильная перезарядка: в state 3 синий портал не
@@ -587,16 +594,19 @@ function cultUseBarTick(enemy) {
     const d = Math.hypot((HQ.x + 16) - (wp[0] + 16), (HQ.y + 25) - (wp[1] + 25))
     if (d > 56) {
         useT > 0 && (useT = 0)
-        useBarFill && useBarFill.setAttribute("width", 0)
+        //V136 (репорт юзера): при отходе полоска исчезает целиком, вместе с фреймом
+        useBarFill && (useBarFill.remove(), useBarFill = null)
+        useBarBack && (useBarBack.remove(), useBarBack = null)
         return
     }
     useT++
     if (!useBarFill) {
-        useBarFill = rect(svgArr[1],wp[0] - 9,wp[1] - 16,0,6,"none","0px","#cc9966",{"id":"pqCultBar"})
+        //V136: геометрия как у полосок интерактивных объектов — fill 60×10 внутри фрейма 64×14
+        useBarFill = rect(svgArr[1],wp[0] - 9,wp[1] - 16,0,10,"none","0px","#cc9966",{"id":"pqCultBar"})
         //V133: задний фрейм bar1mini — как у полосок интерактивных объектов
         useBarBack = worldImage(svgArr[1],wp[0] - 11,wp[1] - 19,64,14,"./images/UI/panels/bar1mini.png",{"id":"pqCultBarR"})
     }
-    useBarFill.setAttribute("width", Math.trunc(50 * useT / USE_TICKS))
+    useBarFill.setAttribute("width", Math.trunc(60 * useT / USE_TICKS))
     if (useT >= USE_TICKS) {
         useBarFill.remove()
         useBarFill = null
