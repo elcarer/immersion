@@ -89,7 +89,8 @@ const PUZZLE_SIZE = 13
 const CUP_TYPE = 22
 //V97: комната «напёрстков» (вид 3 портала) и её тайминги (60 тиков ≈ 1 секунда)
 const SHELL_SIZE = 13
-const SHELL_REVEAL_TICKS = 120 //2с показа «полной» чаши
+//V134 (репорт юзера): 2с — слишком мало, чтобы запомнить правильную чашу → 4с
+const SHELL_REVEAL_TICKS = 240 //4с показа «полной» чаши с жёлтой подсветкой
 const SHELL_SWAP_TICKS = 480   //8с перемещений (репорт V97: 6с — слишком легко угадать)
 const SHELL_SWAP_START = 45    //тиков между свопами в начале
 const SHELL_SWAP_MIN = 10      //потолок скорости к концу
@@ -616,7 +617,7 @@ function createShellRoom(level) {
     //в shellTick под guard'ом
     link.shell = {room: room, portal: portal, lever: lever, cups: cups, full: cups[fullIdx],
         phase: 1, timer: SHELL_REVEAL_TICKS, interval: SHELL_SWAP_START, swapIn: SHELL_SWAP_START,
-        done: false, bossSpawned: false, bossDown: false, entry: [sx + 6, sy + 5]}
+        done: false, bossSpawned: false, bossDown: false, entry: [sx + 6, sy + 5], glowOn: false}
 }
 //каждый тик игры (вызов из gameLoop): фазы «напёрстков» + скольжение чаш.
 //Фаза 1 (2с): по истечении «полная» чаша становится «пустой». Фаза 2 (8с): раз в
@@ -628,8 +629,13 @@ function shellTick() {
     let sh = link.shell
     moveShellCups(sh)
     if (sh.phase === 1) {
+        //V134 (репорт юзера): правильная чаша подсвечена жёлтым ВЕСЬ период показа;
+        //свечение гаснет одновременно с началом скрытия/перемешивания
+        if (!sh.glowOn && setCupGlow(sh.full, true)) sh.glowOn = true
         sh.timer--
         if (sh.timer <= 0) {
+            setCupGlow(sh.full, false)
+            sh.glowOn = false
             setCupSprite(sh.full, 0)
             sh.phase = 2
             sh.timer = SHELL_SWAP_TICKS
@@ -701,6 +707,15 @@ function setCupSprite(cup, full) {
     cup[10] = full
     let img = cup[6] !== undefined ? screenPic[cup[6]] : null
     img && img.setAttribute("href", cupSpriteSrc(cup))
+}
+//V134: жёлтое свечение (обводка) чаши-подсказки — тот же механизм, что подсветка
+//объектов в useObject (drop-shadow через style). Спрайта может ещё не быть — чашу
+//рисует createRoom при входе героя; возвращает true, если свечение реально применено
+function setCupGlow(cup, on) {
+    let img = cup[6] !== undefined ? screenPic[cup[6]] : null
+    if (!img) return false
+    img.setAttribute("style", on ? "filter: drop-shadow(0 0 8px rgb(255, 215, 0))" : "filter: none")
+    return true
 }
 //интерактивность чаши (guard в heroMove.checkObject): только в фазе выбора и пока выбор
 //не сделан — в фазах показа/перемешивания и после вскрытия чаши «мёртвые» объекты

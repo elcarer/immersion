@@ -112,8 +112,9 @@ function trackerHide() {
 export function slimeQuestNewGame(next) {
     clearSession()
     status.questSlime = null
-    if (next === false) return
-    //одноразовый сюжетный: выполненный (мета) не предлагается
+    //V134 (репорт юзера: «портал не появляется»): ранний выход при next===false снят —
+    //при ЗАГРУЗКЕ сейва на 3 главе 1 этажа (newGame(false)) квест теперь тоже спавнится;
+    //новый забег отсекается guard-ом page===3 (новый всегда начинается с 1 главы)
     if (status.meta.page !== 3 || status.levelFloor !== 0) return
     if (status.meta.quests && status.meta.quests.slime) return
     spawnStartObjects()
@@ -150,28 +151,59 @@ function cellBusy(level, x, y) {
 }
 function spawnStartObjects() {
     const lv = dataGeneric.scenes[status.levelFloor]
-    if (!lv.roomsArr || !lv.roomsArr[0]) return
-    const f = lv.floor[lv.roomsArr[0][0]]
-    //угол стартовой комнаты (клетка внутрь от угла, как у Волка/портала):
-    //портал + СВОБОДНАЯ соседняя клетка под рычаг
-    const free = []
-    for (let i = 0; i < NEAR.length; i++) {
+    if (!lv.roomsArr || !lv.roomsArr.length) return
+    //V134 (репорт юзера: «портал не появляется»): стартовая комната — та, где спавнится
+    //герой (lv.hero), а НЕ roomsArr[0] (самая маленькая — на картах 3+ главы она может
+    //не совпадать со стартовой). Fallback — первая запись, как раньше
+    let ri = 0
+    for (let k = 0; k < lv.roomsArr.length; k++) {
+        const rf = lv.floor[lv.roomsArr[k][0]]
+        if (lv.hero[0] >= rf[0] && lv.hero[0] < rf[0] + rf[2] && lv.hero[1] >= rf[1] && lv.hero[1] < rf[1] + rf[3]) { ri = k; break }
+    }
+    const roomRec = lv.roomsArr[ri]
+    const f = lv.floor[roomRec[0]]
+    //V135 (поправка юзера): портал — в углу комнаты, рычаг — В ПРОТИВОПОЛОЖНОМ углу
+    let pcell = null
+    for (let i = 0; i < NEAR.length && !pcell; i++) {
         const cx = f[0] + 1 + NEAR[i][0]
         const cy = f[1] + 1 + NEAR[i][1]
-        status.matrixLevel[cy] && status.matrixLevel[cy][cx] === 1 && !cellBusy(lv, cx, cy) && free.push([cx, cy])
+        status.matrixLevel[cy] && status.matrixLevel[cy][cx] === 1 && !cellBusy(lv, cx, cy) && (pcell = [cx, cy])
     }
-    if (!free.length) return
-    const pcell = free[0]
-    const lcell = free.find(c => Math.abs(c[0] - pcell[0]) + Math.abs(c[1] - pcell[1]) === 1) || free[1] || null
+    let lcell = null
+    if (pcell) {
+        for (let i = 0; i < NEAR.length; i++) {
+            const cx = f[0] + f[2] - 2 + NEAR[i][0]
+            const cy = f[1] + f[3] - 2 + NEAR[i][1]
+            if (!(status.matrixLevel[cy] && status.matrixLevel[cy][cx] === 1)) continue
+            if (cx === pcell[0] && cy === pcell[1]) continue
+            if (cellBusy(lv, cx, cy)) continue
+            lcell = [cx, cy]
+            break
+        }
+        //страховка: противоположный угол весь занят — вторая свободная клетка из списка
+        if (!lcell) {
+            const alt = []
+            for (let i = 0; i < NEAR.length; i++) {
+                const cx = f[0] + 1 + NEAR[i][0]
+                const cy = f[1] + 1 + NEAR[i][1]
+                status.matrixLevel[cy] && status.matrixLevel[cy][cx] === 1 && !cellBusy(lv, cx, cy) &&
+                    !(cx === pcell[0] && cy === pcell[1]) && alt.push([cx, cy])
+            }
+            lcell = alt[0] || null
+        }
+    }
+    if (!pcell) return
     status.questSlime = {"state":1,"entered":0,"room":[f[0],f[1],f[2],f[3]],"portal":null,"lever":null,
         "npc":null,"roomObj":null,"backPortal":null,"backLever":null,"entry":null,
         "wanted":[],"fedTypes":[],"fedItems":[],"fedCount":0,"ready":0,"finalShown":0,"recharge":0}
     const q = status.questSlime
     lv.objects.push([pcell[0], pcell[1], 18, 1, 1, undefined])
     const portal = lv.objects[lv.objects.length - 1]
-    portal[9] = lv.roomsArr[0]
-    portal[10] = 1
-    portal[12] = 4               //зелёный вид — 100c.png (V133)
+    portal[9] = roomRec
+    //V135 (поправка юзера): портал появляется ВЫКЛЮЧЕННЫМ (100d.png), зелёным (100c.png)
+    //его делает юз рычага
+    portal[10] = 0
+    portal[12] = 4
     q.portal = portal
     //портал 64×84 в живой сцене — та же геометрия, что drawQuestPortal (V109)
     screenPic.push(worldImage(svgArr[1], pcell[0]*32 + 16 - 32, pcell[1]*32 + 32 - 84, 64, 84, portalSpriteSrc(portal), {"id": screenPic.length + "O"}))
@@ -180,7 +212,7 @@ function spawnStartObjects() {
     if (lcell) {
         lv.objects.push([lcell[0], lcell[1], 19, 1, 1, undefined])
         const lever = lv.objects[lv.objects.length - 1]
-        lever[9] = lv.roomsArr[0]
+        lever[9] = roomRec
         lever[10] = 1
         q.lever = lever
         //рычаг 32×32 рисуется сразу — стартовая комната уже отрисована
@@ -349,7 +381,19 @@ export function slimeQuestUse(obj) {
     const q = status.questSlime
     if (!q) return false
     if (obj === q.lever) {
-        //стартовый рычаг: перенос в комнату квеста (комната создаётся лениво, один раз)
+        //V135 (поправка юзера): стартовый рычаг ВКЛЮЧАЕТ зелёный портал (сам гаснет,
+        //как рычаги арен); телепортирует теперь сам портал, а не рычаг
+        if (q.portal[10] === 1) return true
+        if (!q.roomObj) buildQuestRoom()
+        if (!q.roomObj) return true
+        setObjectState(obj, 0)
+        setObjectState(q.portal, 1)
+        return true
+    }
+    if (obj === q.portal) {
+        //включённый зелёный портал: вход в комнату квеста (комната строится лениво,
+        //один раз); выключенный порталом не юзается
+        if (q.portal[10] !== 1) return true
         if (q.state === 3) return true
         if (!q.roomObj) buildQuestRoom()
         if (!q.roomObj) return true
