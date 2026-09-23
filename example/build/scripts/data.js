@@ -737,6 +737,29 @@ let data = {"heroes":[
             {"speed":5,"times":4,"w":240,"h":48,"img":"./images/enemy/ent/others/death.png","once":1},
             {"speed":5,"times":4,"w":120,"h":48,"img":"./images/enemy/ent/others/wait.png"}
         ]}
+    ]},
+    //V139: Хруп — квестовый персонаж (лист images/sheets/hrup_64.png, сборка
+    //forWork/hrup_register.py). В пулы спавна глав не входит: в комнаты попадёт
+    //только через явный спавн квеста. Атака 28 — ближний удар топором (принцип
+    //mace, спрайты axe). Ширины полос — окна строк листа
+    {"id":32,"name":"enemy.32.name","stats":{"hp":12,"dmg":[3,6],"exp":10,"speed":6,"range":7,"attacksCd":[],"noStunTime":50,"desc":"enemy.32.desc"},"attacks":[28],"effects":{"takeDamage":1},"anims":[
+        {"move":[
+            {"speed":5,"times":4,"w":128,"h":48,"img":"./images/enemy/hrup/move/back.png"},
+            {"speed":5,"times":4,"w":128,"h":48,"img":"./images/enemy/hrup/move/front.png"},
+            {"speed":5,"times":4,"w":112,"h":48,"img":"./images/enemy/hrup/move/left.png"},
+            {"speed":5,"times":4,"w":104,"h":48,"img":"./images/enemy/hrup/move/right.png"}
+        ]},
+        {"attack":[
+            {"speed":5,"times":4,"w":128,"h":48,"img":"./images/enemy/hrup/attack/back.png","once":1,"attackNew":{"step":3,"anim":[28,0]}},
+            {"speed":5,"times":4,"w":128,"h":50,"img":"./images/enemy/hrup/attack/front.png","once":1,"attackNew":{"step":3,"anim":[28,1]}},
+            {"speed":5,"times":4,"w":136,"h":50,"img":"./images/enemy/hrup/attack/left.png","once":1,"attackNew":{"step":3,"anim":[28,2]}},
+            {"speed":5,"times":4,"w":136,"h":48,"img":"./images/enemy/hrup/attack/right.png","once":1,"attackNew":{"step":3,"anim":[28,3]}}
+        ]},
+        {"others":[
+            {"speed":10,"times":4,"w":128,"h":44,"img":"./images/enemy/hrup/others/damage.png","once":1,"stun":1},
+            {"speed":5,"times":4,"w":240,"h":48,"img":"./images/enemy/hrup/others/death.png","once":1},
+            {"speed":5,"times":4,"w":128,"h":48,"img":"./images/enemy/hrup/others/wait.png"}
+        ]}
     ]}],
 ],
 "attacks":[
@@ -907,6 +930,14 @@ let data = {"heroes":[
         {"img":"./images/attacks/club/all.png","once":1,"times":4,"speed":15,"w":192,"h":48,"x":0,"y":48},
         {"img":"./images/attacks/club/all.png","once":1,"times":4,"speed":15,"w":192,"h":48,"x":-48,"y":0},
         {"img":"./images/attacks/club/all.png","once":1,"times":4,"speed":15,"w":192,"h":48,"x":48,"y":0},
+    ]},
+    //V139: ближняя атака Хрупа — удар топором (принцип mace): одноразовый взмах в
+    //соседней клетке; спрайты — готовые axe (топор), смещения под кадры 256x32/128x64
+    {"name":"attack.28.name","base":1,"cooldown":0.8,"anims":[
+        {"img":"./images/attacks/axe/back.png","once":1,"times":4,"speed":15,"w":256,"h":32,"x":0,"y":-32},
+        {"img":"./images/attacks/axe/front.png","once":1,"times":4,"speed":15,"w":256,"h":32,"x":0,"y":32},
+        {"img":"./images/attacks/axe/left.png","once":1,"times":4,"speed":15,"w":128,"h":64,"x":-32,"y":0},
+        {"img":"./images/attacks/axe/right.png","once":1,"times":4,"speed":15,"w":128,"h":64,"x":32,"y":0},
     ]},
 ],
 "effects":[

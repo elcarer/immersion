@@ -1051,6 +1051,11 @@ const PAIRS = [
     ["enemy.31.desc", "Древний страж леса, что бродит по тропам на корнях-ногах. Скрипит корой, щурится янтарными глазами и тяжёлыми ветвями прогоняет всякого, кто подойдёт близко. В обычные главы не попадается.", "An ancient guardian of the forest who roams the trails on root-legs. Its bark creaks, its amber eyes glint, and it swings heavy branches to drive off anyone who comes close. Does not appear in regular chapters."],
     //V137: ближняя атака Древоброда (удар ветвями, спрайт club)
     ["attack.27.name", "Удар ветвями", "Branch Smash"],
+    //V139: Хруп — квестовый персонаж
+    ["enemy.32.name", "Хруп", "Brittle"],
+    ["enemy.32.desc", "Дряхлый берсерк в рогатом шлеме: спина скрипит, обломанный щит болтается на руке, но старый топор он всё ещё поднимает — а когда опускает, дрожит пол. В обычные главы не попадается.", "A worn-out berserker in a horned helmet: his back creaks and a broken shield dangles from his arm, but he still lifts his old axe — and when it falls, the whole floor shakes. Does not appear in regular chapters."],
+    //V139: ближняя атака Хрупа (удар топором, спрайты axe)
+    ["attack.28.name", "Удар топором", "Axe Strike"],
     //V133: квест «Корм слизи» — трекер, диалоги, журнал
     ["quest.slime.title", "Корм слизи", "Feed the Slime"],
     ["quest.slime.found", "Найдено:", "Found:"],
