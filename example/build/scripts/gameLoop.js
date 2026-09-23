@@ -64,6 +64,9 @@ import { portalQuestTick } from "../scripts/portalQuest.js"
 //V111: квест «Погоня за пламенем» — тик состояния (полоска взаимодействия, перебежки
 //огнементя, режимы лавы)
 import { flameQuestTick } from "../scripts/flameQuest.js"
+//V133: квест «Корм слизи» — тик состояния (исчезновение портала при выходе из
+//стартовой комнаты, полоска взаимодействия со Слаймэном)
+import { slimeQuestTick } from "../scripts/slimeQuest.js"
 import { svgArr,image, text,gamepadDragStart,gamepadDragMove,gamepadDragEnd,isDragging,getCTM } from "../scripts/svg.js"
 //V114: кооператив — подмена контекста игрока + гварды живости
 import { setContext,anyAlive,playerAlive } from "../scripts/players.js"
@@ -180,6 +183,8 @@ function gameLoop() {
         portalQuestTick()
         //V111: «Погоня за пламенем» — состояние квеста (flameQuest.js)
         flameQuestTick()
+        //V133: «Корм слизи» — состояние квеста (slimeQuest.js)
+        slimeQuestTick()
         //V114: activeSkillsCD переехал в пер-игроковую фазу (кулдауны у каждого свои)
         }
     }

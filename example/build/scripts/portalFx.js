@@ -77,6 +77,8 @@ import { journalAdd, J_STD } from "../scripts/journal.js"
 //V109: квест «Голос в портале» — юз портала/рычага СЕТИ (свои телепорты и рычаги).
 //Цикл импортов легален: вызов только в рантайме (portalUse)
 import { portalQuestUse } from "../scripts/portalQuest.js"
+//V133: квест «Корм слизи» — юз стартового рычага и возвратной пары комнаты квеста
+import { slimeQuestUse } from "../scripts/slimeQuest.js"
 
 const PORTAL_TYPE = 18
 const LEVER_TYPE = 19
@@ -170,6 +172,8 @@ function portalUse(obj) {
     //V109: квест «Голос в портале» — свои порталы и рычаги сети. Хук ДО guard link:
     //квест обязан работать и на этаже, где штатного портала/связки нет
     if (portalQuestUse(obj)) return
+    //V133: квест «Корм слизи» — стартовый рычаг и возвратная пара комнаты квеста
+    if (slimeQuestUse(obj)) return
     if (!link) return
     let level = dataGeneric.scenes[status.levelFloor]
     if (obj[2] === PORTAL_TYPE) {

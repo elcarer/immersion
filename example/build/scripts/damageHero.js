@@ -20,6 +20,8 @@ import { setEliteDamageMult } from "../scripts/sets.js"
 import { blessActive } from "../scripts/blessFx.js"
 //V104: снаряды врагов задевают Волка-союзника (квест «Сопроводить Волка», quest.js)
 import { wolfHitBy } from "../scripts/quest.js"
+//V133: эффект «слизь» (Ком слизи) — получив урон, герой снижает макс. атаку врага на 1
+import { slimeRetaliate } from "../scripts/slimeQuest.js"
 //V114: кооператив — контекст игрока-владельца снаряда
 import { setContext } from "../scripts/players.js"
 
@@ -150,6 +152,9 @@ function countDamage(bullet) {
     //V37: имя врага-источника — для красной строки журнала
     //V68: третьим параметром сам враг — «Вечный жемчуг» отражает ему долю урона
     takeDamage(damage, bullet.atacker.class.name, bullet.atacker)
+    //V133: эффект «слизь» (Ком слизи) — получивший урон герой с зачарованным
+    //предметом в левой руке снижает максимальную атаку этого врага на 1
+    slimeRetaliate(bullet.atacker)
 }
 function stunHero() {
     //стан героя

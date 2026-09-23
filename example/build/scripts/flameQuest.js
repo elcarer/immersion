@@ -52,6 +52,8 @@ const LAVA_SEC_TICKS = 62        //проверка «герой на лаве»
 const BUFF_FLOOR_TICKS = 1e9     //«до конца этажа»: снимает del-хук, не истекает сам
 
 let useBarFill = null
+//V133 (репорт юзера): задний фрейм полоски (bar1mini.png) — как у интерактивных объектов
+let useBarBack = null
 let useT = 0
 //кучка-награда финала: маркер хэндла → ветка подбора в takeDrop (WeakSet — записи
 //умирают со сценой, неподобранные кучки память не держат)
@@ -90,6 +92,8 @@ function clearSession() {
     trackerHide()
     useBarFill && useBarFill.remove()
     useBarFill = null
+    useBarBack && useBarBack.remove()
+    useBarBack = null
     useT = 0
 }
 function findClassById(id) {
@@ -204,11 +208,15 @@ function npcUseBarTick(q, e) {
     useT++
     if (!useBarFill) {
         useBarFill = rect(svgArr[1],wp[0] - 9,wp[1] - 16,0,6,"none","0px","#cc9966",{"id":"fqUseBar"})
+        //V133: задний фрейм bar1mini — как у полосок интерактивных объектов
+        useBarBack = worldImage(svgArr[1],wp[0] - 11,wp[1] - 19,64,14,"./images/UI/panels/bar1mini.png",{"id":"fqUseBarR"})
     }
     useBarFill.setAttribute("width", Math.trunc(50 * useT / USE_TICKS))
     if (useT >= USE_TICKS) {
         useBarFill.remove()
         useBarFill = null
+        useBarBack && useBarBack.remove()
+        useBarBack = null
         useT = 0
         q.recharge = 1
         interact(q, e)

@@ -70,6 +70,8 @@ const NEAR = [[0,0],[0,-1],[1,-1],[-1,-1],[1,0],[-1,0],[1,1],[-1,1],[0,1]]
 const staffPiles = new WeakSet()
 
 let useBarFill = null
+//V133 (репорт юзера): задний фрейм полоски (bar1mini.png) — как у интерактивных объектов
+let useBarBack = null
 let useT = 0
 
 // ---------- окно «текущих квестов» (правый край, как у Волка) ----------
@@ -112,6 +114,8 @@ function clearSession() {
     trackerHide()
     useBarFill && useBarFill.remove()
     useBarFill = null
+    useBarBack && useBarBack.remove()
+    useBarBack = null
     useT = 0
 }
 function spawnQuestPortal() {
@@ -166,6 +170,8 @@ function removeQuestPortal() {
     qp.portal = null
     useBarFill && useBarFill.remove()
     useBarFill = null
+    useBarBack && useBarBack.remove()
+    useBarBack = null
     useT = 0
 }
 
@@ -587,11 +593,15 @@ function cultUseBarTick(enemy) {
     useT++
     if (!useBarFill) {
         useBarFill = rect(svgArr[1],wp[0] - 9,wp[1] - 16,0,6,"none","0px","#cc9966",{"id":"pqCultBar"})
+        //V133: задний фрейм bar1mini — как у полосок интерактивных объектов
+        useBarBack = worldImage(svgArr[1],wp[0] - 11,wp[1] - 19,64,14,"./images/UI/panels/bar1mini.png",{"id":"pqCultBarR"})
     }
     useBarFill.setAttribute("width", Math.trunc(50 * useT / USE_TICKS))
     if (useT >= USE_TICKS) {
         useBarFill.remove()
         useBarFill = null
+        useBarBack && useBarBack.remove()
+        useBarBack = null
         useT = 0
         openCultDialog(enemy)
     }

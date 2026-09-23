@@ -8,6 +8,9 @@ import { ctxBar,ctxTx } from "../scripts/players.js"
 import { screenPic } from "../scripts/del.js"
 //V123: дроп удаляемого предмета на пол (кооп)
 import { dropArr,itemDrops } from "../scripts/useObject.js"
+//V133: квест «Корм слизи» — выброшенный рядом со Слаймэном подходящий предмет
+//улетает к нему (кучка с меткой _slimeFed исчезает при приземлении)
+import { slimeQuestFeedSpot } from "../scripts/slimeQuest.js"
 import { placeDrop,dropFly } from "../scripts/dropSafe.js"
 import * as basicData from "../scripts/data.js"
 import { countDopStats } from "../scripts/countDopStats.js"
@@ -166,20 +169,26 @@ function drag (e,item,x,y) {
                 //пересчитывается (сdoll-ветки unEquip пересчитал сам)
                 changeDopStat()
             }
-            //V123 (решение юзера): в коопе «УДАЛИТЬ» не уничтожает — предмет падает
-            //на пол у владельца панели; подобрать его может этот или другой игрок,
-            //и вернётся РОВНО этот же предмет (кучка несёт его в itemDrops)
-            if (status.players.length > 1) {
-                const P = status.hero
-                const el = worldImage(svgArr[1], P.x + 16, P.y + 40, 28, 32, item.img, {"id": screenPic.length - 1})
-                screenPic.push(el)
-                placeDrop(el, P.x + 16, P.y + 40, 28, 32)
-                dropFly(el, P.x + 16, P.y + 25)
-                itemDrops.set(el, item)
-                //V126 (решение юзера): кучка помнит, КТО выбросил предмет, — takeDrop не
-                //поднимет её выбросившим, пока тот не выйдет из хитбокса и не подойдёт снова
-                el._dropBy = P.idx || 0
-            }
+            //V123 (решение юзера): «УДАЛИТЬ» не уничтожает — предмет падает на пол у
+            //владельца панели (V133: и в одиночном режиме, как в кооперативном);
+            //подобрать его может этот или другой игрок, и вернётся РОВНО этот же
+            //предмет (кучка несёт его в itemDrops)
+            //V133: квест «Корм слизи» — брошенный РЯДОМ со Слаймэном предмет
+            //подходящего типа улетает к нему (кучка с меткой _slimeFed исчезает
+            //при приземлении, ветка в takeDrop) и идёт в запись «подошёл»
+            const P = status.hero
+            const spot = slimeQuestFeedSpot(item, P)
+            const lx = spot ? spot[0] : P.x + 16
+            const ly = spot ? spot[1] : P.y + 40
+            const el = worldImage(svgArr[1], lx, ly, 28, 32, item.img, {"id": screenPic.length - 1})
+            screenPic.push(el)
+            placeDrop(el, lx, ly, 28, 32)
+            dropFly(el, P.x + 16, P.y + 25)
+            spot && (el._slimeFed = 1)
+            itemDrops.set(el, item)
+            //V126 (решение юзера): кучка помнит, КТО выбросил предмет, — takeDrop не
+            //поднимет её выбросившим, пока тот не выйдет из хитбокса и не подойдёт снова
+            el._dropBy = P.idx || 0
             e.target.remove()
             //V95: полная перерисовка — рамка редкости не остаётся на пустой ячейке
             reRenderPanels()

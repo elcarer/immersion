@@ -33,6 +33,8 @@ import { portalUse, puzzleButtonUse, shellCupUse } from "../scripts/portalFx.js"
 import { placeDrop,dropFly } from "../scripts/dropSafe.js"
 //V75: шкафчик с древностями (тип 20) — меню благословений; эхо Хлебосола/Золотого эха на дропе
 import { openAncient,blessEcho } from "../scripts/blessFx.js"
+//V133: квест «Корм слизи» — доп. серый предмет с каждого юза активируемого объекта
+import { slimeQuestExtraDrop } from "../scripts/slimeQuest.js"
 
 let bars = []
 function useObject(obj,i0) {
@@ -125,6 +127,9 @@ function finishUsedObject(obj) {
     } else {
         actionsObject(obj)
     }
+    //V133: квест «Корм слизи» активен — юз любого активируемого объекта (кроме спуска
+    //13) даёт дополнительный случайный предмет обычного качества (серый)
+    obj[2] !== 13 && slimeQuestExtraDrop(obj)
     //V48: первое использование объекта открывает его карточку в Библиотеке (зачёт между забегами).
     //id = тип + этаж*20 (формула спрайта createRoom); V63: у ловушек три карточки по спрайту
     //obj[10] — шипы (3) → 14, кислота (4) → 34, огонь (1) → 54; столб — 55. V64: 18/19 — мимо.

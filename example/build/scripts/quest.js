@@ -27,7 +27,7 @@ import { nearestPlayer,setContext } from "../scripts/players.js"
 import { T } from "../scripts/localization.js"
 import { data } from "../scripts/data.js"
 import { dataGeneric } from "../scripts/sceneGenerate.js"
-import { svgArr, image, text, rect, rectPos, uiRightEdge, releaseSprite } from "../scripts/svg.js"
+import { svgArr, image, text, rect, rectPos, uiRightEdge, releaseSprite, worldImage } from "../scripts/svg.js"
 import { objectValues, screenPic } from "../scripts/del.js"
 import { floatText } from "../scripts/floatText.js"
 import { checkCollision, playEffect } from "../scripts/damage.js"
@@ -91,6 +91,8 @@ const NEAR = [[0,0],[0,-1],[1,-1],[-1,-1],[1,0],[-1,0],[1,1],[-1,1],[0,1]]
 
 let wolfRef = null      //живая сущность Волка текущей сцены
 let useBarFill = null   //полоска взаимодействия над NPC
+//V133 (репорт юзера): задний фрейм полоски (bar1mini.png) — как у интерактивных объектов
+let useBarBack = null
 let useT = 0
 
 function wolfUnit() {
@@ -103,6 +105,7 @@ function questNewGame(next) {
         status.quest = {"state":0}
         useT = 0
         useBarFill = null
+        useBarBack = null
         wolfRef = null
         //V106: квест одноразовый (сюжетный) — выполненный больше не предлагается
         status.meta.page === 2 && status.levelFloor === 0 &&
@@ -113,6 +116,7 @@ function questNewGame(next) {
     //этажа, в nextFloor) — страховка от рассинхрона: сцена сменилась, ссылки гасим
     wolfRef = null
     useBarFill = null
+    useBarBack = null
     useT = 0
 }
 
@@ -154,6 +158,7 @@ function spawnWolfNpc() {
 
 function removeWolf(wolf) {
     if (useBarFill) { useBarFill.remove(); useBarFill = null }
+    if (useBarBack) { useBarBack.remove(); useBarBack = null }
     useT = 0
     removeEntShadow(wolf)
     hideEnemyHpBar(wolf)
@@ -258,11 +263,14 @@ function useBarTick(wolf) {
     useT++
     if (!useBarFill) {
         useBarFill = rect(svgArr[1],wp[0] - 9,wp[1] - 16,0,6,"none","0px","#cc9966",{"id":"wolfUseBar"})
+        //V133: задний фрейм bar1mini — как у полосок интерактивных объектов
+        useBarBack = worldImage(svgArr[1],wp[0] - 11,wp[1] - 19,64,14,"./images/UI/panels/bar1mini.png",{"id":"wolfUseBarR"})
     }
     useBarFill.setAttribute("width", Math.trunc(50 * useT / USE_TICKS))
     if (useT >= USE_TICKS) {
         useBarFill.remove()
         useBarFill = null
+        if (useBarBack) { useBarBack.remove(); useBarBack = null }
         useT = 0
         //V126: владелец квеста фиксируется (кто приручил Волка) — награда прощания
         //идёт ЕГО классу и в ЕГО инвентарь (в коопе игроки разные)
@@ -496,6 +504,8 @@ function questDel() {
     questTrackerHide()
     useBarFill && useBarFill.remove()
     useBarFill = null
+    useBarBack && useBarBack.remove()
+    useBarBack = null
     useT = 0
     wolfRef = null
     questHero = null

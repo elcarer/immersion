@@ -19,6 +19,8 @@ import { relicGenerate, abilCopyBonus } from "../scripts/relics.js"
 import { portalQuestTakePile } from "../scripts/portalQuest.js"
 //V111: квест «Погоня за пламенем» — кучка-награда (зачарование текущего оружия)
 import { flameQuestTakePile } from "../scripts/flameQuest.js"
+//V133: квест «Корм слизи» — кучка-корм (исчезает при приземлении) и Ком слизи
+import { slimeQuestTakePile, slimeQuestFedLanded } from "../scripts/slimeQuest.js"
 //V67: новый предмет мог встать в 1-ю ячейку инвентаря — пересчёт копии «Вечного сапфира»
 import { changeDopStat } from "../scripts/drag.js"
 //V114: кооператив — контекст игрока (кучку забирает наступивший)
@@ -41,6 +43,14 @@ function takeDrop() {
 function takeDropFor(pi) {
     let length = dropArr.length
     for (let i = 0; i < length; i++) {
+        //V133: кучка-«корм слизи» исчезает при САМОМ ПРИЗЕМЛЕНИИ — до хитбокс-проверок:
+        //она лежит у Слаймэна, далеко от героя (съеден/не съеден решён при выбросе)
+        if (dropArr[i]._slimeFed) {
+            slimeQuestFedLanded(dropArr[i])
+            dropArr[i].remove()
+            dropArr.splice(i, 1)
+            return
+        }
         let x1 = parseInt(dropArr[i].getAttribute('x'))
         let y1 = parseInt(dropArr[i].getAttribute('y'))
         let w1 = parseInt(dropArr[i].getAttribute('width'))
@@ -67,6 +77,13 @@ function takeDropFor(pi) {
             }
             //V111: кучка квеста «Погоня за пламенем» (огненное оружие) — ветка в flameQuest.js
             if (flameQuestTakePile(dropArr[i])) {
+                playback(strike[3].vol,0,0,7*status.settings.soundVolume)
+                dropArr[i].remove()
+                dropArr.splice(i, 1)
+                return
+            }
+            //V133: Ком слизи — эффект «слизь» предмету в левой руке (ветка в slimeQuest.js)
+            if (slimeQuestTakePile(dropArr[i])) {
                 playback(strike[3].vol,0,0,7*status.settings.soundVolume)
                 dropArr[i].remove()
                 dropArr.splice(i, 1)

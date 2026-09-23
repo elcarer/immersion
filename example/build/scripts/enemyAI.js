@@ -71,6 +71,9 @@ import { portalQuestCultTick, portalQuestEnemyDie } from "../scripts/portalQuest
 //V111: Огнементаль квеста «Погоня за пламенем» — мирный перехват тика (flameNpc)
 //и хук победы над ним в бою (бафф огня на этаж). Цикл импортов легален: рантайм
 import { flameQuestNpcTickHook, flameQuestEnemyDie } from "../scripts/flameQuest.js"
+//V133: Слаймэн квеста «Корм слизи» — мирный перехват тика (slimeNpc) и хук победы
+//над ним в бою (возврат съеденных предметов)
+import { slimeQuestNpcTickHook, slimeQuestEnemyDie } from "../scripts/slimeQuest.js"
 // V32 «рывок» нетопыря (stats.dash): триггер и полёт живёт в dashFx.js,
 // сюда встроены только точки проводки (аналогично tickShadow выше)
 import { dashTryTrigger, dashFlyTick, endDashFlight } from "../scripts/dashFx.js"
@@ -1109,6 +1112,8 @@ export function enemyDie(enemy, exp) {
     portalQuestEnemyDie(enemy)
     //V111: победа над Огнементем в бою («НАПАСТЬ») — бафф огня на весь этаж
     flameQuestEnemyDie(enemy)
+    //V133: победа над Слаймэном («НАПАСТЬ») — возврат трёх съеденных предметов
+    slimeQuestEnemyDie(enemy)
     enemy.stop = 0
     enemy.currentStill = 0
     setEnemyPose(enemy, enemy.class.anims[2].others[1])
@@ -1879,6 +1884,12 @@ export function enemyTick(enemy) {
     //взаимодействия, перебежки в режиме погони; flameNpc=0 после «НАПАСТЬ» — штатный ИИ)
     if (enemy.flameNpc) {
         flameQuestNpcTickHook(enemy)
+        return
+    }
+    //V133: Слаймэн квеста «Корм слизи» — мирный NPC (стоит в углу, ждёт диалога и
+    //кормления; slimeNpc=0 после «НАПАСТЬ» — дальше штатный ИИ)
+    if (enemy.slimeNpc) {
+        slimeQuestNpcTickHook(enemy)
         return
     }
     // совместимость со старыми спавнами (враг создан с behaviour, без state)

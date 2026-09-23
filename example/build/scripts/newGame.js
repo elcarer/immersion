@@ -17,6 +17,8 @@ import { questNewGame } from "../scripts/quest.js"
 import { portalQuestNewGame } from "../scripts/portalQuest.js"
 //V111: квест «Погоня за пламенем» — сброс состояния и спавн NPC (4 глава, 3 этаж)
 import { flameQuestNewGame } from "../scripts/flameQuest.js"
+//V133: квест «Корм слизи» — сброс состояния и спавн портала с рычагом (3 глава, 1 этаж)
+import { slimeQuestNewGame } from "../scripts/slimeQuest.js"
 //V52: старт этажа — сброс забегных счётчиков достижений
 import { achFloorStart } from "../scripts/achievements.js"
 
@@ -45,6 +47,8 @@ function newGame(next) {
     portalQuestNewGame(next)
     //V111: квест «Погоня за пламенем» — сброс; 4 глава, 3 этаж — мирный Огнементаль в углу
     flameQuestNewGame(next)
+    //V133: квест «Корм слизи» — сброс; 3 глава, 1 этаж — зелёный портал и рычаг в углу
+    slimeQuestNewGame(next)
     //V52: статус.info готов — кэшируем ХП, чистим «чистый» этаж и окно Массовика
     achFloorStart()
 }

@@ -32,6 +32,8 @@ import { questDel } from "../scripts/quest.js"
 import { portalQuestDel } from "../scripts/portalQuest.js"
 //V111: квест «Погоня за пламенем» — сброс состояния/трекера/лавы + этажный бафф огня
 import { flameQuestDel } from "../scripts/flameQuest.js"
+//V133: квест «Корм слизи» — сброс состояния/трекера/полоски
+import { slimeQuestDel } from "../scripts/slimeQuest.js"
 //V114: кооператив — контекст игрока (снос спрайтов всех героев, пер-игроковой resetValkyrie)
 import { setContext } from "../scripts/players.js"
 // МИГРАЦИЯ M5: objectValues — Proxy-список, синхронизирующий ECS-сущности zero_engine
@@ -118,6 +120,7 @@ function del() {
     resetPortalFx() //V64: связка портал/рычаг/арены — только на текущем этаже
     portalQuestDel() //V109: квест «Голос в портале» — только на текущем этаже
     flameQuestDel() //V111: квест «Погоня за пламенем» — лава/этажный бафф только на текущем этаже
+    slimeQuestDel() //V133: квест «Корм слизи» — только на текущем этаже
     resetVoidBoss() //V65: босс 4 этажа и его Сгустки — только на текущем этаже
     resetGroundShadows() //V80: реестры наземных теней — узлы уже снесены очисткой слоёв
 

@@ -160,6 +160,8 @@ function showItemTip(obj) {
     tempTip.push(image(svgArr[2], X + (IT_W - 56) / 2, Y + 8, 56, 56, obj.img, {"blur":"filter: drop-shadow(0 0 4px "+color+")"}))
     //V111: оверлей пламени на иконке огненного оружия (карточка поднятого предмета)
     obj.fire && tempTip.push(image(svgArr[2], X + (IT_W - 56) / 2, Y + 8, 56, 56, "./images/effects/flameWeapon.png", {}))
+    //V133: оверлей слизи на иконке предмета с эффектом «слизь» (карточка поднятого предмета)
+    obj.slime && tempTip.push(image(svgArr[2], X + (IT_W - 56) / 2, Y + 8, 56, 56, "./images/effects/slimeShield.png", {}))
     let cy = Y + 94
     for (let i = 0; i < rowTitles.length; i++) {
         tempTip.push(text(svgArr[2], X + IT_W / 2, cy, "0pt","50pt","none","1px", color, rowTitles[i], {"id":"itemName","size":IT_F_TITLE,"font":"baseFont4","anchor":"middle"}))
@@ -199,6 +201,8 @@ function tip (e,obj) {
     tempTip.push(image(svgArr[2],x+72,y+67,256,256,obj.img,{"blur":'filter: drop-shadow(0 0 4px '+color+')'}))
     //V111: огненное оружие — оверлей пламени поверх иконки (подсказки/инвентарь/кукла)
     obj.fire && tempTip.push(image(svgArr[2],x+72,y+67,256,256,"./images/effects/flameWeapon.png",{}))
+    //V133: эффект «слизь» — оверлей слизи поверх иконки (подсказки/инвентарь/кукла)
+    obj.slime && tempTip.push(image(svgArr[2],x+72,y+67,256,256,"./images/effects/slimeShield.png",{}))
     let strokeNum = 0
     if (obj.type!==undefined) {
         let desc
@@ -304,6 +308,8 @@ function compareTip(e,obj,lower=0) {
     tempTip.push(image(svgArr[2],x+72,y+67,256,256,obj.img,{"blur":'filter: drop-shadow(0 0 4px '+color+')'}))
     //V111: оверлей пламени на иконке огненного оружия (окно сравнения)
     obj.fire && tempTip.push(image(svgArr[2],x+72,y+67,256,256,"./images/effects/flameWeapon.png",{}))
+    //V133: оверлей слизи на иконке предмета с эффектом «слизь» (окно сравнения)
+    obj.slime && tempTip.push(image(svgArr[2],x+72,y+67,256,256,"./images/effects/slimeShield.png",{}))
     let strokeNum = 0
     if (obj.type!==undefined) {
         let desc
