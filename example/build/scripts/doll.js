@@ -47,7 +47,9 @@ function doll() {
         //V111: оверлей пламени на иконке огненного оружия (слоты куклы)
         status.inventory.doll[i].fire && dollTemp.push(image(svgArr[2],cellPickArr[i].x,cellPickArr[i].y,"128px","128px","./images/effects/flameWeapon.png",{}))
         //V133: оверлей слизи на иконке предмета с эффектом «слизь» (слоты куклы)
-        status.inventory.doll[i].slime && dollTemp.push(image(svgArr[2],cellPickArr[i].x,cellPickArr[i].y,"128px","128px","./images/effects/slimeShield.png",{}))}
+        status.inventory.doll[i].slime && dollTemp.push(image(svgArr[2],cellPickArr[i].x,cellPickArr[i].y,"128px","128px","./images/effects/slimeShield.png",{}))
+        //V138: оверлей роста на иконке предмета с эффектом «рост» (слоты куклы)
+        status.inventory.doll[i].grow && dollTemp.push(image(svgArr[2],cellPickArr[i].x,cellPickArr[i].y,"128px","128px","./images/effects/plantGrow.png",{}))}
         else
         {dollTemp.push(image(svgArr[2],cellPickArr[i].x,cellPickArr[i].y,"128px","128px",cellPickArr[i].href,{"id":i,"func":()=>{}}))}
     }

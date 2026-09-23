@@ -32,6 +32,8 @@ const COL_CULT = "rgb(220, 110, 100)"
 const COL_FLAME = "rgb(255, 150, 60)"
 const COL_NARR = "rgb(220, 210, 190)"
 const COL_SLIME = "rgb(140, 220, 140)"
+//V138: Древоброд — мшисто-зелёный (кора + листва)
+const COL_ENT = "rgb(170, 190, 120)"
 
 let dlgTemp = []     //узлы окна/портретов/оверлея
 let dlgTimer = null
@@ -44,6 +46,7 @@ function speakerOf(who) {
         who === "cultist" ? {"name":T("enemy.28.name"),"col":COL_CULT} :
         who === "flame" ? {"name":T("enemy.29.name"),"col":COL_FLAME} :
         who === "slime" ? {"name":T("enemy.30.name"),"col":COL_SLIME} :
+        who === "ent" ? {"name":T("enemy.31.name"),"col":COL_ENT} :
         who === "narr" ? {"name":"","col":COL_NARR} :
         {"name":T(data.heroes[status.hero.class].name),"col":COL_HERO}
 }

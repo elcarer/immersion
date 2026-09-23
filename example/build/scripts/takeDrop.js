@@ -21,6 +21,8 @@ import { portalQuestTakePile } from "../scripts/portalQuest.js"
 import { flameQuestTakePile } from "../scripts/flameQuest.js"
 //V133: квест «Корм слизи» — кучка-корм (исчезает при приземлении) и Ком слизи
 import { slimeQuestTakePile, slimeQuestFedLanded } from "../scripts/slimeQuest.js"
+//V138: квест «Разрастание» — кучка-Росток (эффект «рост» предмету на теле)
+import { entQuestTakePile } from "../scripts/entQuest.js"
 //V67: новый предмет мог встать в 1-ю ячейку инвентаря — пересчёт копии «Вечного сапфира»
 import { changeDopStat } from "../scripts/drag.js"
 //V114: кооператив — контекст игрока (кучку забирает наступивший)
@@ -84,6 +86,13 @@ function takeDropFor(pi) {
             }
             //V133: Ком слизи — эффект «слизь» предмету в левой руке (ветка в slimeQuest.js)
             if (slimeQuestTakePile(dropArr[i])) {
+                playback(strike[3].vol,0,0,7*status.settings.soundVolume)
+                dropArr[i].remove()
+                dropArr.splice(i, 1)
+                return
+            }
+            //V138: Росток — эффект «рост» предмету на теле (ветка в entQuest.js)
+            if (entQuestTakePile(dropArr[i])) {
                 playback(strike[3].vol,0,0,7*status.settings.soundVolume)
                 dropArr[i].remove()
                 dropArr.splice(i, 1)

@@ -52,6 +52,8 @@ function inventory () {
                 status.inventory.inv[num].fire && inventoryTemp.push(image(svgArr[2],940 + i * 130,261 + j * 130,128,128,"./images/effects/flameWeapon.png",{}))
                 //V133: оверлей слизи на иконке предмета с эффектом «слизь» (сетка инвентаря)
                 status.inventory.inv[num].slime && inventoryTemp.push(image(svgArr[2],940 + i * 130,261 + j * 130,128,128,"./images/effects/slimeShield.png",{}))
+                //V138: оверлей роста на иконке предмета с эффектом «рост» (сетка инвентаря)
+                status.inventory.inv[num].grow && inventoryTemp.push(image(svgArr[2],940 + i * 130,261 + j * 130,128,128,"./images/effects/plantGrow.png",{}))
             }
             num++        
         }

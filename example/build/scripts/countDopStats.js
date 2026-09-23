@@ -54,7 +54,8 @@ function countDopStats() {
             //V67 «Вечный изумруд»: криты героя отключены (damage.js), ВЕСЬ шанс крита (N%) и
             //вся мощь крита (включая базу 100%) уходят в макс. ХП — решение пользователя.
             //V75 «Кровавый пакт» (шкафчик): итог умножается на 0.8 — снижается именно МАКСИМУМ
-            (status.info.stats[i].dops[j].value2 = (Math.trunc((10+status.meta.dopHP+5*status.info.stats[i].dops[j].value1+emeraldHpBonus())*blessMaxHpMult())+"x"))
+            //V138 «Росток»: эффект «рост» предмета на теле — +10 к максимуму
+            (status.info.stats[i].dops[j].value2 = (Math.trunc((10+status.meta.dopHP+5*status.info.stats[i].dops[j].value1+emeraldHpBonus()+growHpBonus())*blessMaxHpMult())+"x"))
             i===2&&j===1&&
             (status.info.stats[i].dops[j].value1 = statValue1(i,j))&&
             (status.info.stats[i].dops[j].value2 = (countLog(status.info.stats[i].dops[j].value1)+"%"))
@@ -95,6 +96,13 @@ function countLog(i) {
 function emeraldHpBonus() {
     if (!hasRelic(0)) return 0
     return countLog(status.info.stats[1].dops[0].value1) + (100 + 2 * countLog(status.info.stats[1].dops[1].value1))
+}
+//V138 квест «Разрастание»: эффект «рост» — метка .grow на предмете ТЕЛА (слот куклы 3,
+//ставит подбор кучки-Ростка в entQuest.takePile): +10 к макс. ХП, пока предмет надет.
+//Пересчёт штатный — countDopStats дергается при экипировке (drag.js)/старте этажа
+function growHpBonus() {
+    const t = status.inventory.doll[3]
+    return t && t.grow ? 10 : 0
 }
 //копия стата «Вечного сапфира» встроена в формулы выше (value + sapphireStat(i));
 //копия спец-статов 5/6 живёт в belt.js/takeDamage.js

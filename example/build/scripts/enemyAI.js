@@ -74,6 +74,9 @@ import { flameQuestNpcTickHook, flameQuestEnemyDie } from "../scripts/flameQuest
 //V133: Слаймэн квеста «Корм слизи» — мирный перехват тика (slimeNpc) и хук победы
 //над ним в бою (возврат съеденных предметов)
 import { slimeQuestNpcTickHook, slimeQuestEnemyDie } from "../scripts/slimeQuest.js"
+//V138: квест «Разрастание» — мирный Древоброд (entNpc) и пауки-захватчики (entSpider,
+//ползут к ростку); провал (росток съеден) обрабатывает entQuest.js
+import { entQuestNpcTickHook, entQuestSproutEaten } from "../scripts/entQuest.js"
 // V32 «рывок» нетопыря (stats.dash): триггер и полёт живёт в dashFx.js,
 // сюда встроены только точки проводки (аналогично tickShadow выше)
 import { dashTryTrigger, dashFlyTick, endDashFlight } from "../scripts/dashFx.js"
@@ -1892,6 +1895,17 @@ export function enemyTick(enemy) {
         slimeQuestNpcTickHook(enemy)
         return
     }
+    //V138: Древоброд квеста «Разрастание» — мирный NPC (стоит в углу, ждёт диалога;
+    //entNpc=1 на всю жизнь — «не атакует и не атакуется»)
+    if (enemy.entNpc) {
+        entQuestNpcTickHook(enemy)
+        return
+    }
+    //V138: паук квеста «Разрастание» — ползёт к ростку, героев игнорирует
+    if (enemy.entSpider) {
+        entSpiderTick(enemy)
+        return
+    }
     // совместимость со старыми спавнами (враг создан с behaviour, без state)
     if (enemy.state === undefined) {
         enemy.state = enemy.behaviour === 1 || enemy.behaviour === 2 ? enemy.behaviour : enemy.behaviour === 4 ? ENEMY_STATE.CHASE : ENEMY_STATE.IDLE
@@ -2029,4 +2043,32 @@ export function enemyTick(enemy) {
         return
     }
     // IDLE — стоим; героя заметим в следующем тике
+}
+
+// ---------- V138: паук квеста «Разрастание» (entSpider) ----------
+//Цель — РОСТОК, не герой: путь строится штатным buildChasePath к клетке ростка,
+//движение — stepAlongPath. Героя не видят и не атакуют (тик перехвачен раньше
+//обнаружения). Росток съеден/убран (провал, смена сцены) — паук снова обычный.
+function entSpiderTick(enemy) {
+    const s = enemy._sprout
+    const q = status.questEnt
+    if (!q || !s || !s.placed || !s.alive) {
+        enemy.entSpider = 0
+        enemy.noticed = 0
+        return
+    }
+    if (enemy.state === ENEMY_STATE.STUN || enemy.state === ENEMY_STATE.ATTACK) return
+    if (enemy.stop === 1) return
+    const ePos = rectPos(enemy.rect)
+    //центр паука дошёл до центра клетки ростка — росток съеден (провал квеста)
+    if (Math.abs(s.px + 16 - (ePos[0] + 16)) < 16 &&
+        Math.abs(s.py + 16 - (ePos[1] + 16)) < 16) {
+        entQuestSproutEaten(s)
+        return
+    }
+    if (!enemy.path || !enemy.path.length) {
+        enemy.path = buildChasePath(enemyCellOf(enemy), [s.cx, s.cy], enemy)
+        if (!enemy.path || !enemy.path.length) return   //упёрся — повторит попытку
+    }
+    stepAlongPath(enemy)
 }

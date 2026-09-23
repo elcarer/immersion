@@ -67,6 +67,9 @@ import { flameQuestTick } from "../scripts/flameQuest.js"
 //V133: квест «Корм слизи» — тик состояния (исчезновение портала при выходе из
 //стартовой комнаты, полоска взаимодействия со Слаймэном)
 import { slimeQuestTick } from "../scripts/slimeQuest.js"
+//V138: квест «Разрастание» — тик состояния (исчезновение Древоброда при выходе
+//из стартовой комнаты, полоска взаимодействия, таймеры ростков)
+import { entQuestTick } from "../scripts/entQuest.js"
 import { svgArr,image, text,gamepadDragStart,gamepadDragMove,gamepadDragEnd,isDragging,getCTM } from "../scripts/svg.js"
 //V114: кооператив — подмена контекста игрока + гварды живости
 import { setContext,anyAlive,playerAlive } from "../scripts/players.js"
@@ -185,6 +188,8 @@ function gameLoop() {
         flameQuestTick()
         //V133: «Корм слизи» — состояние квеста (slimeQuest.js)
         slimeQuestTick()
+        //V138: «Разрастание» — состояние квеста (entQuest.js)
+        entQuestTick()
         //V114: activeSkillsCD переехал в пер-игроковую фазу (кулдауны у каждого свои)
         }
     }
