@@ -49,7 +49,9 @@ function doll() {
         //V133: оверлей слизи на иконке предмета с эффектом «слизь» (слоты куклы)
         status.inventory.doll[i].slime && dollTemp.push(image(svgArr[2],cellPickArr[i].x,cellPickArr[i].y,"128px","128px","./images/effects/slimeShield.png",{}))
         //V138: оверлей роста на иконке предмета с эффектом «рост» (слоты куклы)
-        status.inventory.doll[i].grow && dollTemp.push(image(svgArr[2],cellPickArr[i].x,cellPickArr[i].y,"128px","128px","./images/effects/plantGrow.png",{}))}
+        status.inventory.doll[i].grow && dollTemp.push(image(svgArr[2],cellPickArr[i].x,cellPickArr[i].y,"128px","128px","./images/effects/plantGrow.png",{}))
+        //V140: эффект «повязка» — оверлей на иконке пояса (кукла)
+        status.inventory.doll[i].barb && dollTemp.push(image(svgArr[2],cellPickArr[i].x,cellPickArr[i].y,"128px","128px","./images/effects/barbTrue.png",{}))}
         else
         {dollTemp.push(image(svgArr[2],cellPickArr[i].x,cellPickArr[i].y,"128px","128px",cellPickArr[i].href,{"id":i,"func":()=>{}}))}
     }

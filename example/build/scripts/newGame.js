@@ -21,6 +21,7 @@ import { flameQuestNewGame } from "../scripts/flameQuest.js"
 import { slimeQuestNewGame } from "../scripts/slimeQuest.js"
 //V138: квест «Разрастание» — сброс состояния и спавн Древоброда (4 глава, 2 этаж)
 import { entQuestNewGame } from "../scripts/entQuest.js"
+import { hrupQuestNewGame } from "../scripts/hrupQuest.js"
 //V52: старт этажа — сброс забегных счётчиков достижений
 import { achFloorStart } from "../scripts/achievements.js"
 
@@ -53,6 +54,7 @@ function newGame(next) {
     slimeQuestNewGame(next)
     //V138: квест «Разрастание» — сброс; 4 глава, 2 этаж — мирный Древоброд в углу
     entQuestNewGame(next)
+hrupQuestNewGame(next)
     //V52: статус.info готов — кэшируем ХП, чистим «чистый» этаж и окно Массовика
     achFloorStart()
 }

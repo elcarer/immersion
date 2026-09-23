@@ -23,6 +23,8 @@ import { flameQuestTakePile } from "../scripts/flameQuest.js"
 import { slimeQuestTakePile, slimeQuestFedLanded } from "../scripts/slimeQuest.js"
 //V138: квест «Разрастание» — кучка-Росток (эффект «рост» предмету на теле)
 import { entQuestTakePile } from "../scripts/entQuest.js"
+//V140: эпик-кучки Хрупа (редкость 2) и Повязка (эффект пояса)
+import { hrupQuestTakeEpic, hrupQuestTakePile } from "../scripts/hrupQuest.js"
 //V67: новый предмет мог встать в 1-ю ячейку инвентаря — пересчёт копии «Вечного сапфира»
 import { changeDopStat } from "../scripts/drag.js"
 //V114: кооператив — контекст игрока (кучку забирает наступивший)
@@ -93,6 +95,26 @@ function takeDropFor(pi) {
             }
             //V138: Росток — эффект «рост» предмету на теле (ветка в entQuest.js)
             if (entQuestTakePile(dropArr[i])) {
+                playback(strike[3].vol,0,0,7*status.settings.soundVolume)
+                dropArr[i].remove()
+                dropArr.splice(i, 1)
+                return
+            }
+            //V140: эпик-кучки Хрупа — случайный предмет редкости 2 (#3300ff), без
+            //фильтра оружия (в отличие от сундуков боссов). Инвентарь полон — кучка
+            //остаётся лежать (маркер снят, дальше сработает href item2.png — та же
+            //редкость 2)
+            if (hrupQuestTakeEpic(dropArr[i])) {
+                useDrop = takeItem(2)
+                if (useDrop) {
+                    playback(strike[3].vol,0,0,7*status.settings.soundVolume)
+                    dropArr[i].remove()
+                    dropArr.splice(i, 1)
+                    return
+                }
+            }
+            //V140: Повязка — «+5% к передвижению» предмету пояса (ветка в hrupQuest.js)
+            if (hrupQuestTakePile(dropArr[i])) {
                 playback(strike[3].vol,0,0,7*status.settings.soundVolume)
                 dropArr[i].remove()
                 dropArr.splice(i, 1)

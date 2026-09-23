@@ -70,6 +70,7 @@ import { slimeQuestTick } from "../scripts/slimeQuest.js"
 //V138: квест «Разрастание» — тик состояния (исчезновение Древоброда при выходе
 //из стартовой комнаты, полоска взаимодействия, таймеры ростков)
 import { entQuestTick } from "../scripts/entQuest.js"
+import { hrupQuestTick } from "../scripts/hrupQuest.js"
 import { svgArr,image, text,gamepadDragStart,gamepadDragMove,gamepadDragEnd,isDragging,getCTM } from "../scripts/svg.js"
 //V114: кооператив — подмена контекста игрока + гварды живости
 import { setContext,anyAlive,playerAlive } from "../scripts/players.js"
@@ -190,6 +191,7 @@ function gameLoop() {
         slimeQuestTick()
         //V138: «Разрастание» — состояние квеста (entQuest.js)
         entQuestTick()
+hrupQuestTick()
         //V114: activeSkillsCD переехал в пер-игроковую фазу (кулдауны у каждого свои)
         }
     }

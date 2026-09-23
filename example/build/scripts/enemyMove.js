@@ -42,7 +42,9 @@ function enemyMove() {
             //E-18: боссы — тоже вне гейта: погоня после урона магией сквозь стены живёт
             //и за экраном (иначе раненый из-за кадра босс «стоял» до подхода героя)
             const offscreen = pos[0] < vb.x || pos[0] > vb.x + vb.width || pos[1] < vb.y || pos[1] > vb.y + vb.height
-            if (offscreen && o.type !== "pet" && !(o.class && o.class.boss === 1)) continue
+            //V140: Хруп квеста «Гонка за сокровищами» (hrupNpc) тикается и вне кадра —
+            //гонщик убегает за экран и иначе навсегда замер бы на месте (причина V78)
+            if (offscreen && o.type !== "pet" && !(o.class && o.class.boss === 1) && !o.hrupNpc) continue
             enemyTick(o)
         }
     }

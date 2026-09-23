@@ -164,6 +164,8 @@ function showItemTip(obj) {
     obj.slime && tempTip.push(image(svgArr[2], X + (IT_W - 56) / 2, Y + 8, 56, 56, "./images/effects/slimeShield.png", {}))
     //V138: оверлей роста на иконке предмета с эффектом «рост» (карточка поднятого предмета)
     obj.grow && tempTip.push(image(svgArr[2], X + (IT_W - 56) / 2, Y + 8, 56, 56, "./images/effects/plantGrow.png", {}))
+    //V140: оверлей «повязки» на иконке (инвентарная ячейка)
+    obj.barb && tempTip.push(image(svgArr[2], X + (IT_W - 56) / 2, Y + 8, 56, 56, "./images/effects/barbTrue.png", {}))
     let cy = Y + 94
     for (let i = 0; i < rowTitles.length; i++) {
         tempTip.push(text(svgArr[2], X + IT_W / 2, cy, "0pt","50pt","none","1px", color, rowTitles[i], {"id":"itemName","size":IT_F_TITLE,"font":"baseFont4","anchor":"middle"}))
@@ -207,6 +209,8 @@ function tip (e,obj) {
     obj.slime && tempTip.push(image(svgArr[2],x+72,y+67,256,256,"./images/effects/slimeShield.png",{}))
     //V138: эффект «рост» — оверлей роста поверх иконки (подсказки/инвентарь/кукла)
     obj.grow && tempTip.push(image(svgArr[2],x+72,y+67,256,256,"./images/effects/plantGrow.png",{}))
+    //V140: оверлей «повязки» (подсказка/окно сравнения)
+    obj.barb && tempTip.push(image(svgArr[2],x+72,y+67,256,256,"./images/effects/barbTrue.png",{}))
     let strokeNum = 0
     if (obj.type!==undefined) {
         let desc
@@ -316,6 +320,8 @@ function compareTip(e,obj,lower=0) {
     obj.slime && tempTip.push(image(svgArr[2],x+72,y+67,256,256,"./images/effects/slimeShield.png",{}))
     //V138: оверлей роста на иконке предмета с эффектом «рост» (окно сравнения)
     obj.grow && tempTip.push(image(svgArr[2],x+72,y+67,256,256,"./images/effects/plantGrow.png",{}))
+    //V140: оверлей «повязки» (подсказка/окно сравнения)
+    obj.barb && tempTip.push(image(svgArr[2],x+72,y+67,256,256,"./images/effects/barbTrue.png",{}))
     let strokeNum = 0
     if (obj.type!==undefined) {
         let desc

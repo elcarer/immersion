@@ -77,6 +77,7 @@ import { slimeQuestNpcTickHook, slimeQuestEnemyDie } from "../scripts/slimeQuest
 //V138: квест «Разрастание» — мирный Древоброд (entNpc) и пауки-захватчики (entSpider,
 //ползут к ростку); провал (росток съеден) обрабатывает entQuest.js
 import { entQuestNpcTickHook, entQuestSproutEaten } from "../scripts/entQuest.js"
+import { hrupQuestNpcTickHook, hrupQuestEnemyDie } from "../scripts/hrupQuest.js"
 // V32 «рывок» нетопыря (stats.dash): триггер и полёт живёт в dashFx.js,
 // сюда встроены только точки проводки (аналогично tickShadow выше)
 import { dashTryTrigger, dashFlyTick, endDashFlight } from "../scripts/dashFx.js"
@@ -1117,6 +1118,8 @@ export function enemyDie(enemy, exp) {
     flameQuestEnemyDie(enemy)
     //V133: победа над Слаймэном («НАПАСТЬ») — возврат трёх съеденных предметов
     slimeQuestEnemyDie(enemy)
+    //V140: Хруп убит в бою (2 эпика + мета) или вклад гонки (кто убил врага комнаты)
+    hrupQuestEnemyDie(enemy)
     enemy.stop = 0
     enemy.currentStill = 0
     setEnemyPose(enemy, enemy.class.anims[2].others[1])
@@ -1899,6 +1902,12 @@ export function enemyTick(enemy) {
     //entNpc=1 на всю жизнь — «не атакует и не атакуется»)
     if (enemy.entNpc) {
         entQuestNpcTickHook(enemy)
+        return
+    }
+    //V140: Хруп квеста «Гонка за сокровищами» — мирный (стоит/ждёт диалога) или
+    //гонщик (самостоятельный тик hrupQuest.raceTick); в фазе боя hrupNpc=0 — штатный ИИ
+    if (enemy.hrupNpc) {
+        hrupQuestNpcTickHook(enemy)
         return
     }
     //V138: паук квеста «Разрастание» — ползёт к ростку, героев игнорирует

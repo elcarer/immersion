@@ -65,7 +65,8 @@ function countDopStats() {
 
             i===3&&j===0&&
             (status.info.stats[i].dops[j].value1 = statValue1(i,j))&&
-            (status.info.stats[i].dops[j].value2 = (countLog(status.info.stats[i].dops[j].value1)+"%"))
+            //V140 «Повязка»: +5 к бонусу передвижения, пока на поясе предмет с меткой .barb
+            (status.info.stats[i].dops[j].value2 = (countLog(status.info.stats[i].dops[j].value1)+barbMoveBonus())+"%")
             i===3&&j===1&&
             (status.info.stats[i].dops[j].value1 = statValue1(i,j))&&
             (status.info.stats[i].dops[j].value2 = (countLog(status.info.stats[i].dops[j].value1)+"%"))
@@ -84,6 +85,13 @@ function countDopStats() {
             (status.info.stats[i].dops[j].value2 = (countLog(status.info.stats[i].dops[j].value1)+"%"))
         }
     }
+}
+//V140 квест «Гонка за сокровищами»: эффект «повязка» — метка .barb на предмете
+//ПОЯСА (слот куклы 10 «талия», ставит подбор кучки в hrupQuest.takePile):
+//+5 процентных пунктов к бонусу передвижения (stats[3].dops[0].value2), пока пояс надет
+function barbMoveBonus() {
+    const b = status.inventory.doll[10]
+    return b && b.barb ? 5 : 0
 }
 function countLog(i) {
         return (Math.trunc(((1 + 40/i)**(i/40) - 1) / (Math.exp(1) - 1) * 100))

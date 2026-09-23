@@ -35,6 +35,8 @@ import { placeDrop,dropFly } from "../scripts/dropSafe.js"
 import { openAncient,blessEcho } from "../scripts/blessFx.js"
 //V133: квест «Корм слизи» — доп. серый предмет с каждого юза активируемого объекта
 import { slimeQuestExtraDrop } from "../scripts/slimeQuest.js"
+//V140: квест «Гонка за сокровищами» — вклад героя в зачистку комнаты
+import { hrupQuestObjectUsed } from "../scripts/hrupQuest.js"
 
 let bars = []
 function useObject(obj,i0) {
@@ -146,6 +148,8 @@ function finishUsedObject(obj) {
     //V97: чаша (22) — мимо (повторяемая, неразрушаемая)
     obj[2] !== 15 && obj[2] !== 17 && obj[2] !== 18 && obj[2] !== 19 && obj[2] !== 20 && obj[2] !== 21 && obj[2] !== 22 && (obj[7] = 1)
     status.attack.current = []
+    //V140: гонка — использованный героем объект даёт ему вклад в зачистку комнаты
+    hrupQuestObjectUsed(obj)
 }
 function actionsObject(obj) {
     switch (obj[2]) {

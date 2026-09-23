@@ -105,7 +105,8 @@ function checkEnemy(attack) {
         //не цель для атак героя; после «НАПАСТЬ» flameNpc сбрасывается и он бьётся
         //V135: то же для мирного Слаймэна (квест «Корм слизи»)
         if (objectValues[i].type === "enemy" && objectValues[i].flameNpc !== 1 &&
-            objectValues[i].slimeNpc !== 1 && objectValues[i].entNpc !== 1) {
+            objectValues[i].slimeNpc !== 1 && objectValues[i].entNpc !== 1 &&
+            objectValues[i].hrupNpc !== 1) {
             let rect = objectValues[i].rect
             let x1 = rect.x.animVal.value
             let y1 = rect.y.animVal.value
@@ -134,7 +135,8 @@ function checkMagic(attack) {
         //не цель для атак героя; после «НАПАСТЬ» flameNpc сбрасывается и он бьётся
         //V135: то же для мирного Слаймэна (квест «Корм слизи»)
         if (objectValues[i].type === "enemy" && objectValues[i].flameNpc !== 1 &&
-            objectValues[i].slimeNpc !== 1 && objectValues[i].entNpc !== 1) {
+            objectValues[i].slimeNpc !== 1 && objectValues[i].entNpc !== 1 &&
+            objectValues[i].hrupNpc !== 1) {
             let rect = objectValues[i].rect
             let x1 = rect.x.animVal.value
             let y1 = rect.y.animVal.value

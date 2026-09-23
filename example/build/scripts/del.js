@@ -36,6 +36,7 @@ import { flameQuestDel } from "../scripts/flameQuest.js"
 import { slimeQuestDel } from "../scripts/slimeQuest.js"
 //V138: квест «Разрастание» — сброс состояния/трекера/полоски
 import { entQuestDel } from "../scripts/entQuest.js"
+import { hrupQuestDel } from "../scripts/hrupQuest.js"
 //V114: кооператив — контекст игрока (снос спрайтов всех героев, пер-игроковой resetValkyrie)
 import { setContext } from "../scripts/players.js"
 // МИГРАЦИЯ M5: objectValues — Proxy-список, синхронизирующий ECS-сущности zero_engine
@@ -123,7 +124,8 @@ function del() {
     portalQuestDel() //V109: квест «Голос в портале» — только на текущем этаже
     flameQuestDel() //V111: квест «Погоня за пламенем» — лава/этажный бафф только на текущем этаже
     slimeQuestDel() //V133: квест «Корм слизи» — только на текущем этаже
-    entQuestDel() //V138: квест «Разрастание» — только на текущем этаже
+    entQuestDel()
+hrupQuestDel() //V138: квест «Разрастание» — только на текущем этаже
     resetVoidBoss() //V65: босс 4 этажа и его Сгустки — только на текущем этаже
     resetGroundShadows() //V80: реестры наземных теней — узлы уже снесены очисткой слоёв
 
