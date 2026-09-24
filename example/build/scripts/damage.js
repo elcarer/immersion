@@ -6,7 +6,9 @@ import { ctxBar,ctxTx,ownerPlayer,setContext,nextLvlExp } from "../scripts/playe
 import { T } from "../scripts/localization.js"
 import { changeHP,changeLvl } from "../scripts/takeDamage.js"
 import { data } from "../scripts/data.js"
-import { svgArr,image,worldImage, moveSprite, releaseSprite, rectPos } from "../scripts/svg.js"
+import { svgArr,image,worldImage, moveSprite, spritePos, releaseSprite, rectPos } from "../scripts/svg.js"
+//V142: полёт от «Каменного шипа» — порядок отрисовки по y на каждом тике (как в dashFlyTick)
+import { checkZOrder } from "../scripts/heroMove.js"
 import { dropArr } from "../scripts/useObject.js"
 import { playback,strike } from "../scripts/sound.js"
 import { callAllies, enemyStun, enemyDie, enemyNoticeHero, setEnemyState, setEnemyPose, ENEMY_STATE } from "../scripts/enemyAI.js"
@@ -540,6 +542,35 @@ function createSplash(enemy,effect,damage,other=0,range=0,selfTo=0,srcName=undef
 //Волшебнице» (направление не определено) — враг остаётся на месте (решение пользователя).
 //Прецедент — shieldKnockback «Ветряного щита» (valkyrie.js): там без отката и БЕЗ обновления
 //xCell/yCell; здесь ячейку врага обновляем (случайный сдвиг раньше её не трогал вовсе).
+//V142: сдвиг больше не мгновенный — враг улетает по ПАРАБОЛЕ, как кучки дропа (dropFly,
+//dropSafe.js): сближение по прямой + «высота» 4·arc·k·(1−k), 24 тика (~0.4с), дуга 40px
+//±30%. Логика не меняется: целевая клетка заносится в xCell/yCell СРАЗУ (как при
+//мгновенном сдвиге), спрайт лишь догоняет её анимацией; на время полёта ИИ врага
+//заменяет spikeFlyTick (ветка в enemyTick рядом с dashFly — паттерн рывка нетопыря).
+//Лежащий враг (мумия между смертью и подъёмом) не летает — мгновенный сдвиг как раньше.
+const SPIKE_FLY_TICKS = 24  //полёт ~0.4с — как у кучек дропа
+const SPIKE_ARC = 40        //базовая высота дуги, px (у каждого полёта свой случайный размах)
+function startSpikeFly(e,dxc,dyc) {
+    if (e.lying !== undefined) {
+        moveSprite(e.img, dxc, dyc)
+        return
+    }
+    const p = rectPos(e.rect)
+    e.spikeFly = {"sx":p[0],"sy":p[1],"tx":p[0]+dxc,"ty":p[1]+dyc,
+        "t":0,"fly":SPIKE_FLY_TICKS,"arc":SPIKE_ARC*(0.7+Math.random()*0.6)}
+}
+function spikeFlyTick(enemy) {
+    const f = enemy.spikeFly
+    f.t++
+    let k = f.t / f.fly
+    let lift = 4 * f.arc * k * (1 - k)
+    spritePos(enemy.img, f.sx + (f.tx - f.sx) * k, f.sy + (f.ty - f.sy) * k - lift)
+    checkZOrder(enemy)
+    if (f.t >= f.fly) {
+        spritePos(enemy.img, f.tx, f.ty)
+        enemy.spikeFly = null
+    }
+}
 function spikeKnockback(e) {
     const matrix = status.matrixLevel
     if (!matrix) return
@@ -569,9 +600,9 @@ function spikeKnockback(e) {
     const tx = col + sx
     const ty = row + sy
     if (cellFree(tx, ty)) {
-        moveSprite(e.img, sx * 32, sy * 32)
         e.xCell = tx
         e.yCell = ty
+        startSpikeFly(e, sx * 32, sy * 32)
         return
     }
     //отступить по направлению нельзя — ищем ближайшую проходимую: периметры колец 1 и 2
@@ -594,9 +625,9 @@ function spikeKnockback(e) {
         }
     }
     if (!best) return
-    moveSprite(e.img, (best[0] - col) * 32, (best[1] - row) * 32)
     e.xCell = best[0]
     e.yCell = best[1]
+    startSpikeFly(e, (best[0] - col) * 32, (best[1] - row) * 32)
 }
 //"reanimate" (Mummy): смертельный удар один раз за жизнь врага не убивает его: враг
 //остаётся с 1 ХП, проигрывает анимацию смерти (lying=-1), затем 3 секунды лежит
@@ -678,4 +709,4 @@ function playEffect(obj,effect,rectAs=1) {
     }
     return objectValues[objectValues.length - 1].img
 }
-export {damage,checkCollision,playEffect,dropKey,checkExp,createSplash,callAllies,reanimateCheck,relicReflect}
+export {damage,checkCollision,playEffect,dropKey,checkExp,createSplash,callAllies,reanimateCheck,relicReflect,spikeFlyTick}

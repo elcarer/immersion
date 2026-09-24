@@ -46,7 +46,7 @@ import { status } from "../scripts/start.js"
 import { T } from "../scripts/localization.js"
 import { data } from "../scripts/data.js"
 import { dataGeneric } from "../scripts/sceneGenerate.js"
-import { checkCollision, playEffect, dropKey, checkExp, reanimateCheck } from "../scripts/damage.js"
+import { checkCollision, playEffect, dropKey, checkExp, reanimateCheck, spikeFlyTick } from "../scripts/damage.js"
 import { svgArr, image, worldImage, spritePos, moveSprite, rectPos, releaseSprite } from "../scripts/svg.js"
 import { checkZOrder } from "../scripts/heroMove.js"
 //V115: кооператив — цель врага, цикл по живым игрокам, контекст
@@ -1921,6 +1921,9 @@ export function enemyTick(enemy) {
     }
     // DOWN: лежит и воскресает (Mummy)
     if (enemy.lying !== undefined) {
+        //V142: враг, сброшенный «Каменным шипом» в полёте и тут же убитый (мумия —
+        //воскрешение), дропается на месте: полёт не переживает лежание
+        enemy.spikeFly = null
         if (enemy.lying > 0) {
             enemy.lying--
             if (enemy.lying === 0) reviveEnemy(enemy)
@@ -1943,6 +1946,13 @@ export function enemyTick(enemy) {
     // обычные ветки ниже в этот тик всё равно не доходят — рано возвращаемся
     if (enemy.dashFly && (enemy.state === ENEMY_STATE.STUN || enemy.lying !== undefined)) {
         endDashFlight(enemy)
+        return
+    }
+    // V142: полёт от «Каменного шипа» — парабола как у кучек дропа (dropFly); на время
+    // полёта движение/атаки ИИ заменяются анимацией (паттерн dashFly). Ветка ДО стана:
+    // подброшенный враг долетает, стан отыгрывается после приземления
+    if (enemy.spikeFly) {
+        spikeFlyTick(enemy)
         return
     }
     // STUN: проигрывается анимация стана (others[0] — она и есть длительность стана);
