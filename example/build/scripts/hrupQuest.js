@@ -29,6 +29,8 @@ import { data } from "../scripts/data.js"
 import { dataGeneric, createRoom } from "../scripts/sceneGenerate.js"
 import { openRoom } from "../scripts/openRoom.js"
 import { createCorridor } from "../scripts/heroMove.js"
+//V111: режим «лава в коридорах» — свежие клетки Хрупа заливаются как у героя
+import { flameQuestCorridorOpen } from "../scripts/flameQuest.js"
 import { animInterval, setEnemyPose, damageEnemy } from "../scripts/enemyAI.js"
 //эпик-кучки Хрупа: подбор — takeItem(2) без фильтра оружия (ветка в takeDrop)
 import { bossWeaponDrops } from "../scripts/useObject.js"
@@ -50,7 +52,9 @@ const NEAR = [[0,0],[0,-1],[1,-1],[-1,-1],[1,0],[-1,0],[1,1],[-1,1],[0,1]]
 const WANTED = 3                 //комнат до победы в гонке
 const NPC = 32                   //Хруп (hrup_64.png)
 const BELT_SLOT = 10             //слот ПОЯСА куклы («талия»)
-const RACER_SPEED = 12           //скорость Хрупа-гонщика (сопоставим с героем)
+const RACER_SPEED = 24           //скорость Хрупа-гонщика: mv=2px/тик — как шаг героя
+                                 //(V140a: было 12 (полускорость); со честными путями
+                                 //(BFS только по полу) гонка при 12 не имела шансов)
 const FOE_RANGE = 44             //дистанция удара по врагу
 const OBJ_RANGE = 40             //дистанция поломки объекта
 const BAR_BACK = "./images/UI/panels/bar1mini.png"
@@ -497,25 +501,33 @@ function stepAlongPath(q, e) {
 function onHrupCell(q, e) {
     const lvv = lv()
     const p = rectPos(e.rect)
-    const cx = Math.trunc((p[0] + 16) / 32)
-    const cy = Math.trunc((p[1] + 25) / 32)
-    //коридор: рисуем и помечаем открытой
+    const x = p[0] + 16, y = p[1] + 25
+    //комната: рисуем и спавним её врагов (openRoom) при подходе на viewus героя
+    //(32px за прямоугольник комнаты — геометрия heroMove.checkNewRoom: Хруп
+    //«открывает по пути» и комнаты, мимо которых пробегает)
+    for (let k = 0; k < lvv.roomsArr.length; k++) {
+        if (lvv.roomsArr[k][3] === 1) continue
+        const f = lvv.floor[lvv.roomsArr[k][0]]
+        if (x + 32 > f[0] * 32 && y + 32 > f[1] * 32 &&
+            x - 32 < (f[0] + f[2]) * 32 && y - 32 < (f[1] + f[3]) * 32) {
+            createRoom(lvv, k, 32, 32)
+            lvv.roomsArr[k][3] = 1
+            openRoom(lvv.roomsArr[k])
+            status.navVersion = (status.navVersion || 0) + 1
+        }
+    }
+    //коридор: клетка в коробе 64px (как у героя) — createCorridor рисует ЦЕЛЫЙ
+    //сегмент [5]/[6]; в режиме лавы свежая клетка заливается сразу
     for (let i = 0; i < lvv.floor.length; i++) {
         const f = lvv.floor[i]
-        if (f[2] === 1 && f[7] !== 1 && f[0] === cx && f[1] === cy) {
+        if (f[2] !== 1 || f[7] === 1) continue
+        if (x > f[0] * 32 - 64 && y > f[1] * 32 - 64 &&
+            x < f[0] * 32 + 96 && y < f[1] * 32 + 96) {
             createCorridor(f, 32, 32, lvv)
-            f[7] = 1
+            flameQuestCorridorOpen(f)
             status.navVersion = (status.navVersion || 0) + 1
             break
         }
-    }
-    //комната: рисуем, спавним её врагов (openRoom), двери откроются openHrupDoors
-    const k = roomAt(e)
-    if (k !== -1 && lvv.roomsArr[k][3] !== 1) {
-        createRoom(lvv, k, 32, 32)
-        lvv.roomsArr[k][3] = 1
-        openRoom(lvv.roomsArr[k])
-        status.navVersion = (status.navVersion || 0) + 1
     }
     openHrupDoors(e)
 }
@@ -542,12 +554,16 @@ function openHrupDoors(e) {
     }
     changed && (status.navVersion = (status.navVersion || 0) + 1)
 }
-//BFS по полу (matrix>0 — включая «тёмные» неоткрытые комнаты: Хруп их открывает
-//на ходу); двери не блокируют — он открывает их на ходу
+//BFS по ПОЛУ (matrixLevel===1: клетки комнат и коридоров, открыты или нет —
+//неоткрытые Хруп открывает на ходу; двери — тоже пол, он открывает их вблизи).
+//V140a (репорт юзера): было >0 — а 2 в matrixLevel это СТЕНА (0 пустота,
+//1 пол, 2 стена; семантику >0 Хрупу принёс BFS призрачного паука V138, который
+//ползёт сквозь породу) — Хруп резал углы сквозь стены: шёл «через темноту»,
+//а коридоры/комнаты по пути оставались тёмными (он по ним не проходил)
 function bfsPath(from, to) {
     if (from[0] === to[0] && from[1] === to[1]) return []
     const w = status.matrixLevel[0].length
-    const pass = (x, y) => status.matrixLevel[y] && status.matrixLevel[y][x] > 0
+    const pass = (x, y) => status.matrixLevel[y] && status.matrixLevel[y][x] === 1
     if (!pass(to[0], to[1])) return null
     const prev = new Map()
     const queue = [from]
@@ -708,13 +724,13 @@ function moveTick(q, e) {
     if (!cand.length) { setEnemyIdle(e); return }
     const k = cand[Math.trunc(Math.random() * cand.length)]
     const f = lvv.floor[lvv.roomsArr[k][0]]
-    //клетка-цель: центр комнаты или любой пол комнаты
+    //клетка-цель: центр комнаты или любой пол комнаты (только matrixLevel===1)
     let cell = [f[0] + (f[2] >> 1), f[1] + (f[3] >> 1)]
-    if (!(status.matrixLevel[cell[1]] && status.matrixLevel[cell[1]][cell[0]] > 0)) {
+    if (!(status.matrixLevel[cell[1]] && status.matrixLevel[cell[1]][cell[0]] === 1)) {
         cell = null
         for (let y = f[1]; y < f[1] + f[3] && !cell; y++) {
             for (let x = f[0]; x < f[0] + f[2] && !cell; x++) {
-                status.matrixLevel[y] && status.matrixLevel[y][x] > 0 && (cell = [x, y])
+                status.matrixLevel[y] && status.matrixLevel[y][x] === 1 && (cell = [x, y])
             }
         }
         if (!cell) { q.pickCd = 20; return }
