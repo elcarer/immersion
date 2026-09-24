@@ -109,19 +109,20 @@ function openRoom(room) {
                 stats.dmg[0] += 1
                 stats.dmg[1] += 2
             }
+            //V143: 3 глава — скорость +2 (было +1 с V65)
             if(status.meta.page > 2) {
                 stats.hp *= 2
                 stats.dmg[0] += 2
                 stats.dmg[1] += 6
-                stats.speed += 1
+                stats.speed += 2
                 stats.range += 1
             }
-            //V65: глава 4 — ещё х1.5 ХП, урон +2/+8, скорость и зоркость +1; V67a: скорость +2
+            //V65: глава 4 — ещё х1.5 ХП, урон +2/+8, зоркость +1; V67a: скорость +2; V143: скорость ещё +4 (было +2)
             if(status.meta.page > 3) {
                 stats.hp *= 1.5
                 stats.dmg[0] += 2
                 stats.dmg[1] += 8
-                stats.speed += 2
+                stats.speed += 4
                 stats.range += 1
             }
             if (emptyCellArr.length>enemesCount) {

@@ -536,8 +536,8 @@ function spawnCultist(level) {
     for (const a of cls.anims[1].attack) a.attackNew && (a.attackNew.anim[0] = 22)
     const stats = JSON.parse(JSON.stringify(lider.stats))
     stats.hp *= 2; stats.dmg[0] += 1; stats.dmg[1] += 2
-    stats.hp *= 2; stats.dmg[0] += 2; stats.dmg[1] += 6; stats.speed += 1; stats.range += 1
-    stats.hp *= 1.5; stats.dmg[0] += 2; stats.dmg[1] += 8; stats.speed += 2; stats.range += 1
+    stats.hp *= 2; stats.dmg[0] += 2; stats.dmg[1] += 6; stats.speed += 2; stats.range += 1 //V143: скорость 3 главы +2 (было +1)
+    stats.hp *= 1.5; stats.dmg[0] += 2; stats.dmg[1] += 8; stats.speed += 4; stats.range += 1 //V143: скорость 4 главы ещё +4 (было +2)
     stats.hp *= 4
     stats.crushAttack = 1
     stats.exp = 10

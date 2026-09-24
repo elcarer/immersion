@@ -824,12 +824,12 @@ function spawnShellBoss(level, sh) {
     stats.hp *= 2
     stats.dmg[0] += 2
     stats.dmg[1] += 6
-    stats.speed += 1
+    stats.speed += 2   //V143: 3 глава +2 (было +1)
     stats.range += 1
     stats.hp *= 1.5
     stats.dmg[0] += 2
     stats.dmg[1] += 8
-    stats.speed += 2
+    stats.speed += 4   //V143: 4 глава ещё +4 (было +2)
     stats.range += 1
     let spawnAnim = cls.anims[2].others[2]
     objectValues.push({"id":status.oVcount,"type":"enemy","class":cls,"stats":stats,

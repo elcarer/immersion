@@ -20,19 +20,20 @@ function createMummy(obj) {
     const spawn = freeDropCell(obj[0],obj[1]+2)
     let type = 4 + 6*status.levelFloor
     let stats = JSON.parse(JSON.stringify(data.enemes[type][0].stats))
+    //V143: 3 глава — скорость +2 (было +1 с V65); 4 глава — ещё +4 (было +2)
     if(status.meta.page > 2) {
         stats.hp *= 2
         stats.dmg[0] += 2
         stats.dmg[1] += 4
-        stats.speed += 1
+        stats.speed += 2
         stats.range += 1
     }
-    //V65: глава 4 — ещё х1.5 ХП, урон +2/+8, скорость и зоркость +1; V67a: скорость +2
+    //V65: глава 4 — ещё х1.5 ХП, урон +2/+8, зоркость +1; V67a: скорость +2; V143: скорость ещё +4 (было +2)
     if(status.meta.page > 3) {
         stats.hp *= 1.5
         stats.dmg[0] += 2
         stats.dmg[1] += 8
-        stats.speed += 2
+        stats.speed += 4
         stats.range += 1
     }
     objectValues.push({"id":status.oVcount,"type":"enemy","class":data.enemes[type][0],"stats":stats,"animCounters":60/data.enemes[type][0].anims[2].others[2].speed,"currentAnim":data.enemes[type][0].anims[2].others[2],"currentStill":0,"room":obj[9],"cells":createCells(obj[9]),"state":0,"stop":0,"xCell":spawn[0],"yCell":spawn[1],"noStunTime":0,
@@ -56,19 +57,20 @@ function createRat(obj) {
     const spawn = freeDropCell(obj[0],obj[1]+2)
     let type = 5 + 6*status.levelFloor
     let stats = JSON.parse(JSON.stringify(data.enemes[type][0].stats))
+    //V143: 3 глава — скорость +2 (было +1 с V65); 4 глава — ещё +4 (было +2)
     if(status.meta.page > 2) {
         stats.hp *= 2
         stats.dmg[0] += 2
         stats.dmg[1] += 4
-        stats.speed += 1
+        stats.speed += 2
         stats.range += 1
     }
-    //V65: глава 4 — ещё х1.5 ХП, урон +2/+8, скорость и зоркость +1; V67a: скорость +2
+    //V65: глава 4 — ещё х1.5 ХП, урон +2/+8, зоркость +1; V67a: скорость +2; V143: скорость ещё +4 (было +2)
     if(status.meta.page > 3) {
         stats.hp *= 1.5
         stats.dmg[0] += 2
         stats.dmg[1] += 8
-        stats.speed += 2
+        stats.speed += 4
         stats.range += 1
     }
     objectValues.push({"id":status.oVcount,"type":"enemy","class":data.enemes[type][0],"stats":stats,"animCounters":60/data.enemes[type][0].anims[0].move[2].speed,"currentAnim":data.enemes[type][0].anims[0].move[2],"currentStill":0,"room":obj[9],"cells":createCells(obj[9]),"state":0,"stop":0,"xCell":spawn[0],"yCell":spawn[1],"noStunTime":0,
