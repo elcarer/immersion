@@ -259,20 +259,39 @@ function loadFromFile() {
         reader.onload = e1 => {
             let data = JSON.parse(decryptGameState(e1.target.result))
             if (data && data.meta) {
-                //V124: кооп-файл разбирается по уровням профиля (applyCoopProfile); соло-файл,
-                //загруженный в кооп-сессии, идёт тем же путём — его поля становятся профилем
-                //игрока 1 (классы не трогаем). В соло-сессии файл заменяет мету целиком
-                if (data.meta.mode === "coop" || status.players.length > 1) {
+                //V141 (репорт юзера: соло-сейв из кооп-лобби не переключил лобби на соло):
+                //тип игры переключается на тип ЗАГРУЖЕННОГО ФАЙЛА. Раньше выбор ветки шёл
+                //по ТЕКУЩЕЙ сессии — соло-файл в кооп-лобби вливался в кооп-профиль (игрок 2
+                //оставался с шаблонной метой), и лобби оставалось кооперативным
+                if (data.meta.mode === "coop") {
+                    if (status.players.length < 2) {
+                        //переключение соло → кооп: пара игроков пересобирается заново
+                        //(свежие забегные статы/инвентарь), как в modeSelect кооп-ветки
+                        status.players.length = 1
+                        status.players[0] = makePlayer("kb1",0,0)
+                        status.players.push(makePlayer("kb2",1,1))
+                    }
                     applyCoopProfile(data.meta)
-                    if (data.meta.mode === "coop" && Array.isArray(data.meta.players)) {
+                    if (Array.isArray(data.meta.players)) {
                         status.players[0].class = data.meta.players[0].class
                         status.players[1].class = data.meta.players[1].class
                     }
                 } else {
+                    if (status.players.length > 1) {
+                        //переключение кооп → соло: состав режется до одного игрока,
+                        //контекст возвращается игроку 1 (в кооп-лобби он мог стоять на
+                        //шаге игрока 2 — status.inventory/info писали бы не туда)
+                        status.players.length = 1
+                        status.players[0].device = "solo"
+                        setContext(status.players[0])
+                    }
                     normMeta(data.meta)
                     status.meta = data.meta
                 }
                 status.settings = {musicVolume:0.1, soundVolume:0.1, ...(data.settings || {})}
+                //V141: lastMode — строго по типу файла, чтобы save() в lobby() сразу
+                //писал профиль в слот загруженного режима
+                status.settings.lastMode = data.meta.mode === "coop" ? "coop" : "solo"
                 //V58: язык из файла сейва (нет поля — русский)
                 if (status.settings.lang !== "en") status.settings.lang = "ru"
                 setLang(status.settings.lang)
