@@ -1136,6 +1136,8 @@ const PAIRS = [
     //V95: чекбоксы эффектов предметов в Настройках
     ["settings.itemFrames", "Рамка предметов", "Item frames"],
     ["settings.itemGlow", "Свечение предметов", "Item glow"],
+    //V144: чекбокс «Эмоции» — эмодзи врагов (заметил/потерял/умер/убегает)
+    ["settings.emotions", "Эмоции", "Emotions"],
     //V126: панель «Управление» — переназначение кнопок клавиатуры и геймпада
     ["settings.controls", "Управление", "Controls"],
     ["controls.title", "УПРАВЛЕНИЕ", "CONTROLS"],

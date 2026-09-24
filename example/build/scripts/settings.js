@@ -45,6 +45,17 @@ function toggleItemGlow() {
     glowCheckMark && glowCheckMark.setAttribute("display", status.settings.itemGlow ? "inline" : "none")
     refreshItemFxContext()
 }
+//V144: чекбокс «Эмоции» — показ эмодзи врагов (emo1 заметил / emo2 потерял / emo3 умер /
+//emo4 убегает). Поле status.settings.emotions (0/1, слот settings, saveSettings); семантика
+//та же, что у эффектов предметов: в старых сейвах поля нет (undefined = включено) —
+//первый клик выключает. Gate читает enemyAI при спавне эмоции
+let emotionsCheckMark = null
+function toggleEmotions() {
+    playback(strike[14].vol,0,0,3*status.settings.soundVolume)
+    status.settings.emotions = status.settings.emotions === 0 ? 1 : 0
+    saveSettings()
+    emotionsCheckMark && emotionsCheckMark.setAttribute("display", status.settings.emotions !== 0 ? "inline" : "none")
+}
 //V95: немедленное применение к открытому экрану. В лобби сундук виден за панелью настроек —
 //полная перерисовка (та же последовательность, что у смены языка: settingsDel(1) → lobby →
 //settings). На заставке предметов нет, в забеге панели перекрыты — эффекты применятся при
@@ -125,6 +136,17 @@ function settings() {
     glowCheckMark.setAttribute("pointer-events", "none")
     settingsTemp.push(glowCheckMark)
     settingsTemp.push(text(svgArr[2],1072,758,"0pt","50pt","black","2px",`rgb(204, 153, 102)`,T("settings.itemGlow"),{"id":"delItemText","size":34,"font":"baseFont4","anchor":"start"}))
+
+    //V144: чекбокс «Эмоции» — отдельный ряд ниже строки эффектов предметов (по ширине там
+    //третий не помещается). Отрисовка как у них (V80a): чекбокс первым, галочка поверх
+    //с pointer-events="none"; галочка видна по умолчанию (undefined = включено)
+    settingsTemp.push(rect(svgArr[2],640,768,34,34,`rgb(204, 153, 102)`,"3px","black",{"rx":"4px","func":toggleEmotions}))
+    emotionsCheckMark = path(svgArr[2],{"id":"emotionsCheck","x":0,"y":0,"r":0,
+        "d":"M 645 788 L 654 798 L 669 775 L 665 772 L 654 791 L 649 785 Z"},`rgb(204, 153, 102)`)
+    emotionsCheckMark.setAttribute("display", status.settings.emotions !== 0 ? "inline" : "none")
+    emotionsCheckMark.setAttribute("pointer-events", "none")
+    settingsTemp.push(emotionsCheckMark)
+    settingsTemp.push(text(svgArr[2],692,796,"0pt","50pt","black","2px",`rgb(204, 153, 102)`,T("settings.emotions"),{"id":"delItemText","size":34,"font":"baseFont4","anchor":"start"}))
 
     //V60: нижняя кнопка панели. Со стартового экрана — ОТМЕНА (просто закрыть настройки),
     //иначе — ГЛАВНОЕ МЕНЮ: из забега (status.start===1) с окном предупреждения ДА/НЕТ

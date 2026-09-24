@@ -178,32 +178,55 @@ export function enemySeesHero(enemy) {
     return false
 }
 
-// ---------- эмоция «заметил героя»: emo1.png над rect на 1с ----------
+// ---------- эмоции врага: emo1 «заметил», emo2 «потерял», emo3 «умер», emo4 «убегает» ----------
+//V144: emo2 спавнится в точках сброса погони (дошёл до последней известной клетки / путь
+//недостижим / раненый вернулся к патрулю), emo3 — в enemyDie, emo4 — на входе раненого в
+//бегство (E-10). emo3 живёт без привязки к врагу: в момент смерти type уже "corpse",
+//эмоция стоит на месте смерти. Чекбокс «Эмоции» (status.settings.emotions, 0 = выкл; в
+//старых сейвах поля нет — undefined = включено) гасит все четыре: gate читается при
+//спавне, уже показанные эмоции доигрывают своё время
 let emoFx = []
-function spawnEmo(enemy) {
+function spawnEmo(enemy, kind) {
+    if (enemy.type !== "enemy" || status.settings.emotions === 0) return
     for (let i = 0; i < emoFx.length; i++) {
-        if (emoFx[i].enemy === enemy) return
+        if (emoFx[i].enemy === enemy && emoFx[i].kind === kind) return
     }
     const r = enemy.rect
     emoFx.push({
         enemy,
+        kind,
         time: 63,
-        img: image(svgArr[1], r.x.animVal.value + r.width.animVal.value - 32, r.y.animVal.value - 32, 32, 32, "./images/effects/emo1.png", {}),
+        img: image(svgArr[1], r.x.animVal.value + r.width.animVal.value - 32, r.y.animVal.value - 32, 32, 32, "./images/effects/emo" + kind + ".png", {}),
+    })
+}
+//emo3 «умер»: позиция фиксируется на момент смерти — трекинг не нужен (враг уже corpse)
+function spawnDeathEmo(enemy) {
+    if (enemy.type !== "enemy" || status.settings.emotions === 0) return
+    const r = enemy.rect
+    emoFx.push({
+        enemy: null,
+        kind: 3,
+        time: 63,
+        img: image(svgArr[1], r.x.animVal.value + r.width.animVal.value - 32, r.y.animVal.value - 32, 32, 32, "./images/effects/emo3.png", {}),
     })
 }
 export function emoFxTick() {
     if (!emoFx.length) return
     for (let i = emoFx.length - 1; i >= 0; i--) {
         const fx = emoFx[i]
-        if (fx.time <= 0 || fx.enemy.type !== "enemy") {
+        //enemy=null (emo3) стоит на месте смерти; живая эмоция гаснет досрочно, если
+        //враг перестал быть "enemy" (смерть снимает emo1/emo2 сразу, очарование — тоже)
+        if (fx.time <= 0 || (fx.enemy && fx.enemy.type !== "enemy")) {
             fx.img.remove()
             emoFx.splice(i, 1)
             continue
         }
         fx.time--
-        const r = fx.enemy.rect
-        const rPos = rectPos(r)
-        spritePos(fx.img, rPos[0] + r._w - 32, rPos[1] - 32)
+        if (fx.enemy) {
+            const r = fx.enemy.rect
+            const rPos = rectPos(r)
+            spritePos(fx.img, rPos[0] + r._w - 32, rPos[1] - 32)
+        }
     }
 }
 export function resetEmoFx() {
@@ -660,7 +683,7 @@ export function enemyNoticeHero(enemy) {
     if (enemy.type !== "enemy" || enemy.lying !== undefined) return
     if (!enemy.noticed) {
         enemy.noticed = 1
-        spawnEmo(enemy)
+        spawnEmo(enemy, 1)
     }
     enemyChase(enemy)
 }
@@ -1067,6 +1090,9 @@ function spawnGoldPile(x, y, w=64, h=64) {
 }
 export function enemyDie(enemy, exp) {
     if (enemy.type !== "enemy") return
+    //V144: эмоция «умер» — спавн ДО смены type (spawnDeathEmo ждёт живого врага),
+    //позиция фиксируется по rect на момент смерти
+    spawnDeathEmo(enemy)
     !status.meta.killedEnemes[enemy.class.id] && (status.meta.killedEnemes[enemy.class.id] = 0)
     status.meta.killedEnemes[enemy.class.id]++
     //V36: зачёт библиотеки живёт между забегами — killedEnemes (забегный счётчик опыта) сбрасывается
@@ -1341,6 +1367,7 @@ function chaseStep(enemy) {
     // герой потерян: дошли до последней известной клетки — блуждаем
     if (!sees && !enemy.called && Math.abs(dx) < 8 && Math.abs(dy) < 8) {
         enemy.noticed = 0
+        spawnEmo(enemy, 2)   //V144: эмоция «потерял героя»
         startPatrolWander(enemy)
         return
     }
@@ -1408,6 +1435,7 @@ function chaseStep(enemy) {
             enemy._heroCellMoves = 0
         } else if (retry) {
             enemy.noticed = 0
+            spawnEmo(enemy, 2)   //V144: эмоция «потерял героя» (зона недостижима)
             enemy.pathFail = undefined
             startPatrolWander(enemy)
             return
@@ -1478,6 +1506,7 @@ function onPathEnd(enemy) {
         else {
             // дошли до последней известной клетки героя, его там нет — блуждаем
             enemy.noticed = 0
+            spawnEmo(enemy, 2)   //V144: эмоция «потерял героя»
             startPatrolWander(enemy)
         }
     } else if (enemy.state === ENEMY_STATE.FLEE) {
@@ -1694,6 +1723,7 @@ function fleeTick(enemy, sees) {
     } else {
         // героя давно не видно — раненый возвращается к обычному патрулю
         enemy.noticed = 0
+        spawnEmo(enemy, 2)   //V144: эмоция «потерял героя»
         startPatrolWander(enemy)
         return
     }
@@ -2030,6 +2060,7 @@ export function enemyTick(enemy) {
             enemy.fleePhase = "flee"
             enemy.path = []
             enemy.pathTarget = null
+            spawnEmo(enemy, 4)   //V144: эмоция «раненый убегает» — на входе в бегство
             setEnemyState(enemy, ENEMY_STATE.FLEE)
         }
     } else if (enemy.state === ENEMY_STATE.FLEE) {
