@@ -29,6 +29,13 @@ import { changeHP } from "../scripts/takeDamage.js"
 let COL = `rgb(204, 153, 102)`
 //пул благословений: ключи bless.N.name / bless.N.desc (нумерация — как в постановке)
 const BLESS_POOL = [1,2,3,4,5,6,7,8,9]
+//V145: у каждого благословения своя иконка — blessN.png нарезаны из спрайтшита юзера
+//(forWork/bless_icons.py): 1 стальная кожа — щит, 2 зеркало — око-линза, 3 громила — мечи,
+//4 заучка — глаз, 5 кровавый пакт — руна, 6 второе дыхание — феникс, 7 хлебосол — кубок,
+//8 золотое эхо — кубок, 9 сын ветра — торнадо. Одно место — и меню шкафа, и ряд HUD
+function blessIcon(id) {
+    return "./images/effects/bless/bless" + id + ".png"
+}
 let ancientTemp = []
 let ancientObj = null
 let hintIcons = []
@@ -54,6 +61,7 @@ function blessMaxHpMult() {
 }
 //V75: открытие меню шкафчика — пауза, чёрная подложка, заголовок и три окна благословений
 //(панель 380×560 на panel.png, иконка bless.png ×3, имя и переносимое описание)
+//V145: иконка каждой карточки — своя, blessIcon(id)
 function openAncient(obj) {
     ancientObj = obj
     status.pause = 1
@@ -90,7 +98,7 @@ function openAncient(obj) {
         let id = picks[i]
         let x = 350 + i * 420
         ancientTemp.push(image(svgArr[2],x,230,380,560,"./images/UI/panels/panel.png",{"glow":1,"func":e => grantBless(id,ancientObj)}))
-        ancientTemp.push(image(svgArr[2],x + 142,290,96,99,"./images/effects/bless.png"))
+        ancientTemp.push(image(svgArr[2],x + 142,290,96,99,blessIcon(id)))
         ancientTemp.push(text(svgArr[2],x + 190,455,"0pt","50pt","black","2px",COL,T("bless." + id + ".name"),{"id":"ancientN"+i,"size":40,"font":"baseFont4","anchor":"middle"}))
         //R4.4: нативный html-блок с переносом по словам на ширине блока
         let fo = nativeHtml(svgArr[2],x + 30,495,320,260,"black","2px",COL,T("bless." + id + ".desc"),{"id":"ancientD"+i,"size":26,"font":"baseFont4"})
@@ -160,7 +168,7 @@ function renderBlessHints() {
     let total = b.length * 44 - 12
     let x0 = 960 - total / 2
     for (let i = 0; i < b.length; i++) {
-        hintIcons.push(image(svgArr[2],x0 + i * 44,8,32,33,"./images/effects/bless.png",{"funcShow":e => showBlessTip(b[i],x0 + i * 44),"funcShowOut":hideBlessTip}))
+        hintIcons.push(image(svgArr[2],x0 + i * 44,8,32,33,blessIcon(b[i]),{"funcShow":e => showBlessTip(b[i],x0 + i * 44),"funcShowOut":hideBlessTip}))
     }
 }
 //скрытие ряда: иконки и открытое информационное окно гасятся вместе
