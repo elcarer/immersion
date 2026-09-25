@@ -42,6 +42,8 @@ import { removeEntShadow } from "../scripts/groundShadow.js"
 import { placeDrop, dropFly } from "../scripts/dropSafe.js"
 //V111: урон лавы идёт мимо брони напрямую в ХП (как алтарь case 12)
 import { changeHP } from "../scripts/takeDamage.js"
+//V146: «Архивариус» — проверка «все сюжетные квесты завершены» при постановке флага
+import { achQuestCheck } from "../scripts/achievements.js"
 
 const USE_TICKS = 45             //полоска взаимодействия (как у Волка/культиста, ~0.72с)
 const NEAR = [[0,0],[0,-1],[1,-1],[-1,-1],[1,0],[-1,0],[1,1],[-1,1],[0,1]]
@@ -451,6 +453,8 @@ function finale(q, e) {
     dropFly(el, p[0] + 16, p[1] + 25)
     flamePiles.add(el)
     status.meta.quests.flame = 1
+    //V146: «Архивариус» — не стал ли этот квест последним
+    achQuestCheck()
     save()
     journalAdd(T("journ.fq.done"), J_YELLOW)
     clearLava(q)
@@ -473,6 +477,8 @@ export function flameQuestEnemyDie(enemy) {
     floatText(status.hero.x - 16 + Math.trunc(Math.random() * 32), status.hero.y + 8, T("float.flameBuff"), "#FF8800", "18px", "none")
     journalAdd(T("journ.fq.buff"), J_GREEN)
     status.meta.quests.flame = 1
+    //V146: «Архивариус» — не стал ли этот квест последним
+    achQuestCheck()
     save()
 }
 //подбор кучки-награды: зачарование ТЕКУЩЕГО оружия (слоты куклы 11-12).

@@ -46,6 +46,8 @@ import { removeEntShadow } from "../scripts/groundShadow.js"
 //полёт и посадка кучек-наград — как у Ростка (entQuest)
 import { placeDrop, dropFly } from "../scripts/dropSafe.js"
 import { playback, strike } from "../scripts/sound.js"
+//V146: «Архивариус» — проверка «все сюжетные квесты завершены» при постановке флага
+import { achQuestCheck } from "../scripts/achievements.js"
 
 const USE_TICKS = 45             //полоска взаимодействия (как у Древоброда)
 const NEAR = [[0,0],[0,-1],[1,-1],[-1,-1],[1,0],[-1,0],[1,1],[-1,1],[0,1]]
@@ -346,6 +348,8 @@ function raceEnd(q, sash) {
         journalAdd(T("journ.hrup.item"), J_STD)
     }
     status.meta.quests.hrup = 1
+    //V146: «Архивариус» — не стал ли этот квест последним
+    achQuestCheck()
     save()
     journalAdd(T("journ.hrup.done"), J_YELLOW)
     trackerHide()
@@ -770,6 +774,8 @@ export function hrupQuestEnemyDie(enemy) {
             status.questHrup = null
         }
         status.meta.quests.hrup = 1
+        //V146: «Архивариус» — не стал ли этот квест последним
+        achQuestCheck()
         save()
         journalAdd(T("journ.hrup.done"), J_YELLOW)
         journalAdd(T("journ.hrup.epic"), J_STD)

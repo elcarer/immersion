@@ -63,12 +63,13 @@ function normShared(meta) {
     } else if (meta.libraryObjects.length < 81) {
         meta.libraryObjects.push(...new Array(81 - meta.libraryObjects.length).fill(0))
     }
-    //V52: достижения (8 слотов) и классы гибели «Перебора» (4 слота) — живут между забегами,
+    //V52: достижения (8 слотов, V146 — 12: добавились «Архивариус»/«Коллекционер»/
+    //«Одетый»/«Дуэт») и классы гибели «Перебора» (4 слота) — живут между забегами,
     //metaItems их не сбрасывает
     if (!Array.isArray(meta.achievements)) {
-        meta.achievements = new Array(8).fill(0)
-    } else if (meta.achievements.length < 8) {
-        meta.achievements.push(...new Array(8 - meta.achievements.length).fill(0))
+        meta.achievements = new Array(12).fill(0)
+    } else if (meta.achievements.length < 12) {
+        meta.achievements.push(...new Array(12 - meta.achievements.length).fill(0))
     }
     if (!Array.isArray(meta.diedClasses)) {
         meta.diedClasses = new Array(4).fill(0)

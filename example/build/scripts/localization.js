@@ -908,6 +908,15 @@ const PAIRS = [
     ["ach.6.desc", "Открыты все мета-улучшения: максимум всех веток прокачки.", "All meta upgrades unlocked: maximum of every upgrade branch."],
     ["ach.7.name", "Перебор", "Overdone"],
     ["ach.7.desc", "Погибнуть всеми четырьмя классами.", "Die with all four classes."],
+    //V146: четыре новых достижения
+    ["ach.8.name", "Архивариус", "Archivist"],
+    ["ach.8.desc", "Завершить все квесты, которые есть в игре.", "Complete every quest the game has to offer."],
+    ["ach.9.name", "Коллекционер", "Collector"],
+    ["ach.9.desc", "Добыть все реликвии в игре — пул дропа реликвий из боссов опустеет.", "Obtain every relic in the game, emptying the bosses' relic drop pool."],
+    ["ach.10.name", "Одетый", "Dressed Up"],
+    ["ach.10.desc", "Одеть на героя 6 разных предметов из одного сета и получить этим эффект сетовой способности для 6 предметов.", "Equip the hero with six different items of the same set to gain the set's six-item bonus."],
+    ["ach.11.name", "Дуэт", "Duet"],
+    ["ach.11.desc", "Победить босса 4 этажа в кооперативном режиме.", "Defeat a floor four boss in cooperative mode."],
     //V60: нижняя кнопка панели настроек (ГЛАВНОЕ МЕНЮ из забега/лобби, ОТМЕНА со стартового
     //экрана) и окно предупреждения при выходе в главное меню из забега
     ["settings.mainmenu", "ГЛАВНОЕ МЕНЮ", "MAIN MENU"],

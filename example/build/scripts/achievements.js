@@ -10,7 +10,13 @@
 //  achSkillsCheck — skillTree.skillEffect (все способности ТЕКУЩЕГО класса на своих
 //  максимумах за один забег — трактовка «Кап-кап», решение пользователя);
 //  achMetaCheck — lobby.upgrade (максимум всех веток прокачки; V74: герои открыты сразу);
-//  achDeath — endGame (гибель всеми 4 классами, мета между забегами).
+//  achDeath — endGame (гибель всеми 4 классами, мета между забегами);
+//  V146: achQuestCheck — каждая точка постановки флага сюжетного квеста (все флаги
+//  meta.quests = «Архивариус», тот же список, что показывает кнопка «завершённые
+//  квесты» лобби); achRelicCheck — relics.relicGenerate (добыты ВСЕ реликвии, пул
+//  уникальности опустел — «Коллекционер»); achDressCheck — drag.equip (6 предметов
+//  одного сета на кукле = активный 6-й сетовой бонус — «Одетый»); achDuet —
+//  enemyAI.enemyDie (в коопе убит босс 4 этажа — «Дуэт»).
 //Библиотека берёт ACH_LIST для третьего режима «Достижения» (кнопка achievLib.png): карточка
 //до открытия — «???» и чёрный силуэт (приём врагов/объектов), после — название выделяющимся
 //цветом (#FFCC66) и текст стандартным цветом надписей (решение пользователя).
@@ -35,6 +41,11 @@ const ACH_LIST = [
     {"name": "ach.5.name", "desc": "ach.5.desc"},
     {"name": "ach.6.name", "desc": "ach.6.desc"},
     {"name": "ach.7.name", "desc": "ach.7.desc"},
+    //V146: четыре новых достижения (слоты 8-11, normShared добивает старые сейвы)
+    {"name": "ach.8.name", "desc": "ach.8.desc"},
+    {"name": "ach.9.name", "desc": "ach.9.desc"},
+    {"name": "ach.10.name", "desc": "ach.10.desc"},
+    {"name": "ach.11.name", "desc": "ach.11.desc"},
 ]
 
 const ACH_GOLD = "#FFCC66" //цвет названия открытого достижения (журнал/всплывашка — тем же)
@@ -193,4 +204,65 @@ function achDeath() {
     died[0] && died[1] && died[2] && died[3] && achUnlock(7)
 }
 
-export {ACH_LIST, achTame, achKill, achFloorStart, achFloorEnd, achTick, achSkillsCheck, achMetaCheck, achDeath}
+//--- 8 «Архивариус» (V146): завершены ВСЕ сюжетные квесты. Список ключей meta.quests —
+//тот же, что показывает кнопка «завершённые квесты» лобби (V112): Волк, портал,
+//Слаймэн, Огнементаль, Древоброд, Хруп. Новый квест добавит флаг в meta.quests —
+//его ключ нужно дописать и сюда (проверка идёт по этому списку). Зовётся из КАЖДОЙ
+//точки постановки флага — неизвестно, какой квест станет последним
+const QUEST_KEYS = ["wolf", "portal", "slime", "flame", "ent", "hrup"]
+function achQuestCheck() {
+    let q = status.meta.quests
+    if (!q) return
+    for (let i = 0; i < QUEST_KEYS.length; i++) {
+        if (q[QUEST_KEYS[i]] !== 1) return
+    }
+    achUnlock(8)
+}
+
+//--- 9 «Коллекционер» (V146): добыты все 7 реликвий — пул уникальности (meta.obtainedRelics)
+//опустел, боссы больше не дают реликвий. Список = RELICS (relics.js), kind 0..6; новый
+//вид реликвий продлит normShared и потребует увеличить порог здесь. Зовётся из
+//relics.relicGenerate сразу после записи выпавшей kind в мету
+function achRelicCheck() {
+    let got = status.meta.obtainedRelics
+    if (!Array.isArray(got)) return
+    for (let i = 0; i < 7; i++) {
+        if (!got[i]) return
+    }
+    achUnlock(9)
+}
+
+//--- 10 «Одетый» (V146): на герое 6 предметов одного сета — активен 6-й сетовой бонус.
+//Считаем только настоящие предметы сета на кукле (та же проверка, что itemSet в sets.js —
+//без импорта: sets → relics → этот модуль, лишний цикл ни к чему): «Вечный берилл»
+//(+1 к каждому сету) и копия «Сапфира» порог НЕ засчитывают — формулировка требует
+//именно вещи. 6 предметов на кукле всегда в разных слотах (кукла слот не делит).
+//Зовётся из drag.equip — кукла к моменту вызова уже несёт надетый предмет
+function achDressCheck(item) {
+    if (!item || item.rarity !== 3 || !item.set) return
+    let count = 0
+    let doll = status.inventory.doll
+    for (let i = 0; i < doll.length; i++) {
+        let d = doll[i]
+        d && d.rarity === 3 && d.set === item.set && count++
+    }
+    count >= 6 && achUnlock(10)
+}
+
+//--- 11 «Дуэт» (V146): в кооперативном режиме убит босс 4 этажа. Виды — записи с тегом
+//boss в группе data.enemes[18] (Циклоп 25 / Медуза 26 / Гриб пустоты 27; те же, что
+//копит «Я сделал!» — мини-грибы/клоны тега не имеют, культист/Огнементаль тоже).
+//Момент смерти босса — победа независимо от этажа, где он встречен (связки порталов
+//выводят на боссов 4 этажа и в 3 главе). Зовётся из enemyAI.enemyDie в boss-блоке
+function achDuet(enemy) {
+    if (!enemy || !enemy.class || status.players.length < 2) return
+    let group = data.enemes[18]
+    for (let i = 0; i < group.length; i++) {
+        if (group[i].boss === 1 && group[i].id === enemy.class.id) {
+            achUnlock(11)
+            return
+        }
+    }
+}
+
+export {ACH_LIST, achTame, achKill, achFloorStart, achFloorEnd, achTick, achSkillsCheck, achMetaCheck, achDeath, achQuestCheck, achRelicCheck, achDressCheck, achDuet}

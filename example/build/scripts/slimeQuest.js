@@ -39,6 +39,8 @@ import { floatText } from "../scripts/floatText.js"
 import { journalAdd, J_STD, J_RED, J_YELLOW } from "../scripts/journal.js"
 import { openDialog } from "../scripts/dialog.js"
 import { save } from "../scripts/save.js"
+//V146: «Архивариус» — проверка «все сюжетные квесты завершены» при постановке флага
+import { achQuestCheck } from "../scripts/achievements.js"
 //исчезающий Слаймэн уносит тень (как Волк/культист/огнементаль)
 import { removeEntShadow, removeObjShadow, objectShadow } from "../scripts/groundShadow.js"
 //штатные хелперы порталов (телепорты переносят ОБОИХ игроков — V123)
@@ -514,6 +516,8 @@ function openFinalDialog(q) {
 //любая кнопка финала = квест выполнен: мета сразу (решение пользователя)
 function questDone(q) {
     status.meta.quests.slime = 1
+    //V146: «Архивариус» — не стал ли этот квест последним
+    achQuestCheck()
     save()
     //стартовый портал — красный и мёртвый (как после сети V109), рычаг исчезает
     if (q.portal) {

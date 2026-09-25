@@ -19,6 +19,8 @@ import { beltChange } from "../scripts/belt.js"
 import { changeHP,dollArmor } from "../scripts/takeDamage.js"
 //V56: сет «Доблестный небожитель» (4 надетых): двуручное оружие занимает только одну руку
 import { setTwoHandOneHand } from "../scripts/sets.js"
+//V146: «Одетый» — 6 предметов одного сета на кукле (активен 6-й сетовой бонус)
+import { achDressCheck } from "../scripts/achievements.js"
 //V63a: двуручность нельзя определять только строкой "hand.2": у вещей из старого сундука
 //V58-миграция (keyByRu) перевела русское «руки» в ПЕРВЫЙ подходящий ключ пары —
 //"weapon.2.desc2", поэтому проверка desc2 === "hand.2" их не видела, и щит второй руки
@@ -361,6 +363,9 @@ function equip(item) {
     if(item.abil && item.abil.desc === "iabil.5.desc") {
         status.info.greedus++
     }
+    //V146: «Одетый» — 6 предметов одного сета на кукле (активен 6-й сетовой бонус); кукла
+    //к этому месту уже несёт надетый предмет — все пути постановки зовут equip после записи
+    achDressCheck(item)
 }
 function unEquip(item) {
     //E-20: страховка половинных путей (changeItem2 = null в обмене со слотом) — раньше

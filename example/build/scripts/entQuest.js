@@ -44,6 +44,8 @@ import { removeEntShadow, removeObjShadow, objectShadow } from "../scripts/groun
 //полёт и посадка кучки-награды — как у Кома слизи (slimeQuest/portalQuest)
 import { placeDrop, dropFly } from "../scripts/dropSafe.js"
 import { playback, strike } from "../scripts/sound.js"
+//V146: «Архивариус» — проверка «все сюжетные квесты завершены» при постановке флага
+import { achQuestCheck } from "../scripts/achievements.js"
 
 const USE_TICKS = 45             //полоска взаимодействия (как у Слаймэна, ~0.72с)
 const NEAR = [[0,0],[0,-1],[1,-1],[-1,-1],[1,0],[-1,0],[1,1],[-1,1],[0,1]]
@@ -447,6 +449,8 @@ function hmphEnd(q) {
     entPiles.add(el)
     journalAdd(T("journ.ent.item"), J_STD)
     status.meta.quests.ent = 1
+    //V146: «Архивариус» — не стал ли этот квест последним
+    achQuestCheck()
     save()
     journalAdd(T("journ.ent.done"), J_YELLOW)
     trackerHide()

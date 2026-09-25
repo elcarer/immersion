@@ -37,6 +37,8 @@ import { showEnemyHpBar, hideEnemyHpBar } from "../scripts/enemyHpBarFx.js"
 import { removeEntShadow } from "../scripts/groundShadow.js"
 import { journalAdd, J_RED } from "../scripts/journal.js"
 import { playback, strike } from "../scripts/sound.js"
+//V146: «Архивариус» — проверка «все сюжетные квесты завершены» при постановке флага
+import { achQuestCheck } from "../scripts/achievements.js"
 import { addAnim } from "../scripts/animPlay.js"
 import { openDialog } from "../scripts/dialog.js"
 import { itemGenerate } from "../scripts/itemGenerate.js"
@@ -494,6 +496,8 @@ function questFloorExit(cont) {
             status.quest.state = 4
             //V106: отметка о выполнении сюжетного квеста — в мету (сохраняется)
             status.meta.quests.wolf = 1
+            //V146: «Архивариус» — не стал ли этот квест последним
+            achQuestCheck()
             save()
             const wolf = wolfUnit()
             wolf && removeWolf(wolf)

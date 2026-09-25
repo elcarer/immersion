@@ -46,6 +46,8 @@ import { playback, strike } from "../scripts/sound.js"
 import { openDialog } from "../scripts/dialog.js"
 //V109: отметка о выполнении сюжетного квеста сохраняется сразу (meta в localStorage)
 import { save } from "../scripts/save.js"
+//V146: «Архивариус» — проверка «все сюжетные квесты завершены» при постановке флага
+import { achQuestCheck } from "../scripts/achievements.js"
 //V109: исчезающий живым культист уносит тень (как Волк в removeWolf); тень статичного
 //объекта — objectShadow/removeObjShadow (тем же конвейером, что createRoom)
 import { removeEntShadow, removeObjShadow, objectShadow } from "../scripts/groundShadow.js"
@@ -671,6 +673,8 @@ function questComplete(enemy) {
     removeCult(enemy)
     removeQuestPortal()
     status.meta.quests.portal = 1
+    //V146: «Архивариус» — не стал ли этот квест последним
+    achQuestCheck()
     save()
     journalAdd(T("journ.pq.done"), J_YELLOW)
     playback(strike[3].vol,0,0,2*status.settings.soundVolume)
@@ -721,6 +725,8 @@ export function portalQuestEnemyDie(enemy) {
         dropFly(el, p[0] + enemy.rect._w / 2, p[1] + enemy.rect._h / 2)
         journalAdd(T("journ.pq.done"), J_YELLOW)
         status.meta.quests.portal = 1
+        //V146: «Архивариус» — не стал ли этот квест последним
+        achQuestCheck()
         save()
         removeQuestPortal()
         qp.cult = null

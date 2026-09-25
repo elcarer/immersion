@@ -36,7 +36,9 @@ function defaultMeta() {
         "invNum":1,"inv":[null,null,null],
         "page":1,"pageMax":1,"openPage":[0,0,0],
         "metaInvLen":3,"startKey":0,"dopHP":0,"startStat":0,"metaPageNum":1,"identLegends":0,
-        "achievements":new Array(8).fill(0),
+        //V146: 12 слотов = 8 старых достижений + «Архивариус»/«Коллекционер»/«Одетый»/«Дуэт»
+        //(achievements.js ACH_LIST; старые сейвы добивает до 12 normShared в save.js)
+        "achievements":new Array(12).fill(0),
         "diedClasses":new Array(4).fill(0),
         //V68: пул уникальных реликвий — какие kind уже выпадали (1 = выпадала); живёт между
         //забегами, как libraryObjects; полная «Новая игра» сбрасывает профиль целиком.

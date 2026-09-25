@@ -59,7 +59,8 @@ import { changeBossHP, bossBarOwnerDied } from "../scripts/hpBar.js"
 import { playback, strike } from "../scripts/sound.js"
 import { objectValues,screenPic,doorPics } from "../scripts/del.js"
 //V52: «Массовик-затейник» — окно смертей врагов «одной атакой»
-import { achKill } from "../scripts/achievements.js"
+//V146: «Дуэт» — босс 4 этажа, убитый в кооперативном режиме
+import { achKill,achDuet } from "../scripts/achievements.js"
 //V64: смерть монстра арены — счёт «все 9 убиты» и появление рычага арены
 import { portalArenaKill } from "../scripts/portalFx.js"
 //V104: Волк-союзник (квест «Сопроводить Волка») — поведение в ветке pet enemyTick.
@@ -1157,6 +1158,8 @@ export function enemyDie(enemy, exp) {
     enemy.class.boss === 1 && (() => {
         Array.isArray(status.meta.bossesSlain) || (status.meta.bossesSlain = [])
         status.meta.bossesSlain.indexOf(enemy.class.id) === -1 && status.meta.bossesSlain.push(enemy.class.id)
+        //V146: «Дуэт» — босс 4 этажа пал в кооперативном режиме (виды те же, что выше)
+        achDuet(enemy)
     })()
     //V90: полоса ХП босса (правый верхний угол) снимается смертью владельца
     //(Медуза — с гибелью последнего живого осколка; логика в hpBar.js)
