@@ -1,0 +1,319 @@
+# Единый пиксель: разнопиксельность спрайтов и правила пиксель-арта в играх
+
+**Дата:** 2026-09-25 · **Игра:** «Погружение», билд 2.17 (V146) · **Повод:** жалобы игроков на разнопиксельность спрайтов
+**Статус:** исследование и рекомендации. В игре ничего не менялось — реализация и объём на выбор.
+
+---
+
+## TL;DR
+
+1. Жалоба игроков имеет устоявшееся имя — **«миксели» (mixels)**: пиксели разного видимого размера в одном кадре. Мозг читает пиксель-арт как единую сетку, и «чужая» ячейка воспринимается как поломка, а не как стиль.
+2. Канон жанра: **одна пиксельная сетка на весь игровой мир** («священное правило» Педро Медейроса). Допустимые исключения — UI, шрифты, свет/частицы — но только как *отдельные слои с чёткой границей* (каноничный пример — Celeste и её «три мира»).
+3. В «Погружении» разнопиксельность собирается из **трёх независимых источников**: (а) у AI-листов разное и нестабильное «зерно» — фактический размер внутренней ячейки каждого листа свой; (б) рендер-цепочка — непрерывный дробный зум камеры + принудительно линейная фильтрация текстур дают «мыло», а при попадании масштаба в целое число картинка скачком становится резкой (`pixelated`); (в) крупные враги в клетках 128px с собственным зерном выглядят «другим стилем» рядом с персонажами 64px.
+4. Путь починки — по возрастанию объёма: **Шаг 0: аудит зерна** всех листов скриптом (готовый MIT-инструмент Retro Diffusion *pixel-art-fixer*, работает из CLI, ничего в игре не трогает) → **Вариант A: рендер-минимум** (снап камеры и/или ступенчатый зум — маленькая кодовая правка) → **Вариант B: ре-растеризация** худших листов к единой сетке с пересборкой листов → **Вариант C: регенерация** новых персонажей на фиксированном гриде.
+5. Моя рекомендация: начать с Шага 0 + Варианта A; ре-растеризацию делать точечно по результатам аудита, а не «всё сразу».
+
+---
+
+## 1. Проблема: что игроки называют «разнопиксельностью»
+
+Термин, закрепившийся в сообществе, — **mixels** («миксели»): пиксели разного видимого размера внутри одной сцены или даже одного спрайта. Эссе shoutscion формулирует это жёстко: *«mixels look like some sort of bug»* — на настоящем ретро-железе смешанные размеры были физически невозможны (пиксель — минимальная единица экрана), поэтому глаз воспринимает нарушение сетки не как художественный приём, а как ошибку отрисовки.
+
+Ключевые термины, которыми оперируют источники:
+
+- **Пиксельная сетка (pixel grid)** — невидимая решётка, на которой лежит весь арт: каждый «арт-пиксель» занимает ровно N экранных пикселей, N одно для всего мира.
+- **Плотность (pixel density)** — число арт-пикселей на единицу игрового мира. Спрайт может быть любого размера на канве — важна только плотность: у двух спрайтов, стоящих рядом, она должна совпадать.
+- **Implied grid («мнимая сетка»)** — фактический шаг внутренней ячейки изображения. У AI-генераций он часто *дробный, дрейфующий и разный по осям*: картинка «похожа» на пиксель-арт, но ячейки 1.7px, полупиксельные сдвиги и двойные ячейки вперемешку.
+
+Правило Медейроса (Studio Miniboss, art Celeste), статья [«Consistency»](https://saint11.art/blog/consistency/):
+
+> «Священное правило пиксель-арта — не смешивать разрешения. Комбинирование спрайтов разной плотности даёт любительский, сбивающий с толку вид. Выбери одно разрешение и придерживайся его».
+
+Важный нюанс из того же источника: масштабировать можно только **всю канву целиком целым множителем** через nearest-neighbor. Никогда — отдельные спрайты и никогда — со сглаживанием.
+
+---
+
+## 2. Канонические правила «правильного» пиксель-арта
+
+Сводка по четырём каноническим школам: [Derek Yu](https://www.derekyu.com/makegames/pixelart.html) (классический туториал), [Cure на PixelJoint](https://pixeljoint.com/forum/forum_posts.asp?TID=11299) (фактический FAQ PixelJoint), [Raymond Schlitter / Slynyrd PixelBlog](https://www.slynyrd.com/blog/2018/5/16/pixelblog-5-back-to-basics), [Pedro Medeiros / Saint11](https://saint11.art/blog/pixel-art-tutorials/).
+
+### 2.1 Сетка и кластеры
+
+- Единица решений — **кластер**: группа соприкасающихся пикселей одного цвета. Cure: *«изолированный одиночный пиксель — это крапинка на экране, это шум»*. Medeiros: цель — «как можно меньше кластеров, однопиксельные кластеры избегать».
+- Каждая ячейка сетки должна быть одинаковой по всему спрайту. **2×2-ячейки рядом с 1×1 внутри одного спрайта — это и есть главный «миксель»-антипаттерн**; зритель считывает двойные ячейки как более грубую сетку, и видимое разрешение падает (Cure относит это к семейству banding — «fat pixels»).
+- Линии: длины «ступеней» должны монотонно расти/убывать (Derek Yu, Medeiros).
+
+### 2.2 Контуры
+
+- Чистый контур толщиной 1 пиксель, без случайных уширений («doubles» — допустимы только как сознательный акцент).
+- **Селективный контур**: не глухой чёрный, а темнее к тени и исчезающий к свету (Derek Yu). Cell-outline (обводка в цвет фона) оправдан только при предсказуемом фоне (Cure).
+
+### 2.3 Палитра
+
+- Ограниченная палитра (новичку — готовая 16–32 цвета) «заставляет фокусироваться на размещении пикселей» (Cure).
+- **Hue shift**: рамп не должен быть прямым — тон смещается (у Slynyrd — ~20° на свотч), насыщенность «пикует в середине, не достигая 0 или 100»; главная ошибка — высокая насыщенность + высокая яркость ([Slynyrd, Pixelblog 1](https://www.slynyrd.com/blog/2018/1/10/pixelblog-1-color-palettes)).
+
+### 2.4 Шейдинг и антиалиасинг
+
+- Шейдить от единого источника света, «представляя персонажа сделанным из глины»; прищур должен показывать крупные зоны свет/тень (Derek Yu).
+- AA дозируется: «чем длиннее сегмент линии, тем длиннее сегмент AA» (Derek Yu). Ошибки: over-AA (мыло), under-AA (тупые ступени), **AA banding** — полосы AA, параллельные контуру (Cure).
+- Дизеринг — точечно: «если покрывает пол-спрайта — добавь цвет вместо него» (Cure).
+
+### 2.5 Анимация
+
+- Меньше кадров ≠ хуже: бег Mega Man — 3 кадра; при сокращении кадров — замедлять тайминг (80 мс/поза при 8 кадрах → 160 мс при 4); сила — в ключевых позах ([Slynyrd, Pixelblog 8](https://www.slynyrd.com/blog/2018/8/19/pixelblog-8-intro-to-animation)). Слишком много промежуточных кадров делают движение «вялым».
+- В лупах «один осиротевший пиксель очевиден» — чистота кластеров важнее плавности.
+- **Sub-pixel анимация**: чтобы сдвинуть спрайт на малое расстояние, двигают не силуэт, а *цвета* (осветление контура) — [классический туториал 2dwillneverdie](https://2dwillneverdie.com/tutorial/give-your-sprites-depth-with-sub-pixel-animation/). Требует запаса цветов и работает на маленьких спрайтах.
+
+### 2.6 Выбор разрешения («детальный бюджет»)
+
+- Рисовать под фиксированную «игровую канву» (Celeste: 320×180 → целые ×6/×10 до 1080p/4K) и масштабировать канву целиком, а не спрайты по отдельности (Saint11).
+- Типовые канвы персонажей 128×128–256×256 (Slynyrd); «масштаб — только целыми кратными для однородности пиксельных единиц».
+- Философия низкого разрешения (Saint11, [«Thoughts on Very Low Resolution»](https://saint11.art/blog/thoughts_on_low_resolution/)): каждый пиксель осмыслен, сначала убирать контуры, простое освещение — «проще» сильнее.
+
+### 2.7 Таблица антипаттернов
+
+| Антипаттерн | Что это | Лечение |
+|---|---|---|
+| **Mixels / двойные ячейки** | ячейки 2×2 и 1×1 вперемешку (в спрайте или между спрайтами) | ре-растеризация к единой сетке |
+| **Pillow shading** | концентрические полосы света без источника | трекинг единого источника света |
+| **Jaggies** | сбойные ступени на линиях | выравнивание монотонности ступеней |
+| **Orphan pixels** | одиночные пиксели вне кластеров (шум) | чистка; оправдание — только блики/текстура |
+| **Banding / fat lines** | пиксели «хуггят» контур, линии вдвое толще | разрыв параллельности, контроль толщины |
+| **Over/under-AA** | мыло или тупые ступени | правило длины AA от длины линии |
+| **Случайный дизеринг** | шум вместо текстуры | точечное применение |
+| **Сохранение в JPG** | артефакты сжатия ломают сетку | всегда PNG |
+
+---
+
+## 3. Рендеринг: как движок ломает или спасает сетку
+
+Ассеты могут быть идеальными, но рендер их «расплавит». Канон здесь такой же строгий, как в арте.
+
+### 3.1 Целочисленный масштаб и nearest-neighbor
+
+Каноническая статья — [Tanalin, «Integer scaling»](https://tanalin.com/en/articles/integer-scaling/): nearest-neighbor **без потерь** работает только при целых коэффициентах. При дробном (например 2.5×) часть исходных пикселей становится шириной 2 экранных, часть — 3: неровные пиксели, «wobble», мерцание при движении. Godot-документация показывает тот же эффект на примере 640×360 → 1366×768 (2.133×, «uneven pixel scaling»). Линейная фильтрация решает неровность ценой равномерного «мыла» по всему кадру. То есть **без целого масштаба выбор лишь между двумя дефектами: неровные пиксели (nearest) или мыло (linear)**.
+
+### 3.2 Как это решают движки
+
+- **Unity** ([2D Pixel Perfect Camera](https://docs.unity3d.com/Packages/com.unity.2d.pixel-perfect@5.0/manual/index.html)): Reference Resolution (канва ассетов) + три режима Grid Snapping — `PixelSnapping` (округление позиций спрайтов на этапе рендера, Transforms не трогаются), `UpscaleRenderTexture` (сцена рендерится в low-res текстуру, затем целочисленный апскейл — «unaliased and unrotated pixels»), плюс Crop Frame (letterbox вместо дробного масштаба).
+- **Godot** ([Multiple resolutions](https://docs.godotengine.org/en/stable/tutorials/rendering/multiple_resolutions.html)): Stretch Mode `viewport` (рендер в низком разрешении — канонический путь) или `canvas_items`; Stretch Scale Mode `integer` (округление вниз + поля вместо дробного масштаба); `rendering/2d/snap/snap_2d_transforms_to_pixel` (снап позиций при рендере) и `snap_2d_vertices_to_pixel`; дефолтный фильтр текстур `nearest`.
+- **Phaser**: флаг `pixelArt: true` = NEAREST + antialias:false + roundPixels:true ([docs](https://docs.phaser.io/api-documentation/class/core-config)).
+- **LÖVE**: `love.graphics.setDefaultFilter("nearest","nearest")` ([wiki](https://love2d.org/wiki/love.graphics.setDefaultFilter)).
+
+### 3.3 Дилемма «дрожь vs мыло»
+
+Документированные решения проблемы «субпиксельного движения камеры»:
+
+1. **Снап мировой трансформации**: двигать камеру целыми текселями — округлять позицию камеры *после* умножения на зум ([gamedev.SE](https://gamedev.stackexchange.com/questions/130312/how-do-i-move-the-camera-in-full-pixel-intervals): корень проблемы — «your texel-to-pixel ratio is slightly non-integer»).
+2. **Per-sprite rounding** (`roundPixels` / `snap_2d_transforms_to_pixel` / Unity `PixelSnapping`) — чинит дрожание спрайтов, но не камеру: дрожание переходит в шаг камеры.
+3. **Только целые ступени зума** (Godot Scale Mode `integer`, Unity Crop Frame) — самый чистый результат, но теряется плавность камеры.
+
+Важное следствие из доков PixiJS: `roundPixels` округляет позиции объектов **до применения зума камеры**, поэтому при дробном зуме он не спасает — что мы и наблюдали в R2.5 («подпрыгивание» спрайтов при дробной камере).
+
+### 3.4 Канонический рецепт «фиксированное внутреннее разрешение»
+
+Рендер мира в low-res (например 480×270) в `RenderTexture`, затем вывод на экран целым коэффициентом с nearest — аналоги: Unity `UpscaleRenderTexture`, Godot Stretch Mode `viewport`, [рецепт на surfaces для GameMaker/LÖVE](https://nikles.it/blog/scale-2d-pixel-art-games-using-surfaces/). Ловушка подхода при непрерывном зуме: часть строк «декимируется» (дублируется/пропускается) — nikles называет это «pixels are being, literally, decimated». Компромисс для плавного зума: рендерить RT в разрешении «экран/зум», а снапить только контент.
+
+---
+
+## 4. Кейсы игр
+
+| Игра | Решение | Источник |
+|---|---|---|
+| **Celeste** | внутреннее 320×180 (×6→1080p, ×10→4K); вся игровая графика на единой сетке, но «три мира» стилей — пиксельный геймплей, **высокорезный UI** и 3D-карты — «карантинятся», никогда не перетекают | [Saint11 «Consistency»](https://saint11.art/blog/consistency/), [aran.ink](https://aran.ink/posts/celeste-tilesets) |
+| **Owlboy** («hi-bit») | база 640×360, чисто масштабируемая до 720p/1080p/4K; плотные спрайты поверх плотных фонов — стиль вызвал споры в хардкорных сообществах, но не в рецензиях | [D-Pad Studio «Entering the Hi-Bit Era»](http://dpadstudio.com/Blog/postHibit.html) |
+| **Dead Cells** | персонажи — 3D-модели, анимированные ключами и отрендеренные в пиксельные кадры; единый низкий внутренний рендер выравнивает плотность | [gameanim.com](https://www.gameanim.com/2018/01/31/dead-cells-3d-pipeline-2d-animation/) |
+| **Octopath Traveler (HD-2D)** | пиксельные спрайты в 3D-мире; главные претензии игроков — не сетка спрайтов, а **размытие/DOF/низкое разрешение рендера** (опрос ResetEra: «ненавидят» лишь 11,8%) | [Wikipedia HD-2D](https://en.wikipedia.org/wiki/HD-2D) |
+| **Sonic Mania** | пиксели ровно 4×4 при 1080p (внутренняя канва ~424×240 — по данным обсуждений) | [r/SonicTheHedgehog](https://www.reddit.com/r/SonicTheHedgehog/comments/6u1c24/whats_the_true_resolution_of_sonic_mania/) |
+| **Нарушители** | Terraria (смешанная плотность + вращение спрайтов), Balatro (иконки на собственной повёрнутой сетке), Dave the Diver — «игрокам всё равно, если игра выглядит хорошо в целом»; но заметность нарушений часть комментаторов называет «detracts from the look» | [r/IndieDev](https://www.reddit.com/r/IndieDev/comments/1r09hlb/how_do_some_games_get_away_with_breaking_the) |
+
+**Выводы из кейсов:** (1) все «успешные смешивания» — либо с чёткой границей слоёв (Celeste), либо с единым низким рендером, который выравнивает плотность (Dead Cells), либо «успешны постфактум», потому что игра красива в целом; (2) ретро-игры нарушали правила при первой возможности (Mode 7) и *хотели, чтобы это заметили* — нарушение легитимно, только когда оно выглядит намеренным; (3) самое ценное правило для ретрофита из r/gamedev: **«не масштабируй спрайты разного базового разрешения до одинакового размера на экране»** и «приводи всё к самому низкому разрешению из имеющихся».
+
+---
+
+## 5. Диагноз «Погружения» (по коду, билд 2.17)
+
+Собрано по билду (`example/build/scripts/`, ничего не менялось):
+
+| Факт | Значение | Где |
+|---|---|---|
+| Тайл пола | **32×32** px текстура = 32 мировых юнита (1:1) | `images/dungeon/floor/*.png` |
+| Стены | 32×32 и 32×64 | `images/dungeon/walls/*.png` |
+| Объекты | 32×32 … 96×64 … 64×84 (рычаг 32×32, портал 64×84, шкафчик 64×42) | `images/dungeon/objects/`, `mapRender.js` |
+| Персонажи (мелкие) | листы 5×11 клеток **64px**, арт кадра ~**32×51** (bat, cultist, герои knight/rogue/sorca) | `images/sheets/*_64.png`, `sheetsMap.js` |
+| Персонажи (крупные) | клетки **128px**, арт до полного кадра (cyclop, demon, medusa, mushroom) | `images/sheets/*_128.png`, `sheetsMap.js` |
+| Камера | окно 1920×1080 юнитов; зум непрерывный **1..3** (колесо `pow(1.001,-d)`, кооп — лерп 0.08 к дробной цели), старт 2 | `zoomFx.js:24-26,158-170` |
+| Pixelated-переключатель | nearest включается только при \|масштаб−целое\|<0.02, иначе `auto` (сглаживание) — **стиль переключается на лету при зуме** | `zoomFx.js:112-133` |
+| Фильтрация текстур | **всегда linear** (решение R2.5 «паритет SVG»); `roundPixels` снят (дробные позиции для плавности) | `pixiBackend.js:206-219,1792-1794` |
+| Разрешение рендера | `resolution = min(2, devicePixelRatio)` | `pixiBackend.js:1174` |
+
+### Три источника разнопиксельности у нас
+
+1. **Зерно ассетов.** Все листы — AI-генерация (SDXL + Pixel Art LoRA, RD Animation). У каждого листа своя фактическая плотность ячейки («implied grid»): где-то честный 1px, где-то 2×2, где-то дробные и дрейфующие ячейки — это типовой профиль AI-вывода, описанный и в §1, и в §2.7. Экран собирает тайл 1:1, персонажа с зерном 2×2 и cyclop 128px в один кадр — глаз видит три разные сетки.
+2. **Рендер-цепочка.** Итоговый экранный масштаб = (окно/1920)×zoom — при непрерывном зуме почти всегда дробный. При дробном масштабе linear даёт «мыло» по всем спрайтам; когда масштаб случайно попадает в целое число, `pixelated` скачком делает картинку резкой — стиль видимо «перещёлкивает» во время зума.
+3. **Клетки 128 у крупных.** Если зерно крупного врага совпадает по плотности с мелкими — всё в порядке (он просто больше); если AI нарисовал его грубее — он выглядит «другим стилем». Это решается аудитом, а не догадкой.
+
+### Что у нас уже правильно
+
+- UI-слой (`svgArr[2]`) не зумится никогда — это ровно правило «отдельного мира» Celeste, его трогать не нужно.
+- Мелкие персонажи имеют одинаковый формат кадра (~32×51) — единый «знаменатель» для ре-растеризации уже есть.
+- Тайлы пола честные 1:1 — готовый эталон плотности.
+
+---
+
+## 6. Что делать: меню вариантов
+
+### Шаг 0. Аудит зерна (дешёво, ничего не меняет, нужен при любом выборе)
+
+Нарезать все листы на клетки (скрипт уже есть — `make_sheets_map.py` знает сетку), прогнать каждую клетку через аудитор и получить таблицу «лист → фактический шаг ячейки по X/Y»:
+
+- **[Retro Diffusion pixel-art-fixer](https://github.com/Retro-Diffusion/pixel-art-fixer)** (MIT; Python 3.9+/numpy/scipy/opencv или Rust-бинарник): три детектора (автокорреляция, run-length, shift self-similarity) + арбитраж; `pixelfixer full input.png` → JSON с сеткой; `pixelfixer process in.png out.png` — сразу чинит в истинный 1x. Заявленная точность: точный нативный размер в 77% случаев (альтернативы <5%), выравнивание сетки 94% (самоназвание, независимо не проверено). Прозрачность восстанавливается «голосованием по клетке».
+- **[fast-pixelizer](https://github.com/handsupmin/fast-pixelizer)** (npm, MIT, zero-deps, TypeScript): `snap(imageData)` возвращает `detectedResolution` + сетку разрезов; k-means квантизация + анализ периодичности; работает и в браузере (Web Worker). Честное предупреждение в README: для AI-арта «quality is not guaranteed», если источник никогда не был на чистой сетке.
+- Научная база подхода: Seo J.W. (2026), «Structure-Aware Pixel Art Scaling via Block Size Detection» (MDPI).
+
+**Результат шага:** карта плотностей всех 34 листов + тайлов → становится ясно, кто «виноват» в микселях на самом деле, и насколько велика работа.
+
+### Вариант A. Рендер-минимум (арт не трогаем)
+
+Маленькие правки камеры/рендера, снимающие источник №2:
+
+- **A1. Снап камеры к сетке**: округлять позицию вьюпорта после умножения на зум (`Math.round(x*zoom)/zoom`) — камера двигается целыми экранными пикселями, «плавание» контента исчезает (gamedev.SE-рецепт, §3.3).
+- **A2. Ступенчатый зум**: квантовать зум до фиксированных ступеней (например 0.5 или только целые 1/2/3) — исчезает скачок `pixelated`↔`auto` (§5, факт 7). Потеря: плавность зума, к которой привыкли.
+- **A3. Сознательный smooth-рендер**: оставить как есть (решение R2.5), но тогда с A1 — чтобы linear-мыло хотя бы не «плавало».
+- Плюсы: не трогаем 34 листа арта. Минусы: не чинит источник №1 (зерно) и №3 (крупные) — миксели остаются.
+
+### Вариант B. Ре-растеризация к единой сетке (основная починка арта)
+
+Целевая плотность — как у тайлов пола: **1 арт-пиксель = 1 мировой юнит** (у мелких персонажей арт 32×51 в клетке 64 уже близок к этому). Пайплайн:
+
+1. Аудит (Шаг 0) → таблица плотностей.
+2. Для каждого листа: если зерно 2×2 — даунскейл ×2 мажоритарным голосованием по ячейке; если дробное/дрейфующее — `pixelfixer process`; если мельче эталона — NN-апскейл (или xBRZ как *промежуточный* шаг с последующей пере-пикселизацией).
+3. Палитра: сведение к мастер-палитре (`pngquant`, `magick -remap master.png`) + контроль hue-рампов (§2.3).
+4. Чистка: осиротевшие пиксели, обводки, AA (§2.7) — вручную в Aseprite или скриптом по списку.
+5. Пересборка листов 5×11 и регенерация `make_sheets_map.py` — в игре размеры клеток и код не меняются вовсе.
+
+Команды (проверены по документации/обсуждениям):
+
+```bash
+# строгий nearest-neighbor даунскейл ×2 (зерно 2×2 → 1×1)
+magick in.png -filter point -resize 50% out.png
+# быстрое сэмплирование (неравномерно на нецелых коэффициентах — задавать в пикселях!)
+magick in.png -sample 50% out.png
+# box-усреднение (чисто ТОЛЬКО при целом коэффициенте; рождает новые цвета)
+magick in.png -scale 50% out.png
+ffmpeg -i in.png -vf scale=iw/2:ih/2:flags=neighbor out.png
+# палитра
+pngquant --quality=65-80 --speed 3 in.png
+# фикс дробной сетки AI
+pixelfixer process in.png out.png
+```
+
+**Ловушки** (из обсуждений ImageMagick #6788, практики ретрофита): (а) нецелые коэффициенты неравномерно выбрасывают пиксели — всегда задавать размеры явно; (б) усредняющие фильтры создают новые цвета и мыло на границах; (в) 1px-обводки при даунскейле исчезают — их перерисовывать; (г) полупрозрачные края портятся «голосованием» — проверить альфу после фикса; (д) округление меняет размер на ±1px.
+
+Объём: 34 листа — скриптуемо, но каждый лист требует визуальной приёмки (пофреймовая проверка по альфа-контуру у нас уже обкатана в `make_sheets_map.py`).
+
+### Вариант C. Регенерация на фиксированном гриде (для новых персонажей)
+
+- **Retro Diffusion** (уже в нашем стеке): модели обучены на истинном гриде и ограниченных палитрах («perfect grid alignment, every pixel the same size»); при генерации запрашивать **маленький нативный размер** (32) и NN-апскейлить в клетку 64/128 — надёжнее, чем просить «пиксель-арт 128px».
+- **PixelLab** ([pixellab.ai](https://pixellab.ai)): генерация персонажей/анимаций/ротаций, API и MCP-сервер; механизмы фиксации разрешения и цены за checkout не подтверждены.
+- Бесплатный веб-fixer на retrodiffusion.ai — нейронная версия починки для сильно повреждённых входов.
+
+### Вариант D. Принять мультискейл осознанно
+
+Если аудит покажет чёткие группы (например, «герои всегда плотнее врагов») — можно сделать это **правилом стиля** по образцу «трёх миров» Celeste: «герои 2× плотнее врагов, фон 1:1» — но тогда обязательна консистентность *внутри* каждой группы, и граница не должна «перетекать» (однотипные объекты — одна плотность). Это самый дешёвый вариант, если разница системная и красиво смотрится.
+
+### Рекомендация
+
+1. **Сейчас:** Шаг 0 (аудит) + Вариант A1/A2 — дёшево, снимает «мыло/скачки» и даёт данные для решения по арту.
+2. **Далее:** точечная ре-растеризация (B) только листов с худшим/дробным зерном — по таблице аудита, начиная с тех, что чаще всего в кадре рядом (герои + частые враги + тайлы).
+3. **Параллельно:** все новые персонажи — сразу на фиксированном гриде (C).
+4. **Не делать:** «всё перерисовать за один заход» — риск потерять узнаваемость и утонуть в приёмке 34 листов.
+
+---
+
+## 7. Инструменты
+
+| Инструмент | Назначение | Лицензия/цена | Примечание |
+|---|---|---|---|
+| [RD pixel-art-fixer](https://github.com/Retro-Diffusion/pixel-art-fixer) | аудит «мнимой сетки» + фикс в истинный 1x; CLI/Python API/Rust | MIT, бесплатно | проверено; 77% точного натива, прозрачность — голосованием |
+| [fast-pixelizer](https://github.com/handsupmin/fast-pixelizer) | аудит+snap в Node/браузере (Web Worker) | MIT | проверено; для AI-арта «не гарантировано» |
+| [ImageMagick](https://github.com/ImageMagick/ImageMagick/discussions/6788) | `-filter point -resize` / `-sample` / `-scale` / `-remap` | свободная | проверено обсуждение фильтров |
+| [ffmpeg](https://trac.ffmpeg.org/wiki/Scaling) | `flags=neighbor` для пакетной обработки | свободная | в filter_complex флаги указывать явно |
+| [pngquant](https://pngquant.org) | квантизация палитры, `--quality` | свободная | проверить дизеринг-флаг под наш стиль |
+| [Aseprite](https://www.aseprite.org/docs/cli/) | ручная чистка, экспорт листов, скрипты | ~$20 (есть бесплатный LibreSprite, [Pixelorama](https://github.com/Orama-Interactive/Pixelorama)) | CLI: `--sheet`, `--script` |
+| [xBRZ](https://sourceforge.net/projects/xbrz/) / [Scale2x](https://scale2x.sourceforge.net) / hqx | апскейл сетки без «мыла» | свободные | только как промежуточный шаг; вводят новые цвета |
+| [Retro Diffusion](https://retrodiffusion.ai) | генерация на фиксированном гриде, палитра-лок | платно (уже используем) | вендорские заявления, независимо не проверены |
+| [PixelLab](https://pixellab.ai) | генерация персонажей/анимаций, API/MCP | цены не подтверждены | проверено существование |
+
+---
+
+## 8. Чего не делать (сводка ловушек)
+
+- Не сохранять арт в JPG — только PNG.
+- Не масштабировать дробными коэффициентами и не задавать размеры в процентах (округление ±1px) — только явные размеры и целые множители.
+- Не применять усредняющие фильтры (`-scale`, бикубические) к финальному пиксель-арту — они рождают новые цвета.
+- Не смешивать ассеты разных паков/генераций без синхронизации масштаба и палитры.
+- Не масштабировать спрайты разного базового разрешения до одинакового размера на экране (главное правило ретрофита из r/gamedev).
+- Не трогать `deploy/` (правило юзера) — все эксперименты только в `example/build/` или на копиях в `forWork/`.
+- Не внедрять «фиксы на глаз» без аудита — сначала таблица плотностей.
+
+---
+
+## 9. Источники
+
+### Канонические туториалы и правила
+1. [Pedro Medeiros (Saint11) — «Consistency»](https://saint11.art/blog/consistency/) — «священное правило», Celeste 320×180, «три мира», integer scale (прочитано полностью).
+2. [Saint11 — «Thoughts on Very Low Resolution»](https://saint11.art/blog/thoughts_on_low_resolution/) — философия низкого разрешения (прочитано).
+3. [Saint11 — индекс туториалов](https://saint11.art/blog/pixel-art-tutorials/) — 40+ анимированных туториалов.
+4. [Derek Yu — «Pixel Art Tutorial»](https://www.derekyu.com/makegames/pixelart.html) — линии, AA, селективный контур, шейдинг (прочитано).
+5. [Cure (PixelJoint) — «Creating Pixel Art»](https://pixeljoint.com/forum/forum_posts.asp?TID=11299) — кластеры, banding, pillow shading, палитры (прочитано; фактический FAQ PixelJoint).
+6. [Slynyrd (R. Schlitter) — Pixelblog 5: Back to Basics](https://www.slynyrd.com/blog/2018/5/16/pixelblog-5-back-to-basics) — кластеры, канвы, целочисленный скейл (прочитано).
+7. [Slynyrd — Pixelblog 1: Color Palettes](https://www.slynyrd.com/blog/2018/1/10/pixelblog-1-color-palettes) — рампы, hue shift, насыщенность (прочитано).
+8. [Slynyrd — Pixelblog 8: Intro to Animation](https://www.slynyrd.com/blog/2018/8/19/pixelblog-8-intro-to-animation) — тайминг, ключевые позы, чистота лупов (прочитано).
+9. [Medeiros — Pixel Grimoire ч.2 (Medium)](https://medium.com/pixel-grimoire/how-to-start-making-pixel-art-2-bcd705cb04d7) — кластеры, orphan pixels, фикс джагги (прочитано).
+10. [2dwillneverdie — Sub-pixel animation](https://2dwillneverdie.com/tutorial/give-your-sprites-depth-with-sub-pixel-animation/) — «двигай цвета, а не спрайт» (прочитано).
+11. [S. Maglione — Getting started with pixel art](https://www.sandromaglione.com/articles/getting-started-with-pixel-art) — jaggies, doubles, идеальные линии (прочитано).
+12. [Lospec — база туториалов](https://lospec.com/pixel-art-tutorials?tags=beginner).
+
+### Рендеринг
+13. [Tanalin — «Integer scaling»](https://tanalin.com/en/articles/integer-scaling/) — канон о целочисленном масштабе (частично через ридер).
+14. [Godot — Multiple resolutions](https://docs.godotengine.org/en/stable/tutorials/rendering/multiple_resolutions.html) — stretch modes, Scale Mode integer, uneven scaling (прочитано).
+15. [Godot — ProjectSettings](https://docs.godotengine.org/en/stable/classes/class_projectsettings.html) — `snap_2d_transforms_to_pixel` и др.
+16. [Unity — 2D Pixel Perfect package](https://docs.unity3d.com/Packages/com.unity.2d.pixel-perfect@5.0/manual/index.html) — Reference Resolution, Upscale RT, Pixel Snapping, Crop Frame (прочитано).
+17. [Unity URP — PixelPerfectCamera.GridSnapping enum](https://docs.unity.cn/Packages/com.unity.render-pipelines.universal@17.5/api/UnityEngine.Rendering.Universal.PixelPerfectCamera.GridSnapping.html) — None/PixelSnapping/UpscaleRenderTexture.
+18. [Phaser — Core.Config](https://docs.phaser.io/api-documentation/class/core-config) — `pixelArt: true`.
+19. [PixiJS v8 Migration Guide](https://pixijs.com/8.x/guides/migrations/v8) — `'nearest'`/`'linear'` на TextureSource.
+20. [PixiJS — RendererOptions API](https://pixijs.download/release/docs/rendering.RendererOptions.html) — `resolution`, `autoDensity`, `roundPixels`.
+21. [nikles.it — Scale 2D pixel art games using surfaces](https://nikles.it/blog/scale-2d-pixel-art-games-using-surfaces/) — low-res surface + целочисленный вывод, «pixel decimation» (прочитано).
+22. [gamedev.SE — How do I move the camera in full pixel intervals?](https://gamedev.stackexchange.com/questions/130312/how-do-i-move-the-camera-in-full-pixel-intervals) — снап камеры к текселям.
+23. [LÖVE wiki — setDefaultFilter](https://love2d.org/wiki/love.graphics.setDefaultFilter).
+24. [Sysl-Pixel (LÖVE)](https://github.com/sysl-dev/Sysl-Pixel) — модуль pixel-perfect скейлинга.
+
+### Кейсы и обсуждения сообщества
+25. [D-Pad Studio — «Entering the Hi-Bit Era»](http://dpadstudio.com/Blog/postHibit.html) — Owlboy, база 640×360 (прочитано).
+26. [Wikipedia — HD-2D](https://en.wikipedia.org/wiki/HD-2D) — стиль и споры (прочитано).
+27. [ResetEra — тред о HD-2D](https://www.resetera.com/threads/so-am-i-the-only-one-who-hates-the-new-2d-hd-graphics.560125/page-2) — опрос, критика размытия (прочитано).
+28. [gameanim.com — Dead Cells 3D pipeline](https://www.gameanim.com/2018/01/31/dead-cells-3d-pipeline-2d-animation/) (прочитано; [Game Developer](https://www.gamedeveloper.com/design/art-design-deep-dive-using-a-3d-pipeline-for-2d-animation-in-i-dead-cells-i-) — закрыт, по сниппетам).
+29. [r/gamedev — When is it fine to use different pixel sizes](https://www.reddit.com/r/gamedev/comments/1pwq1eo/when_is_it_fine_to_use_different_pixel_sizes_in/) (через API).
+30. [r/gamedev — How do you fix inconsistent pixel size](https://www.reddit.com/r/gamedev/comments/1wlaneq/how_do_you_fix_inconsistent_pixel_size_when_your/) (через API).
+31. [r/PixelArt — «Am I committing a sin by mixing resolutions»](https://www.reddit.com/r/PixelArt/comments/15sy6a9/am_i_committing_a_sin_by_mixing_resolutions/) (через API).
+32. [r/godot — Inconsistent pixel sizes](https://www.reddit.com/r/godot/comments/1k2xuw4/inconsistent_pixel_sizes/) — технические фиксы (через API).
+33. [r/IndieDev — How do some games get away with breaking the rules](https://www.reddit.com/r/IndieDev/comments/1r09hlb/how_do_some_games_get_away_with_breaking_the) — Terraria/Balatro (через API).
+34. [shoutscion — эссе о микселях](https://shoutscion.tumblr.com) («look like a bug»; tumblr закрыт для прямого чтения — по сниппетам).
+
+### Инструменты
+35. [Retro-Diffusion/pixel-art-fixer](https://github.com/Retro-Diffusion/pixel-art-fixer) — аудитор/фиксер грида (проверено, README прочитан).
+36. [handsupmin/fast-pixelizer](https://github.com/handsupmin/fast-pixelizer) — npm-детектор грида (проверено, README прочитан).
+37. [ImageMagick discussion #6788](https://github.com/ImageMagick/ImageMagick/discussions/6788) — `-sample` vs `-filter point` vs `-scale` (проверено).
+38. [ffmpeg wiki — Scaling](https://trac.ffmpeg.org/wiki/Scaling) — `flags=neighbor` (проверено).
+39. [pngquant.org](https://pngquant.org) (проверено).
+40. [Wikipedia — Pixel-art scaling algorithms](https://en.wikipedia.org/wiki/Pixel-art_scaling_algorithms) — Scale2x/hqx/xBRZ (проверено).
+41. [xBRZ на SourceForge](https://sourceforge.net/projects/xbrz/) · [Scale2x](https://scale2x.sourceforge.net).
+42. [Aseprite — exporting/CLI](https://www.aseprite.org/docs/cli/) (проверено) · [AsepriteAddons](https://github.com/behreajj/AsepriteAddons).
+43. [retrodiffusion.ai](https://retrodiffusion.ai) · [pixellab.ai](https://pixellab.ai) — вендорские страницы (частично проверены).
+44. Seo J.W. (2026) — «Structure-Aware Pixel Art Scaling via Block Size Detection», MDPI (полный текст 403, по индексам).
+
+---
+
+*Статья подготовлена по итогам исследования (4 направления, ~35 прочитанных источников). Факты по билду проверены по коду `example/build` на дату 2026-09-25 (V146, билд 2.17). Заявления вендоров и цифры из недоступных тредов помечены. В игре ничего не менялось.*
