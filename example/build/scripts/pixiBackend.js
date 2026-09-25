@@ -32,7 +32,11 @@ let windowSize = { wt: 1920, ht: 1080 }
 let cameraVB = { x: 0, y: 0, width: 1920, height: 1080 }  // слои 0/1
 const uiVB = { x: 0, y: 0, width: 1920, height: 1080 }
 let uiCTM = null           // кэш getScreenCTM UI-слоя (инвалидация на resize)
-let pixelatedNow = null    // текущий режим scaleMode текстур (null — не установлен)
+let pixelatedNow = null    // текущий режим scaleMode текстур (null — ещё не применялся)
+// B32-эпоха (запрос юзера 2026-09-26): зум тянет спрайты «ближайшим соседом» без
+// размытия — новые источники создаются сразу nearest; applyPixelated перекрашивает
+// уже созданные (загруженные до первого его вызова)
+if (PIXI.TextureSource) PIXI.TextureSource.defaultOptions.scaleMode = "nearest"
 
 const shimById = new Map()   // id → El (для document.getElementById)
 // «кладбище» откреплённых remove()-шимов: освобождаем Pixi-узлы отложенно
@@ -204,19 +208,21 @@ async function preloadGameTextures(fromFile, basePath) {
 }
 
 // ---------- scaleMode текстур ----------
-// R2.5 (паритет SVG): ВСЕГДА linear. Прежний переключатель «nearest при целом
-// масштабе» в связке с roundPixels квантил дробные шаги движения в неровные целые
-// («подпрыгивание» спрайтов каждый кадр — репорт юзера 2026-09-17). Старый SVG
-// рисовал дробные позиции с антиалиасингом — воспроизводим именно это: дробные
-// шаги скользят плавно. Вызов оставлен (много точек), тело — идемпотентный фикс линейного режима.
+// Запрос юзера 2026-09-26 (эпоха B32-пиксель-арта): ВСЕГДА nearest — зум увеличивает
+// спрайты «ближайшим соседом», резкие пиксели без размытия, на любом масштабе окна/зума.
+// Прежний R2.5 «всегда linear» отменён. roundPixels по-прежнему НЕТ (репорт о
+// «подпрыгивании» 2026-09-17 касался именно его) — позиции субпиксельные, движение
+// скользит плавно. Свечение (getGlowTexture) красится linear отдельно — размытому
+// силуэту резкость не нужна. Вызовов много (href/createWorldImage/resize) — тело
+// идемпотентно; новые источники покрывает defaultOptions выше.
 function applyPixelated() {
-    if (pixelatedNow === "linear") return
-    pixelatedNow = "linear"
+    if (pixelatedNow === "nearest") return
+    pixelatedNow = "nearest"
     for (const t of texCache.values()) {
-        if (t && t.source) t.source.style.scaleMode = "linear"
+        if (t && t.source) t.source.style.scaleMode = "nearest"
     }
     for (const frames of frameCache.values()) {
-        for (const t of frames) if (t && t.source) t.source.style.scaleMode = "linear"
+        for (const t of frames) if (t && t.source) t.source.style.scaleMode = "nearest"
     }
 }
 
@@ -1789,10 +1795,10 @@ function createImage(place, x, y, w, h, src, obj = {}) {
     if (sprite.texture === PIXI.Texture.EMPTY) registerPending(String(src), shim)
     sprite.position.set(num(x), num(y))
     sprite.width = wN; sprite.height = hN
-    // R2.5 (паритет SVG): БЕЗ roundPixels — мир рендерится в субпиксельных позициях
-    // с линейной фильтрацией (см. applyPixelated): дробные шаги движения скользят
-    // плавно, как это делал браузерный SVG-рендер. roundPixels давал «подпрыгивание»:
-    // дробный шаг (мирШаг × дробный масштаб камеры) квантился в неровные целые.
+    // R2.5: БЕЗ roundPixels — мир рендерится в субпиксельных позициях (дробные шаги
+    // движения скользят плавно; roundPixels давал «подпрыгивание»: дробный шаг
+    // (мирШаг × дробный масштаб камеры) квантился в неровные целые). Фильтрация
+    // текстур — всегда nearest, см. applyPixelated
     shim.attrs.href = String(src)
     // контракт svg.js: id статичных картинок хранится С суффиксом «I» (getElementById
     // в game-коде ищет именно «…I»: expBarI/hpBarI — полосы ХП/опыта и т.д.)
@@ -1850,7 +1856,7 @@ function createAnimImage(place, x, y, w, h, src, obj = {}) {
     sprite.width = wN / n
     sprite.height = hN
     sprite.eventMode = "none"
-    // R2.5: субпиксельный рендер мира — см. комментарий в createImage
+    // R2.5: субпиксельный рендер мира (без roundPixels) — см. комментарий в createImage
     applyPixelated()
     place.appendChild(shim)
     registerFrameUser(String(src), times, shim)
