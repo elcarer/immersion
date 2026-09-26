@@ -94,16 +94,6 @@ function ownerOfPanelKey(code) {
     }
     return null
 }
-//V148: чей код клавиши атаки (ручной режим) — сам игрок или null. Как и панели,
-//ищем по ПРОФИЛЮ игрока (kbKeys), не по устройству: в соло профиль p0 один —
-//работает только его Ctrl; в коопе Ctrl — игрок 1, «0» — игрок 2
-function ownerOfAttackKey(code) {
-    for (let i = 0; i < status.players.length; i++) {
-        const P = status.players[i]
-        if (kbKeys(P.idx || 0, "attack").indexOf(code) !== -1) return P
-    }
-    return null
-}
 //шаблон для панели «Управление» и глубокого долива дефолтов при загрузке сейва.
 //ТОЛЬКО панельные действия и пад: движение НЕ попадает в привязки, пока игрок не
 //переназначил клавишу сам, — иначе записанный дефолт (WASD) перекрыл бы solo-слив
@@ -116,4 +106,4 @@ function bindingsTemplate() {
         "pad": clone(DEFAULT_PAD)
     }
 }
-export {playerMoveKeys,padIndex,ownerOfMoveKey,ownerOfPanelKey,ownerOfAttackKey,kbKeys,padBtn,bindingsTemplate,DEVICE_KEYS,DIR_NAMES}
+export {playerMoveKeys,padIndex,ownerOfMoveKey,ownerOfPanelKey,kbKeys,padBtn,bindingsTemplate,DEVICE_KEYS,DIR_NAMES}

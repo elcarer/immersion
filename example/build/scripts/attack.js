@@ -6,6 +6,8 @@ import { dataGeneric } from "../scripts/sceneGenerate.js"
 import { addAnim } from "../scripts/animPlay.js"
 import { playback,strike } from "../scripts/sound.js"
 import { battleDanceHit } from "../scripts/valkyrie.js"
+//V148a: ручная атака — состояние клавиши атаки (нажатие/удержание)
+import { attackHeld } from "../scripts/heroMove.js"
 import { flameOnHeroAttack } from "../scripts/flameFx.js"
 //V49 огненное оружие (баф статуи): атака по врагу вешает/освежает ожог, по горящему — 2 плоских
 import { fireOnAttack, weaponFireOnAttack } from "../scripts/buffFx.js"
@@ -28,22 +30,24 @@ function checkAttack() {
         status.attack.current.length = 0
         return
     }
-    //V148: режим атаки (чекбокс «Автоатака» в Настройках, по умолчанию включена —
+    //V148/V148a: режим атаки (чекбокс «Автоатака» в Настройках, по умолчанию включена —
     //undefined=вкл). Авто: удар происходит сам, когда цель входит в зону удара.
-    //Ручной (autoAttack===0): удар только по клавише атаки — edge keydown (heroMove)
-    //ставит attackQueued владельцу, здесь флаг consumed. Кулдауны (stack-таймеры)
-    //тикают одинаково в обоих режимах — ручной режим не ускоряет и не замедляет атаку
+    //Ручной (autoAttack===0): удар по клавише атаки — при нажатии И при удержании
+    //(attackHeld читает pressedKeys по ПРОФИЛЮ игрока: соло — Ctrl, кооп — Ctrl/«0»),
+    //частоту задаёт кд оружия: удар происходит только когда атака «созрела» в current.
+    //Кулдауны (stack-таймеры) тикают одинаково в обоих режимах. Очарование выше
+    //блокирует атаку целиком. Ручной ближний бой и выстрелы бьют и «в воздух» по
+    //направлению взгляда; магия (type="magic", самонаводящиеся снаряды) — только при цели
     const manual = status.settings.autoAttack === 0
-    const strikeNow = manual ? status.hero.attackQueued === 1 : true
-    status.hero.attackQueued = 0
+    const strikeNow = manual ? attackHeld(status.hero.idx || 0) : true
     let lengthCurrent = status.attack.current.length
     if (strikeNow) for (let i = 0; i < lengthCurrent; i++) {
         let enemy = checkEnemy(status.attack.current[i])
         let obj
         enemy ? true : obj = checkObject(status.attack.current[i])
-        if (enemy||obj) {
+        if (enemy || obj || (manual && status.attack.current[i].type !== "magic")) {
             playback(strike[5].vol,0,0,3*status.settings.soundVolume)
-            enemy ? attack(enemy) :attack(obj)
+            enemy ? attack(enemy) : obj ? attack(obj) : attack()
             status.attack.current.splice(i,1)
             i--
             lengthCurrent--
