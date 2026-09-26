@@ -169,12 +169,15 @@ function showChoices() {
         const c = dlgState.choices[i]
         const w = 232
         const x = WIN_X + WIN_W/2 - (n * (w + 24) - 24)/2 + i * (w + 24)
-        dlgTemp.push(image(svgArr[2],x,WIN_Y + WIN_H - 76,w,60,"./images/UI/panels/buttons/button.png",{"glow":1,"func":e => {
+        //выбор: один обработчик на подложку И на надпись (V147: клик по тексту кнопки
+        //обязан выбирать — надпись не должна «глотать» клик, даже если перехватчик выше)
+        const pick = () => {
             const cb = c.cb
             closeDialog()
             cb && cb()
-        }}))
-        dlgTemp.push(text(svgArr[2],x + w/2,WIN_Y + WIN_H - 34,"0pt","26pt","black","2px","rgb(204, 153, 102)",T(c.label),{"id":"dlgChoice"+i,"size":24,"font":"baseFont4","anchor":"middle"}))
+        }
+        dlgTemp.push(image(svgArr[2],x,WIN_Y + WIN_H - 76,w,60,"./images/UI/panels/buttons/button.png",{"glow":1,"func":pick}))
+        dlgTemp.push(text(svgArr[2],x + w/2,WIN_Y + WIN_H - 34,"0pt","26pt","black","2px","rgb(204, 153, 102)",T(c.label),{"id":"dlgChoice"+i,"size":24,"font":"baseFont4","anchor":"middle","func":pick}))
     }
 }
 

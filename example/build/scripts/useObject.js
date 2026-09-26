@@ -53,8 +53,12 @@ function useObject(obj,i0) {
     //V114: owner — игрок, начавший юз (завершение в checkBars исполняется в его контексте)
     //V131: lobj — объект, чей это юз («кто что использует»): stopUseObject гасит полоски
     //только своего игрока и подчищает именно ИХ объекты (фон/подсветку/obj[5])
-    bars.push({"type":"use","fin":setUseTicks(),"speed":1,"owner":status.players.indexOf(status.hero),"lobj":obj,"obj":screenPic[screenPic.length - 1],"func":() => finishUsedObject(obj)})
+    //V147: запоминаем индексы записей в screenPic — stopUseObject занулит их («надгробия»,
+    //индексы в screenPic неизменны), иначе мёртвые узлы копятся в отрисовке: у повторяемых
+    //объектов (лестница при живом боссе) — тысячи мёртвых rect за минуты
+    bars.push({"type":"use","fin":setUseTicks(),"speed":1,"owner":status.players.indexOf(status.hero),"lobj":obj,"obj":screenPic[screenPic.length - 1],"objIdx":screenPic.length - 1,"func":() => finishUsedObject(obj)})
     screenPic.push(worldImage(svgArr[1],obj[0]*32+obj[3]*16-32,obj[1]*32-24,64,14,"./images/UI/panels/bar1mini.png",{"id":i0+"R"}))
+    bars[bars.length - 1].frameIdx = screenPic.length - 1
     obj[5] = i0
 }
 function stopUseObject(pi) {
@@ -68,6 +72,10 @@ function stopUseObject(pi) {
         const bar = bars[i]
         bars.splice(i,1)
         bar.obj.remove()
+        //V147: «надгробия» в screenPic — записи удалённых узлов зануляются, чтобы
+        //мёртвые шимы не копились в отрисовке (утечка у повторяемых объектов)
+        bar.objIdx !== undefined && (screenPic[bar.objIdx] = null)
+        bar.frameIdx !== undefined && (screenPic[bar.frameIdx] = null)
         const lobj = bar.lobj
         if (lobj && lobj[5] !== undefined) {
             let barBg = picById(lobj[5]+"RI")

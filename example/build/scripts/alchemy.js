@@ -28,9 +28,6 @@ let mergeCost = [0,20,100]
 
 function openAlchemy(obj) {
     alchemyObj = obj
-    status.pause = 1
-    status.move = 0
-    status.panels = 9
     musicDuck(1)
     svgArr[2].style.display = 'none'
     //чёрная подложка — скрывает игровое поле (как у Карты, map.js)
@@ -95,6 +92,12 @@ function openAlchemy(obj) {
     alchemyTemp.push(text(svgArr[2],1920/2,1066,"0pt","26pt","black","2px","rgba(204, 153, 102, 0.6)",T("alchemy.hint"),{"id":"alchemyHintText","size":26,"font":"baseFont4","anchor":"middle"}))
     refreshMergeButton()
     svgArr[2].style.display = ''
+    //V147: пауза/панель ставятся ПОСЛЕ отрисовки всех узлов — если рисование упадёт,
+    //игра НЕ зависает на «pause=1 при пустой панели» (такое залипание ловил авто-прогон:
+    //флаги стояли, узлов не было, ESC бессилен — closePanels не видел alchemyTemp)
+    status.pause = 1
+    status.move = 0
+    status.panels = 9
 }
 
 //клик по предмету — переключение рамки выделения (стиль рамки V39). Легендарки (rarity 3,

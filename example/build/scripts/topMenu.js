@@ -48,6 +48,10 @@ function closePanels(nomusic=0) {
     mapTemp.length > 0 && mapDel(nomusic)
     //V54: алхимический стол — выход БЕЗ расхода объекта (объект можно использовать снова)
     alchemyTemp.length > 0 && alchemyDel(nomusic)
+    //V147: «залипшая» алхимия — флаги panels=9/pause=1 стоят, а узлов уже нет
+    //(alchemyTemp пуст): обычный путь выше alchemyDel не зовёт и пауза висит вечно.
+    //alchemyDel на пустом temp безопасен — только сбрасывает флаги и музыку
+    alchemyTemp.length === 0 && status.panels === 9 && alchemyDel(nomusic)
     //V126: панель «Управление»
     controlsTemp.length > 0 && controlsDel(nomusic)
     //V75: шкафчик с древностями — выход БЕЗ расхода объекта (благословение не выдано)
