@@ -28,8 +28,16 @@ function checkAttack() {
         status.attack.current.length = 0
         return
     }
+    //V148: режим атаки (чекбокс «Автоатака» в Настройках, по умолчанию включена —
+    //undefined=вкл). Авто: удар происходит сам, когда цель входит в зону удара.
+    //Ручной (autoAttack===0): удар только по клавише атаки — edge keydown (heroMove)
+    //ставит attackQueued владельцу, здесь флаг consumed. Кулдауны (stack-таймеры)
+    //тикают одинаково в обоих режимах — ручной режим не ускоряет и не замедляет атаку
+    const manual = status.settings.autoAttack === 0
+    const strikeNow = manual ? status.hero.attackQueued === 1 : true
+    status.hero.attackQueued = 0
     let lengthCurrent = status.attack.current.length
-    for (let i = 0; i < lengthCurrent; i++) {
+    if (strikeNow) for (let i = 0; i < lengthCurrent; i++) {
         let enemy = checkEnemy(status.attack.current[i])
         let obj
         enemy ? true : obj = checkObject(status.attack.current[i])

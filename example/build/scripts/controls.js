@@ -45,6 +45,8 @@ const ROWS = [
     ["controls.down","down",null],
     ["controls.left","left",null],
     ["controls.right","right",null],
+    //V148: клавиша ручной атаки (чекбокс «Автоатака» в Настройках снят) — у каждого игрока своя
+    ["controls.attack","attack",null],
     ["controls.equip","equip","equip"],
     ["controls.map","map","map"],
     ["controls.journal","journal","journal"],

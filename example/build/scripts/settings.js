@@ -56,6 +56,17 @@ function toggleEmotions() {
     saveSettings()
     emotionsCheckMark && emotionsCheckMark.setAttribute("display", status.settings.emotions !== 0 ? "inline" : "none")
 }
+//V148: чекбокс «Автоатака» — режим атаки героя. Включено (по умолчанию, undefined=вкл,
+//семантика itemFrames/emotions) — герой бьёт сам, когда враг входит в зону удара.
+//Выключено — ручная атака: удар по клавише атаки (attack.js гейтит checkAttack,
+//клавиши — devices.js bindings «attack», переназначение в панели «Управление»)
+let autoAttackCheckMark = null
+function toggleAutoAttack() {
+    playback(strike[14].vol,0,0,3*status.settings.soundVolume)
+    status.settings.autoAttack = status.settings.autoAttack === 0 ? 1 : 0
+    saveSettings()
+    autoAttackCheckMark && autoAttackCheckMark.setAttribute("display", status.settings.autoAttack !== 0 ? "inline" : "none")
+}
 //V95: немедленное применение к открытому экрану. В лобби сундук виден за панелью настроек —
 //полная перерисовка (та же последовательность, что у смены языка: settingsDel(1) → lobby →
 //settings). На заставке предметов нет, в забеге панели перекрыты — эффекты применятся при
@@ -147,6 +158,16 @@ function settings() {
     emotionsCheckMark.setAttribute("pointer-events", "none")
     settingsTemp.push(emotionsCheckMark)
     settingsTemp.push(text(svgArr[2],692,796,"0pt","50pt","black","2px",`rgb(204, 153, 102)`,T("settings.emotions"),{"id":"delItemText","size":34,"font":"baseFont4","anchor":"start"}))
+
+    //V148: «Автоатака» — в той же строке справа от «Эмоции». Отрисовка та же (V80a):
+    //чекбокс первым, галочка поверх с pointer-events="none"; по умолчанию включена
+    settingsTemp.push(rect(svgArr[2],860,768,34,34,`rgb(204, 153, 102)`,"3px","black",{"rx":"4px","func":toggleAutoAttack}))
+    autoAttackCheckMark = path(svgArr[2],{"id":"autoAttackCheck","x":0,"y":0,"r":0,
+        "d":"M 865 788 L 874 798 L 889 775 L 885 772 L 874 791 L 869 785 Z"},`rgb(204, 153, 102)`)
+    autoAttackCheckMark.setAttribute("display", status.settings.autoAttack !== 0 ? "inline" : "none")
+    autoAttackCheckMark.setAttribute("pointer-events", "none")
+    settingsTemp.push(autoAttackCheckMark)
+    settingsTemp.push(text(svgArr[2],912,796,"0pt","50pt","black","2px",`rgb(204, 153, 102)`,T("settings.autoAttack"),{"id":"delItemText","size":34,"font":"baseFont4","anchor":"start"}))
 
     //V60: нижняя кнопка панели. Со стартового экрана — ОТМЕНА (просто закрыть настройки),
     //иначе — ГЛАВНОЕ МЕНЮ: из забега (status.start===1) с окном предупреждения ДА/НЕТ

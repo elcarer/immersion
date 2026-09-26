@@ -23,7 +23,7 @@ import { flameQuestCorridorOpen } from "../scripts/flameQuest.js"
 import { tryFinSummon } from "../scripts/finPillars.js"
 //V114: кооператив — контекст игрока + профили устройств ввода
 import { setContext } from "../scripts/players.js"
-import { playerMoveKeys,padIndex,ownerOfMoveKey } from "../scripts/devices.js"
+import { playerMoveKeys,padIndex,ownerOfMoveKey,ownerOfAttackKey } from "../scripts/devices.js"
 //V56: сет «Доблестный небожитель» (6 надетых): скорость перемещения героя ×1.05
 import { setHeroSpeedMult } from "../scripts/sets.js"
 //V75: благословения шкафчика — Сын ветра +10%, Громила/Заучка по -10% к скорости перемещения
@@ -42,7 +42,14 @@ document.addEventListener('keydown', (event) => {pressedKeys.add(event.code);
     //V114: рывок (двойное нажатие направления) уходит ВЛАДЕЛЬЦУ кода: в соло профиль один
     //на единственного героя (WASD+стрелки равноправны), в коопе WASD — игрок 1, стрелки — игрок 2
     const hit = ownerOfMoveKey(event.code)
-    if (!hit) return
+    if (!hit) {
+        //V148: клавиша атаки (ручной режим, чекбокс «Автоатака» снят) — edge на keydown
+        //владельцу; checkAttack (attack.js) consumes в свой тик. Гвард: в панелях/паузе
+        //нажатие не копится — первый тик после снятия паузы не бьёт «сам по себе»
+        const att = ownerOfAttackKey(event.code)
+        att && status.start === 1 && status.pause === 0 && (att.attackQueued = 1)
+        return
+    }
     hit.player.lastDir = hit.dir
     setContext(hit.player)
     dashPress(hit.dir)

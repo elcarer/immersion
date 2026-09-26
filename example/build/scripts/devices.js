@@ -22,9 +22,11 @@ export const PANEL_ACTIONS = [["equip",0],["map",1],["journal",2],["settings",3]
 //p0/p1 строго не пересекаются, иначе ownerOfMoveKey не определит владельца.
 //Движение в дефолтах привязок НЕ хранится — его дефолты живут в DEVICE_KEYS
 //и берутся по УСТРОЙСТВУ игрока (playerMoveKeys)
+//V148: «attack» — клавиша ручной атаки (чекбокс «Автоатака» снят): левый Ctrl у
+//игрока 1, «0» у игрока 2 (правая половина, рядом со стрелками)
 const DEFAULT_BINDINGS = [
-    {"equip":["KeyN"],"map":["KeyM"],"journal":["Comma"],"settings":["Period"],"library":["Slash"]},
-    {"equip":["KeyK"],"map":["KeyL"],"journal":["Semicolon"],"settings":["Quote"],"library":["Backspace"]}
+    {"equip":["KeyN"],"map":["KeyM"],"journal":["Comma"],"settings":["Period"],"library":["Slash"],"attack":["ControlLeft"]},
+    {"equip":["KeyK"],"map":["KeyL"],"journal":["Semicolon"],"settings":["Quote"],"library":["Backspace"],"attack":["Digit0"]}
 ]
 //дефолты движения ПО УСТРОЙСТВУ (V114-семантика): solo = обе половины сразу
 const DEVICE_KEYS = {
@@ -92,6 +94,16 @@ function ownerOfPanelKey(code) {
     }
     return null
 }
+//V148: чей код клавиши атаки (ручной режим) — сам игрок или null. Как и панели,
+//ищем по ПРОФИЛЮ игрока (kbKeys), не по устройству: в соло профиль p0 один —
+//работает только его Ctrl; в коопе Ctrl — игрок 1, «0» — игрок 2
+function ownerOfAttackKey(code) {
+    for (let i = 0; i < status.players.length; i++) {
+        const P = status.players[i]
+        if (kbKeys(P.idx || 0, "attack").indexOf(code) !== -1) return P
+    }
+    return null
+}
 //шаблон для панели «Управление» и глубокого долива дефолтов при загрузке сейва.
 //ТОЛЬКО панельные действия и пад: движение НЕ попадает в привязки, пока игрок не
 //переназначил клавишу сам, — иначе записанный дефолт (WASD) перекрыл бы solo-слив
@@ -104,4 +116,4 @@ function bindingsTemplate() {
         "pad": clone(DEFAULT_PAD)
     }
 }
-export {playerMoveKeys,padIndex,ownerOfMoveKey,ownerOfPanelKey,kbKeys,padBtn,bindingsTemplate,DEVICE_KEYS,DIR_NAMES}
+export {playerMoveKeys,padIndex,ownerOfMoveKey,ownerOfPanelKey,ownerOfAttackKey,kbKeys,padBtn,bindingsTemplate,DEVICE_KEYS,DIR_NAMES}

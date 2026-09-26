@@ -1147,6 +1147,8 @@ const PAIRS = [
     ["settings.itemGlow", "Свечение предметов", "Item glow"],
     //V144: чекбокс «Эмоции» — эмодзи врагов (заметил/потерял/умер/убегает)
     ["settings.emotions", "Эмоции", "Emotions"],
+    //V148: чекбокс «Автоатака» — выкл = ручная атака клавишей (bindings «attack»)
+    ["settings.autoAttack", "Автоатака", "Auto attack"],
     //V126: панель «Управление» — переназначение кнопок клавиатуры и геймпада
     ["settings.controls", "Управление", "Controls"],
     ["controls.title", "УПРАВЛЕНИЕ", "CONTROLS"],
@@ -1157,6 +1159,8 @@ const PAIRS = [
     ["controls.down", "Вниз", "Down"],
     ["controls.left", "Влево", "Left"],
     ["controls.right", "Вправо", "Right"],
+    //V148: клавиша атаки для ручного режима (чекбокс «Автоатака» снят)
+    ["controls.attack", "Атака", "Attack"],
     ["controls.equip", "Экипировка", "Equipment"],
     ["controls.map", "Карта", "Map"],
     ["controls.journal", "Журнал", "Journal"],
