@@ -40,17 +40,13 @@ function openDoor () {
                 pic.setAttribute("href",walls[i2][1])
                 //E-9: navMatrix ИИ врагов (enemyAI) перестраивается — дверь проходима
                 status.navVersion = (status.navVersion || 0) + 1
-                //V4: открывшаяся дверь стала накладкой (27/28 на 1-м этаже, 57/58 на 2-м) —
-                //добавляем в кэш Z-сортировки (при создании тайла она была 9/12/23/24 и в кэш не попала)
-                if (Array.isArray(wallsOverlay) && wallsOverlay.indexOf(pic) === -1 &&
-                    (walls[i2][1] === "./images/dungeon/walls/27.png" ||
-                     walls[i2][1] === "./images/dungeon/walls/28.png" ||
-                     walls[i2][1] === "./images/dungeon/walls/57.png" ||
-                     walls[i2][1] === "./images/dungeon/walls/58.png" ||
-                     walls[i2][1] === "./images/dungeon/walls/87.png" ||
-                     walls[i2][1] === "./images/dungeon/walls/88.png")) {
-                    wallsOverlay.push(pic)
-                }
+                //V150: ЛЮБАЯ открывшаяся дверь — арка, требующая Z-сортировки против
+                //сущностей. Раньше в кэш попадали только 27/28/57/58/87/88, а открытые
+                //двери типов 23/24 (29/30/59/60/89/90) сортировались мимо — герой в их
+                //проёме рисовался ПОВЕРХ арки. _zOverlay — метка для статичного клеточного
+                //прохода checkZOrder (арки обрабатывает ветка стен-накладок выше)
+                if (Array.isArray(wallsOverlay) && wallsOverlay.indexOf(pic) === -1) wallsOverlay.push(pic)
+                pic._zOverlay = 1
                 break
             }
         }

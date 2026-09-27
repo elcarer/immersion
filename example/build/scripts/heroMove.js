@@ -1,7 +1,7 @@
 import * as basicData from "../scripts/data.js"
 import { status } from "../scripts/start.js"
 import { dataGeneric,createRoom,floorTexture } from "../scripts/sceneGenerate.js"
-import { collision } from "../scripts/collision.js"
+import { collision, zNear } from "../scripts/collision.js"
 import { svgArr,image,worldImage, moveSprite, rectPos } from "../scripts/svg.js"
 import { screenPic,objectValues,wallsOverlay,acidArr,doorPics } from "../scripts/del.js"
 import { openRoom } from "../scripts/openRoom.js"
@@ -487,9 +487,17 @@ function createCorridor (cell,tileX,tileY,level) {
                     w[1]*tileY,
                     w[3]*tileX,
                     w[4]*tileY,"./images/dungeon/walls/"+(w[2]+status.levelFloor*30)+".png"))
-        //V4: стены-накладки (27/28) — в кэш Z-сортировки («;» обязательна:
-        //строка начинается с «(» — без неё ASI склеивает с push выше)
-        ;(w[2]===27||w[2]===28)&&wallsOverlay.push(conteiner[conteiner.length-1])
+        //V150: индекс спрайта в screenPic — клеточный Z-проход checkZOrder берёт
+        //спрайт стены по нему (в createRoom drawWall этот индекс ставил и раньше)
+        w[6] = conteiner.length-1
+        //V4: стены-накладки (27/28) — в кэш Z-сортировки («;» обязательна: строка
+        //начинается с «(» — без неё ASI склеивает с присваиванием выше); V150: метка
+        //_zOverlay — статичный проход checkZOrder их пропускает (это работа ветки выше)
+        if (w[2]===27||w[2]===28) {
+            const ov = conteiner[conteiner.length-1]
+            wallsOverlay.push(ov)
+            ov._zOverlay = 1
+        }
         //V16: двери — в кэш openDoor
         ;(w[2]===9||w[2]===12||w[2]===23||w[2]===24)&&doorPics.push(conteiner[conteiner.length-1])
     }
@@ -516,16 +524,36 @@ function createCorridor (cell,tileX,tileY,level) {
 }
 function checkZOrder (obj,hero = 0) {
     let rect1 = obj.rect
-    let length = objectValues.length
-    for (let i = 0; i < length; i++) {
-        if (objectValues[i].img !== obj.img && svgArr[1].contains(objectValues[i].img)) {
-            let rect2 = objectValues[i].rect
-            //V16: координаты из кэша (rectPos) — animVal не читаем в цикле
-            let r2 = rectPos(rect2)
-            if (checkCollision(rect1.x.animVal.value,r2[0],rect1.width.animVal.value,rect2.width.animVal.value,rect1.y.animVal.value,r2[1],rect1.height.animVal.value,rect2.height.animVal.value)) {
-                if (r2[1]+rect2.height.animVal.value < rect1.y.animVal.value+rect1.height.animVal.value) {
-                    svgArr[1].append(obj.img)
-                }
+    //Порядок веток ВАЖЕН (V150): сначала СТАТИЧНЫЕ коллайдеры, потом арки, потом
+    //сущности — каждая следующая ветка ставит поверх итогового порядка то, что ниже.
+    //Обратный порядок ломал пары: ветка сущностей поднимала врага над героем, а идущая
+    //следом статичная снова поднимала героя — враг оставался рисоваться под героем.
+    //V150: статичные стены/двери/объекты — клеточный индекс collision.js (только клетки
+    //под спрайтом сущности). Раньше против них сортировки не было вовсе: сущность,
+    //вошедшая в комнату ПОЗЖЕ отрисовки её стен, рисовалась ПОД стенами, а стоящая ЗА
+    //высоким объектом (столб/статуя/портал/шкафчик) — ПОВЕРХ него. Правило обеих сторон —
+    //по нижней границе СПРАЙТОВ (у столба/статуи спрайт выше логической клетки). Плоские
+    //типы (ловушка 14, рычаг 19, чаша 22) лежат на полу; арки открытых дверей (_zOverlay)
+    //сортирует следующая ветка.
+    let zP = rectPos(rect1)
+    let zW = rect1.width.animVal.value
+    let zH = rect1.height.animVal.value
+    let zRecs = zNear(dataGeneric.scenes[status.levelFloor],zP[0],zP[1],zW,zH)
+    for (let i = 0; i < zRecs.length; i++) {
+        let rec = zRecs[i]
+        let tp = rec[2]
+        if (tp === 14 || tp === 19 || tp === 22) continue
+        let sp = screenPic[rec[6]]
+        if (!sp || sp._dead || sp._zOverlay) continue
+        //V150: x/y/width/height мирового спрайта — holder-геттеры (SVG-совместимость),
+        //число — только через animVal.value
+        let spx = sp.x.animVal.value, spy = sp.y.animVal.value
+        let spw = sp.width.animVal.value, sph = sp.height.animVal.value
+        if (checkCollision(zP[0],spx,zW,spw,zP[1],spy,zH,sph)) {
+            if (spy + sph > zP[1] + zH) {
+                svgArr[1].append(sp)
+            } else {
+                svgArr[1].append(obj.img)
             }
         }
     }
@@ -539,6 +567,25 @@ function checkZOrder (obj,hero = 0) {
                 svgArr[1].prepend(wall)
             } else {
                 svgArr[1].append(wall)
+            }
+        }
+    }
+    let length = objectValues.length
+    for (let i = 0; i < length; i++) {
+        if (objectValues[i].img !== obj.img && svgArr[1].contains(objectValues[i].img)) {
+            let rect2 = objectValues[i].rect
+            //V16: координаты из кэша (rectPos) — animVal не читаем в цикле
+            let r2 = rectPos(rect2)
+            if (checkCollision(rect1.x.animVal.value,r2[0],rect1.width.animVal.value,rect2.width.animVal.value,rect1.y.animVal.value,r2[1],rect1.height.animVal.value,rect2.height.animVal.value)) {
+                if (r2[1]+rect2.height.animVal.value < rect1.y.animVal.value+rect1.height.animVal.value) {
+                    svgArr[1].append(obj.img)
+                } else if (objectValues[i].type === "hero" || objectValues[i].type === "enemy" || objectValues[i].type === "pet") {
+                    //V150: симметричная ветка — сосед НИЖЕ рисуется ПОВЕРХ obj. Раньше
+                    //порядок был односторонним: движущаяся сущность поднимала себя над
+                    //тем, кто выше, но никто не опускался под того, кто ниже — враг,
+                    //у которого герой прошёл снизу вверх, оставался рисоваться ПОД героем
+                    svgArr[1].append(objectValues[i].img)
+                }
             }
         }
     }

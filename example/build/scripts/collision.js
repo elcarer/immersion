@@ -88,4 +88,42 @@ function collisionCheckObject(obj) {
     //Юзу проходимость не нужна — зона взаимодействия checkObject шире клетки объекта на ±32px
     return obj[2] !== 14 && obj[2] !== 19 && obj[2] !== 22
 }
-export {collision}
+//V150: записи стен/объектов, покрывающие клетки прямоугольника — для Z-сортировки
+//checkZOrder (heroMove.js): против статичных стен/дверей/объектов раньше не сортировало
+//вовсе. Индекс переиспользуется (тот же, что у collision), записи уникальны — одна
+//стена покрывает несколько клеток прямоугольника.
+//Выборка берётся по ЛОГИЧЕСКИМ клеткам коллайдеров, расширенным на 2 клетки ВНИЗ и
+//по 1 клетке влево/вправо: у высоких объектов спрайт торчит ВВЕРХ от логической клетки
+//(столб 81px, портал 84px, выход 128px — якорь низа в клетку), и сущность «за» объектом
+//стоит в клетках его СПРАЙТА, но не логики. Пересечение потом проверяется точно — по
+//спрайтам в checkZOrder, лишние записи отсеиваются.
+function zNear(level, x, y, w, h) {
+    if (indexedLevel !== level || indexedObjectsLen !== level.objects.length) buildCollisionIndex(level)
+    const x1 = Math.trunc((x - 32) / 32)
+    const x2 = Math.trunc((x + w - 1 + 32) / 32)
+    const y1 = Math.trunc(y / 32)
+    const y2 = Math.trunc((y + h - 1 + 64) / 32)
+    const out = []
+    const seen = new Set()
+    for (let cy = y1; cy <= y2; cy++) {
+        for (let cx = x1; cx <= x2; cx++) {
+            const key = cy * 4096 + cx
+            const walls = wallIndex.get(key)
+            if (walls) {
+                for (let i = 0; i < walls.length; i++) {
+                    const rec = walls[i]
+                    if (!seen.has(rec)) { seen.add(rec); out.push(rec) }
+                }
+            }
+            const objs = objIndex.get(key)
+            if (objs) {
+                for (let i = 0; i < objs.length; i++) {
+                    const rec = objs[i]
+                    if (!seen.has(rec)) { seen.add(rec); out.push(rec) }
+                }
+            }
+        }
+    }
+    return out
+}
+export {collision, zNear}

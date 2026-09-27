@@ -296,8 +296,13 @@ function createRoom (level,i0,tileX,tileY) {
             w[4]*tileY,"./images/dungeon/walls/"+(w[2]+status.levelFloor*30)+".png",{"id":screenPic.length+"W"}))
         w[6] = screenPic.length-1
         //V4: стены-накладки (27/28) — в кэш Z-сортировки («;» обязательна: строка
-        //начинается с «(» — без неё ASI склеивает с присваиванием выше)
-        ;(w[2]===27||w[2]===28)&&wallsOverlay.push(screenPic[screenPic.length-1])
+        //начинается с «(» — без неё ASI склеивает с присваиванием выше); V150: метка
+        //_zOverlay — статичный проход checkZOrder их пропускает (это работа ветки выше)
+        if (w[2]===27||w[2]===28) {
+            const ov = screenPic[screenPic.length-1]
+            wallsOverlay.push(ov)
+            ov._zOverlay = 1
+        }
         //V16: двери (9/12/23/24) — в кэш openDoor (не сканировать весь screenPic каждый тик)
         ;(w[2]===9||w[2]===12||w[2]===23||w[2]===24)&&doorPics.push(screenPic[screenPic.length-1])
     }

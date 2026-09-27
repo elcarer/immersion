@@ -1389,7 +1389,11 @@ function createWorldImage(place, x, y, w, h, src, obj = {}) {
 // Z-операции слоя над нативным спрайтом (checkZOrder: стены-накладки под/над героем)
 function appendWorld(layer, ws, toBottom) {
     if (ws._dead || !layer.node) return
-    layer.node.addChildAt(ws.node, toBottom ? 0 : layer.node.children.length)
+    const kids = layer.node.children
+    //V150: checkZOrder гоняет сущность вдоль стен/дверей каждый шаг — re-append узла,
+    //который УЖЕ последний, это no-op вместо addChildAt (splice всего массива детей)
+    if (!toBottom && kids[kids.length - 1] === ws.node) return
+    layer.node.addChildAt(ws.node, toBottom ? 0 : kids.length)
     ws.parent = layer
     ws._layer = layer
 }
