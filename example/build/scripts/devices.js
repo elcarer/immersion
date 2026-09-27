@@ -22,10 +22,11 @@ export const PANEL_ACTIONS = [["equip",0],["map",1],["journal",2],["settings",3]
 //p0/p1 строго не пересекаются, иначе ownerOfMoveKey не определит владельца.
 //Движение в дефолтах привязок НЕ хранится — его дефолты живут в DEVICE_KEYS
 //и берутся по УСТРОЙСТВУ игрока (playerMoveKeys)
-//V148: «attack» — клавиша ручной атаки (чекбокс «Автоатака» снят): левый Ctrl у
-//игрока 1, «0» у игрока 2 (правая половина, рядом со стрелками)
+//V148: «attack» — клавиша ручной атаки (чекбокс «Автоатака» снят). V149 (просьба юзера):
+//у игрока 1 дефолт — Пробел (левый Ctrl из V148 неудобен); у игрока 2 — «0»
+//(правая половина, рядом со стрелками)
 const DEFAULT_BINDINGS = [
-    {"equip":["KeyN"],"map":["KeyM"],"journal":["Comma"],"settings":["Period"],"library":["Slash"],"attack":["ControlLeft"]},
+    {"equip":["KeyN"],"map":["KeyM"],"journal":["Comma"],"settings":["Period"],"library":["Slash"],"attack":["Space"]},
     {"equip":["KeyK"],"map":["KeyL"],"journal":["Semicolon"],"settings":["Quote"],"library":["Backspace"],"attack":["Digit0"]}
 ]
 //дефолты движения ПО УСТРОЙСТВУ (V114-семантика): solo = обе половины сразу
@@ -94,6 +95,15 @@ function ownerOfPanelKey(code) {
     }
     return null
 }
+//V149: миграция сохранённых настроек — старый дефолт атаки игрока 1 (левый Ctrl, V148)
+//заменяется новым дефолтом (Пробел). Без неё смена дефолта не дошла бы до тех, у кого
+//биндинги уже долиты в слот settings (ensureBindings при первом открытии «Управления»
+//записал тогдашние дефолты). Идёт и в сейв-файлах при «Загрузить». Вызвавший переключение
+//на Ctrl вручную получит Пробел — вернуть Ctrl можно в «Управлении»
+function normBindings(settings) {
+    const a = settings && settings.bindings && settings.bindings.p0 && settings.bindings.p0.attack
+    if (Array.isArray(a) && a.length === 1 && a[0] === "ControlLeft") settings.bindings.p0.attack = ["Space"]
+}
 //шаблон для панели «Управление» и глубокого долива дефолтов при загрузке сейва.
 //ТОЛЬКО панельные действия и пад: движение НЕ попадает в привязки, пока игрок не
 //переназначил клавишу сам, — иначе записанный дефолт (WASD) перекрыл бы solo-слив
@@ -106,4 +116,4 @@ function bindingsTemplate() {
         "pad": clone(DEFAULT_PAD)
     }
 }
-export {playerMoveKeys,padIndex,ownerOfMoveKey,ownerOfPanelKey,kbKeys,padBtn,bindingsTemplate,DEVICE_KEYS,DIR_NAMES}
+export {playerMoveKeys,padIndex,ownerOfMoveKey,ownerOfPanelKey,kbKeys,padBtn,bindingsTemplate,normBindings,DEVICE_KEYS,DIR_NAMES}

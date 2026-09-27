@@ -6,6 +6,8 @@ import { setLang,keyByRu } from "../scripts/localization.js"
 //V118: кооп-профиль — фабрика второго игрока при загрузке
 //V124: раздельная мета коопа — пер-игроковые поля, шаблон, общая часть
 import { makePlayer,META_PLAYER_FIELDS,playerMetaTemplate,sharedMetaPart,setContext } from "../scripts/players.js"
+//V149: миграция биндингов сохранённых настроек (старый дефолт атаки P1 Ctrl → Пробел)
+import { normBindings } from "../scripts/devices.js"
 
 //V118: два профиля — соло (ключ "meta", как всегда) и кооп ("metaCoop"). Активный
 //режим — settings.lastMode; сейв одного режима другим не грузится (несовместимость —
@@ -189,6 +191,7 @@ function load() {
         let settings = JSON.parse(localStorage.getItem("settings"))
         if (settings && typeof settings === "object") {
             status.settings = {musicVolume:0.1, soundVolume:0.1, ...settings}
+            normBindings(status.settings)
         }
         //V118: грузим профиль последнего режима (по умолчанию соло). Кооп-профиль
         //валидируем: mode="coop" и два игрока с РАЗНЫМИ классами (правило коопа),
@@ -236,6 +239,7 @@ function loadSettings() {
         let settings = JSON.parse(localStorage.getItem("settings"))
         if (settings && typeof settings === "object") {
             status.settings = {musicVolume:0.1, soundVolume:0.1, ...settings}
+            normBindings(status.settings)
         }
     } catch (e) {
         console.error("Ошибка загрузки настроек:", e)
@@ -290,6 +294,7 @@ function loadFromFile() {
                     status.meta = data.meta
                 }
                 status.settings = {musicVolume:0.1, soundVolume:0.1, ...(data.settings || {})}
+                normBindings(status.settings)
                 //V141: lastMode — строго по типу файла, чтобы save() в lobby() сразу
                 //писал профиль в слот загруженного режима
                 status.settings.lastMode = data.meta.mode === "coop" ? "coop" : "solo"

@@ -87,6 +87,14 @@ function settings() {
     status.move = 0
     status.panels = 6
     musicDuck(1) //V61: панель глушит музыку (на заставке шина музыку не трогает)
+    //V149 (репорт юзера: панель настроек пропускает хиттест): гасящая подложка на весь
+    //экран. Фон panel.png не интерактивен (нет func — контракт шима «все примитивы
+    //pointer-events:none»), и клики сквозь него ловили элементы ПОД панелью: на заставке —
+    //кнопки главного меню (клик мимо контролов закрывал настройки/стартовал игру), в лобби —
+    //карточки героев и сундук. Рисуется ПЕРВОЙ: контролы, добавленные следом, стоят выше
+    //и кликабельны, всё под панелью перекрыто. Тот же приём, что в exitConfirm/
+    //newGameConfirm/modeSelect: интерактивность подложке даёт no-op func
+    settingsTemp.push(rect(svgArr[2],0,0,uiRightEdge(),uiBottomEdge(),"none","0px","black",{"fillOpacity":"0.6","func":()=>{}}))
     settingsTemp.push(image(svgArr[2],525,160,919,796,"./images/UI/panels/panel.png"))
     settingsTemp.push(text(svgArr[2],960,215,"0pt","50pt","black","2px",`rgb(204, 153, 102)`,T("settings.title"),{"id":"delItemText","size":60,"font":"baseFont4","anchor":"middle"}))
     settingsTemp.push(image(svgArr[2],700,290,500,73,"./images/UI/panels/buttonUp.png",{"glow":1,"func":()=>{playback(strike[14].vol,0,0,3*status.settings.soundVolume);status.settings.musicVolume=0;status.settings.soundVolume=0;musicVolume();saveSettings()}}))
