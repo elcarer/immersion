@@ -13,6 +13,8 @@ import { journalAdd, J_GREEN } from "../scripts/journal.js"
 //V75 «Кровавый пакт»: пересчёт статов (макс. ХП ×0.8) сразу при выдаче эффекта
 import { countDopStats } from "../scripts/countDopStats.js"
 import { changeHP } from "../scripts/takeDamage.js"
+//V153: сет «Исследователь пустоты» — шанс, что шкафчик не гаснет после благословения
+import { rollVoidReuse } from "../scripts/sets.js"
 
 //V75: ШКАФЧИК С ДРЕВНОСТЯМИ — интерактивный объект 20, спрайт objects/101|101d.png один на
 //все этажи (паттерн портала/рычага V64). После использования — пауза и три окна с тремя
@@ -124,12 +126,18 @@ function grantBless(id,obj) {
     }
     journalAdd(T("journ.bless",T("bless." + id + ".name")), J_GREEN)
     playback(strike[13].vol,0,0,2*status.settings.soundVolume)
-    //объект использован: флаг + спрайт «d»-версии — защитный поиск по screenPic, как в alchemy
-    obj[7] = 1
-    let img = picById(obj[6]+"OI")
-    if (img) {
-        let href = img.getAttribute("href") || ""
-        img.setAttribute("href", href.slice(0,-4)+"d"+href.slice(-4))
+    //объект использован: флаг + спрайт «d»-версии — защитный поиск по screenPic, как в alchemy.
+    //V153: сет «Исследователь пустоты» (3 надетых) — шкафчик с шансом 10% не гаснет
+    //(obj[11]=1 — повторное благословение после выхода героя из зоны), спрайт остаётся светлым
+    if (rollVoidReuse()) {
+        obj[11] = 1
+    } else {
+        obj[7] = 1
+        let img = picById(obj[6]+"OI")
+        if (img) {
+            let href = img.getAttribute("href") || ""
+            img.setAttribute("href", href.slice(0,-4)+"d"+href.slice(-4))
+        }
     }
     renderBlessHints()
     ancientDel(0)

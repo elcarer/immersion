@@ -694,6 +694,11 @@ const PAIRS = [
     ["iset.12.2.1", "Кунай «Победителя турниров»", "Kunai of the Tournament Champion"],
     ["iset.12.3.0", "Щит «Доблести небожителя»", "Shield of Valor Celestial"],
     ["iset.12.3.1", "Кунай «Доблести небожителя»", "Kunai of Valor Celestial"],
+    //V153: сет 5 «Исследователь пустоты» — только плащ (слот 1), пояс (слот 10) и книга (левая рука вид 1)
+    ["iset.1.4.0", "Плащ «Исследователя пустоты»", "Cloak of the Void Explorer"],
+    ["iset.10.4.0", "Пояс «Исследователя пустоты»", "Belt of the Void Explorer"],
+    ["iset.12.4.0", "Щит «Исследователя пустоты»", "Shield of the Void Explorer"],
+    ["iset.12.4.1", "Книга «Исследователя пустоты»", "Book of the Void Explorer"],
     ["ipfx.0", "Мощный", "Mighty"],
     ["ipfx.1", "Ответный", "Returning"],
     ["ipfx.2", "Защитный", "Protective"],
@@ -790,7 +795,12 @@ const PAIRS = [
     ["set.3.b2.desc", "1% шанс получить кучку золота при убийстве врага", "1% chance to get a gold pile when killing an enemy"],
     ["set.4.b0.desc", "-1 к скорости элитных врагов и боссов", "-1 to elite enemy and boss speed"],
     ["set.4.b1.desc", "Двуручное оружие занимает только одну руку", "Two-handed weapons take up only one hand"],
-    ["set.4.b2.desc", "+5% к скорости перемещения", "+5% movement speed"],    // ---------- карточки врагов (enemyHover/library) ----------
+    ["set.4.b2.desc", "+5% к скорости перемещения", "+5% movement speed"],
+    //V153: сет 5 «Исследователь пустоты» — один бонус на три предмета (метка set.bl3)
+    ["set.5.name", "Исследователь пустоты", "Void Explorer"],
+    ["set.5.gen", "Исследователя пустоты", "the Void Explorer"],
+    ["set.bl3", "3 предмета", "3 items"],
+    ["set.5.b0.desc", "Активируемые объекты пустых комнат с шансом 10% остаются активируемыми после использования", "Activatable objects of empty rooms have a 10% chance to stay usable after use"],    // ---------- карточки врагов (enemyHover/library) ----------
     ["eh.hp", "Жизни: {0}", "Lives: {0}"],
     ["eh.vision", "Зоркость: {0}", "Vision: {0}"],
     ["eh.dmg", "Урон: {0}-{1}", "Damage: {0}-{1}"],

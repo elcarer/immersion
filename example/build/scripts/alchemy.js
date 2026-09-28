@@ -7,6 +7,8 @@ import { cellPickArr } from "../scripts/doll.js"
 //V67: «Вечный сапфир» — состав inv[0] изменился (удаление/новый предмет), копия пересчитывается
 import { unEquip,changeDopStat } from "../scripts/drag.js"
 import { itemGenerate } from "../scripts/itemGenerate.js"
+//V153: сет «Исследователь пустоты» — шанс, что стол не гаснет после объединения
+import { rollVoidReuse } from "../scripts/sets.js"
 import { playback,strike,musicDuck } from "../scripts/sound.js"
 
 //V54: алхимический стол — интерактивный объект (тип 17, спрайты objects/15|35|55.png).
@@ -199,12 +201,18 @@ function mergeSelected() {
         //копия пересчитывается (unEquip с куклы пересчитал сам, добавка безвредна)
         changeDopStat()
         //объект использован: флаг + спрайт «d»-версии (15d/35d/55d), как у прочих объектов.
-        //Поиск защитный: без animVal-чтений и с guard от не-элементов в screenPic
-        alchemyObj[7] = 1
-        let img = picById(alchemyObj[6]+"OI")
-        if (img) {
-            let href = img.getAttribute("href") || ""
-            img.setAttribute("href", href.slice(0,-4)+"d"+href.slice(-4))
+        //Поиск защитный: без animVal-чтений и с guard от не-элементов в screenPic.
+        //V153: сет «Исследователь пустоты» (3 надетых) — стол с шансом 10% не гаснет
+        //(obj[11]=1 — повторное объединение после выхода героя из зоны), спрайт остаётся светлым
+        if (rollVoidReuse()) {
+            alchemyObj[11] = 1
+        } else {
+            alchemyObj[7] = 1
+            let img = picById(alchemyObj[6]+"OI")
+            if (img) {
+                let href = img.getAttribute("href") || ""
+                img.setAttribute("href", href.slice(0,-4)+"d"+href.slice(-4))
+            }
         }
         playback(strike[13].vol,0,0,2*status.settings.soundVolume)
     } catch (e) {

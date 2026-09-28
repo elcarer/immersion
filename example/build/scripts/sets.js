@@ -11,6 +11,9 @@ import { relicCount, hasRelic, sapphireSource } from "../scripts/relics.js"
 //3 — «Доблестный небожитель». Бонусы считаются ОТДЕЛЬНО по каждому сету (setCount(set)).
 //Старые сейвы: у предметов без setN идентификация ставит сет 1 — все старые легендарки
 //принадлежали «Великому вору» (спрайт-вариант 0).
+//V153: пятый сет «Исследователь пустоты» (спрайт-вариант 4) — ИСКЛЮЧЕНИЕ из общей схемы:
+//состоит ровно из трёх предметов (плащ — слот 1, пояс — слот 10, книга — левая рука вид 1),
+//выпадает только ими и имеет единственный бонус «3 предмета» (см. itemGenerate и rollVoidReuse)
 //V58: тексты сетов — ключи локализации (set.N.name/gen, set.N.b<K>.desc; метки «N предметов»
 //общие — set.bl<K>). Отображение — T() в setTip (tip.js)
 const SETS = [
@@ -34,12 +37,17 @@ const SETS = [
         {"need":4,"label":"set.bl1","desc":"set.4.b1.desc"},
         {"need":6,"label":"set.bl2","desc":"set.4.b2.desc"},
     ]},
+    //V153: один бонус на три предмета — других предметов у сета нет (метка «3 предмета» — set.bl3)
+    {"name":"set.5.name","gen":"set.5.gen","bonuses":[
+        {"need":3,"label":"set.bl3","desc":"set.5.b0.desc"},
+    ]},
 ]
 //фиксированные подтипы оружия/левой руки новых сетов (индекс = номер сета; null — случайно,
 //как у «Великого вора»). Подтип оружия = индекс атаки (3 посох, 4 молот/булава, 6 протазан/
 //копьё); вид левой руки: 0 — щит (+броня), 1 — предмет на +урон (у Волшебницы — книга)
-const SET_WEAPON_SUBTYPE = [null,null,3,4,6]
-const SET_OFFHAND_KIND = [null,null,1,0,0]
+//V153: у сет 5 оружие не бывает (генерация в слот 11 его не выбирает), левая рука — книга
+const SET_WEAPON_SUBTYPE = [null,null,3,4,6,null]
+const SET_OFFHAND_KIND = [null,null,1,0,0,1]
 //номер сета идентифицированного предмета: 0 — не сетовый или ещё неидентифицированный
 //(set ставит только мета-апгрейд «Идентификация легенд»)
 function itemSet(obj) {
@@ -149,4 +157,12 @@ function setUseTicks() {
 function set1TrapDamageMult() {
     return 2 * setBonusMult()
 }
-export {SETS,SET_WEAPON_SUBTYPE,SET_OFFHAND_KIND,itemSet,isSetItem,setCount,chestUnidentified,setAbilDamageMult,setCdRateBonus,rollGoldPickup,setEliteDamageMult,setArmorBonus,rollGoldKillPile,setEliteSpeedMod,setTwoHandOneHand,setHeroSpeedMult,set1AttackDamageMult,setUseTicks,set1TrapDamageMult}
+//Сет 5 «Исследователь пустоты» (3 предмета): активируемые неразрушаемые объекты пустых
+//комнат (obj[8]=1 — метка неразрушаемости, ставится только объектам пустых комнат) с шансом
+//10% не гаснут после использования — вместо obj[7]=1 взводится перезарядка obj[11]=1
+//(повторный юз разрешён после выхода героя из зоны, как у повторяемых объектов). V67:
+//«Вечный берилл» удваивает шанс — 20%. rng — подмена генератора для тестов
+function rollVoidReuse(rng) {
+    return setCount(5) >= 3 && (rng || Math.random)() < 0.1 * setBonusMult()
+}
+export {SETS,SET_WEAPON_SUBTYPE,SET_OFFHAND_KIND,itemSet,isSetItem,setCount,chestUnidentified,setAbilDamageMult,setCdRateBonus,rollGoldPickup,setEliteDamageMult,setArmorBonus,rollGoldKillPile,setEliteSpeedMod,setTwoHandOneHand,setHeroSpeedMult,set1AttackDamageMult,setUseTicks,set1TrapDamageMult,rollVoidReuse}
