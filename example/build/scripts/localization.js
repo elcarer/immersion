@@ -1010,6 +1010,9 @@ const PAIRS = [
     //V97: комната «напёрстков» — исходы выбора чаши
     ["journ.shellWin", "Чаша угадана — золото ваше!", "Right cup — the gold is yours!"],
     ["journ.shellLose", "Чаша пуста... Из тени встаёт {0}!", "Empty cup... The {0} rises from the shadows!"],
+    //V152: комната «ход коня» — награда за все 12 переключателей
+    ["float.knightWin", "Загадка «хода коня» решена!", "Knight's move puzzle solved!"],
+    ["journ.knightWin", "Все переключатели включены — выпали два свитка очков характеристик.", "All switches lit — two stat-point scrolls have dropped."],
     //V98: имена бафов статуи + анонс выпавшего бафа (текст над героем и журнал)
     ["buff.1.name", "Ускорение", "Swiftness"],
     ["buff.2.name", "Огненное оружие", "Fire weapon"],

@@ -55,6 +55,20 @@
 // максимальным усилением 4 главы (все три блока множителей openRoom), но БЕЗ тега boss
 // (без полосы ХП и зачёта bossKill). После его смерти (portalArenaKill) Рычаг
 // возвращается — герой активирует им портал и уходит.
+// V152 — четвёртый вид в пуле, жёлтый (100e.png, obj[12]=5, решение пользователя): комната
+// «ход коня» — четвёртый «остров» нижнего ряда (правее «напёрстков», x=45), пол 12×12
+// (интерьер 10×10). Герой входит в верхний ЛЕВЫЙ угол (2,2); в правом верхнем — выключенный
+// возвратный Портал (8,2) и взведённый Рычаг (9,2). В нижней части — 12 переключателей
+// (тип 23, спрайты push0/push1) сеткой 4×3 с шагом 3 клетки (колонки 1/4/7/10 — крайние
+// ровно по сторонам комнаты, ряды 4/7/10 — нижний прилегает к нижней стене). Один случайный
+// включён (obj[10]=1), остальные выключены. Активируемые = соседи «ходом коня»
+// (2 переключателя прямо + 1 вбок — ЛОГИЧЕСКАЯ сетка 4×3, как у кнопок V83) последнего
+// включённого в состоянии 0 — подсвечены жёлтой обводкой (drop-shadow, как чаши V134). Активация подсвеченного: он включается, подсветка гаснет,
+// «проверка» — подсвечиваются его соседи в состоянии 0. Все 12 включены — награда:
+// 2 свитка очков характеристик (кучки scroll.png) на свободных клетках рядом с героем.
+// Тупик (активируемых нет, а не все включены) — полный сброс: все в 0, случайный в 1,
+// снова «проверка». Подсветку ведёт knightTick (gameLoop) — по факту стиля спрайта,
+// поэтому самовосстанавливается после прерванного юза и появления комнаты.
 import { status } from "../scripts/start.js"
 import { data } from "../scripts/data.js"
 import { dataGeneric, createMatrix } from "../scripts/sceneGenerate.js"
@@ -87,6 +101,11 @@ const BUTTON_TYPE = 21
 const PUZZLE_SIZE = 13
 //V97: чаша «напёрстков» — интерактивный объект комнаты вида 3
 const CUP_TYPE = 22
+//V152: переключатель «ход коня» (тип 23) и комната вида 5 портала
+const SWITCH_TYPE = 23
+const KNIGHT_SIZE = 12
+//V152: жёлтая обводка активируемых переключателей — та же запекалка, что у чаш V134
+const KNIGHT_GLOW = "filter: drop-shadow(0 0 8px rgb(255, 215, 0))"
 //V97: комната «напёрстков» (вид 3 портала) и её тайминги (60 тиков ≈ 1 секунда)
 const SHELL_SIZE = 13
 //V134 (репорт юзера): 2с — слишком мало, чтобы запомнить правильную чашу → 4с
@@ -103,7 +122,7 @@ const PORTAL_SPRITE_H = 84
 const ARENA_SIZE = 9
 const ARENA_ENEMES = 9
 
-let link = null // {portal, lever, arenas: [{room, portal, lever, left, entryCell}], puzzle: {room, portal, lever, buttons, solved, entry}|null, shell: {room, portal, lever, cups, full, phase, timer, interval, swapIn, done, bossSpawned, bossDown, entry}|null}
+let link = null // {portal, lever, arenas: [{room, portal, lever, left, entryCell}], puzzle: {room, portal, lever, buttons, solved, entry}|null, shell: {...}|null, knight: {room, portal, lever, switches, ready, solved, entry}|null}
 
 //----- генерация: портал кладёт ОБЩИЙ пул объектов (configEnemesRoomObject в newGame.js,
 //комнаты с врагами, не более 1 на этаж — решение пользователя V64a); здесь только рычаг -----
@@ -115,17 +134,19 @@ function configPortal(level) {
         if (level.objects[i][2] === PORTAL_TYPE) { portal = level.objects[i]; break }
     }
     if (!portal) return
-    //V97: вид портала (obj[12]) — пул из трёх видов: 1 — арена (100.png), 2 — комната-
-    //загадка (100a.png), 3 — «напёрстки» (100b.png). Каждый спец-вид — не более одного
-    //за забег (решение пользователя): флаги status.info (puzzleUsed/shellUsed) переживают
-    //смены этажей; уже использованные виды выпадают из пула. У арен/возвратных порталов
-    //obj[12] не ставится
+    //V97: вид портала (obj[12]) — пул из четырёх видов: 1 — арена (100.png), 2 — комната-
+    //загадка (100a.png), 3 — «напёрстки» (100b.png), 5 — «ход коня» (100e.png). Каждый
+    //спец-вид — не более одного за забег (решение пользователя): флаги status.info
+    //(puzzleUsed/shellUsed/knightUsed) переживают смены этажей; уже использованные виды
+    //выпадают из пула. У арен/возвратных порталов obj[12] не ставится
     let kinds = [1]
     status.info.puzzleUsed || kinds.push(2)
     status.info.shellUsed || kinds.push(3)
+    status.info.knightUsed || kinds.push(5)
     portal[12] = kinds[Math.trunc(Math.random() * kinds.length)]
     portal[12] === 2 && (status.info.puzzleUsed = 1)
     portal[12] === 3 && (status.info.shellUsed = 1)
+    portal[12] === 5 && (status.info.knightUsed = 1)
     //рычаг — в ЛЮБОЙ комнате этажа (решение пользователя, включая стартовую и комнату портала)
     let rooms = level.roomsArr
     let idxs = []
@@ -204,6 +225,18 @@ function portalUse(obj) {
             teleportHero(cell[0], cell[1])
             return
         }
+        //V152: возвратный портал комнаты «ход коня» — телепорт ОБРАТНО к главному порталу
+        //(аналог комнат-загадки/«напёрстков»)
+        let kn = link.knight
+        if (kn && obj === kn.portal) {
+            if (obj[10] !== 1) return
+            let cell = freeCellNear(level, link.portal[0], link.portal[1])
+            if (!cell) return
+            setObjectState(obj, 0)
+            kn.lever && setObjectState(kn.lever, 0)
+            teleportHero(cell[0], cell[1])
+            return
+        }
         //аренный портал — телепорт ОБРАТНО к главному порталу (рычаг арены гаснет,
         //он и так уже выключен своим юзом; сам портал гаснет, но связка НЕ одноразовая:
         //вернувшись главным порталом, герой снова взведёт рычаг зачищенной арены).
@@ -247,6 +280,14 @@ function portalUse(obj) {
             teleportHero(link.shell.entry[0], link.shell.entry[1])
             return
         }
+        //V152: вид 5 — комната «ход коня»: первый юз создаёт её, повторные телепортируют
+        //в ту же (состояния переключателей сохраняются); рычаг возврата пере-взводится
+        if (obj[12] === 5) {
+            if (!link.knight) createKnightRoom(level)
+            else link.knight.lever && link.knight.lever[10] !== 1 && setObjectState(link.knight.lever, 1)
+            teleportHero(link.knight.entry[0], link.knight.entry[1])
+            return
+        }
         let target = link.arenas[0]
         if (!target) target = createArena(level)
         else if (target.left <= 0 && target.lever) setObjectState(target.lever, 1)
@@ -266,6 +307,11 @@ function portalUse(obj) {
         if (link.shell.portal[10] === 1) return
         setObjectState(obj, 0)
         setObjectState(link.shell.portal, 1)
+    } else if (link.knight && obj === link.knight.lever) {
+        //V152: рычаг комнаты «ход коня» — включает возвратный портал
+        if (link.knight.portal[10] === 1) return
+        setObjectState(obj, 0)
+        setObjectState(link.knight.portal, 1)
     } else {
         //рычаг арены: включает портал своей арены
         let arena = link.arenas.find(a => a.lever === obj)
@@ -884,6 +930,174 @@ function shellState() {
     return link && link.shell ? link.shell : null
 }
 
+//----- комната «ход коня» (вид 5 портала, V152) -----
+//Четвёртый «остров» нижнего ряда, правее «напёрстков»: арена x=3..11, загадка x=17..29,
+//«напёрстки» x=31..43 (шаг 14) — «ход коня» x=45..56. Пол 12×12, стены по периметру пола
+//(интерьер 10×10) — тот же приём, что у createPuzzleRoom/createShellRoom
+function createKnightRoom(level) {
+    let nx = 45
+    let ny = level.h + 3
+    level.h = ny + KNIGHT_SIZE + 3
+    let floorIdx = level.floor.length
+    //пол-прямоугольник комнаты: [x, y, w, h, tex, centerX, centerY] (как у newGame)
+    level.floor.push([nx, ny, KNIGHT_SIZE, KNIGHT_SIZE, 3, nx + 6, ny + 6])
+    //кольцо стен — рецепт createArena/createPuzzleRoom: верх 20 (1×1), лево 22 / право 21
+    //(1×1), низ 19 (1×2), верхние углы 6/7 (1×1), нижние 3/2 (1×2)
+    let walls = level.walls
+    walls.push([nx, ny, 6, 1, 1])
+    walls.push([nx + 11, ny, 7, 1, 1])
+    for (let i = 1; i < 11; i++) {
+        walls.push([nx + i, ny, 20, 1, 1])
+        walls.push([nx, ny + i, 22, 1, 1])
+        walls.push([nx + 11, ny + i, 21, 1, 1])
+        walls.push([nx + i, ny + 11, 19, 1, 2])
+    }
+    walls.push([nx, ny + 11, 3, 1, 2])
+    walls.push([nx + 11, ny + 11, 2, 1, 2])
+    //комната в roomsArr: спек из шести ПУСТЫХ групп (формат openRoom) — врагов нет;
+    //[4]=1 — маркер «острова»: волна призыва Демона не ходит
+    let spec = []
+    for (let i = 0; i < 6; i++) spec.push([0, 0])
+    let room = [floorIdx, KNIGHT_SIZE * KNIGHT_SIZE, spec, 0]
+    room[4] = 1
+    level.roomsArr.push(room)
+    //возвратный портал — выключенный, в ПРАВОМ ВЕРХНЕМ углу комнаты: клетка (8,2) от угла;
+    //взведённый рычаг рядом — (9,2). obj[12] возвратному порталу не ставится (portalSprite.js)
+    level.objects.push([nx + 8, ny + 2, PORTAL_TYPE, 1, 1, undefined])
+    let portal = level.objects[level.objects.length - 1]
+    portal[9] = room
+    portal[10] = 0
+    level.objects.push([nx + 9, ny + 2, LEVER_TYPE, 1, 1, undefined])
+    let lever = level.objects[level.objects.length - 1]
+    lever[9] = room
+    lever[10] = 1
+    //12 переключателей (тип 23) сеткой 4×3 с шагом 3: колонки 1/4/7/10 (крайние ровно
+    //по сторонам комнаты), ряды 4/7/10 (нижний прилегает к нижней стене). Один случайный
+    //включён (obj[10]=1), остальные выключены
+    let switches = []
+    const cols = [1, 4, 7, 10]
+    const rows = [4, 7, 10]
+    let onIdx = Math.trunc(Math.random() * 12)
+    for (let r = 0; r < 3; r++) {
+        for (let c = 0; c < 4; c++) {
+            level.objects.push([nx + cols[c], ny + rows[r], SWITCH_TYPE, 1, 1, undefined])
+            let sw = level.objects[level.objects.length - 1]
+            sw[9] = room
+            sw[10] = (r * 4 + c) === onIdx ? 1 : 0
+            switches.push(sw)
+        }
+    }
+    //матрица проходимости: комната — «остров»; BFS врагов и коллизии читают её каждый тик
+    createMatrix()
+    //герой входит в верхний ЛЕВЫЙ угол комнаты; «проверка» стартовых активируемых —
+    //соседи «ходом коня» включённого переключателя в состоянии 0
+    link.knight = {room: room, portal: portal, lever: lever, switches: switches, ready: [], solved: false, entry: [nx + 2, ny + 2]}
+    knightRecompute(link.knight, switches[onIdx])
+}
+//соседи переключателя «ходом коня»: 2 переключателя по горизонтали/вертикали + 1 под
+//прямым углом — шаг по ЛОГИЧЕСКОЙ сетке 4×3 (как у кнопок загадки V83, растянутой по
+//комнате): физический шаг сетки 3 клетки, поэтому смещения (±1,±2)/(±2,±1) — в индексах
+//переключателей (порядок r*4+c в kn.switches), не в клетках пола
+function knightNeighbors(sw) {
+    let out = []
+    let idx = link.knight.switches.indexOf(sw)
+    let c = idx % 4
+    let r = Math.trunc(idx / 4)
+    const offs = [[1, 2], [2, 1], [-1, 2], [-2, 1], [1, -2], [2, -1], [-1, -2], [-2, -1]]
+    for (let i = 0; i < offs.length; i++) {
+        let nc = c + offs[i][0]
+        let nr = r + offs[i][1]
+        if (nc < 0 || nc > 3 || nr < 0 || nr > 2) continue
+        out.push(link.knight.switches[nr * 4 + nc])
+    }
+    return out
+}
+//шаг «проверки»: активируемые — соседи «ходом коня» переключателя fromSw в состоянии 0.
+//Подсветку рисует knightTick по kn.ready — здесь только логика
+function knightRecompute(kn, fromSw) {
+    kn.ready = []
+    let nb = knightNeighbors(fromSw)
+    for (let i = 0; i < nb.length; i++) {
+        nb[i][10] === 0 && kn.ready.push(nb[i])
+    }
+}
+//готовность переключателя к юзу (guard в heroMove.checkObject): активируемы ТОЛЬКО
+//подсвеченные (в kn.ready) и пока загадка не решена
+function knightSwitchReady(obj) {
+    return !!(link && link.knight && !link.knight.solved && link.knight.ready.indexOf(obj) !== -1)
+}
+//юз переключателя (вызов из useObject, тип 23): включается, подсветка гаснет (knightTick),
+//шаг «проверки» — новые активируемые из его соседей. Все 12 включены — награда;
+//активируемых нет, а не все включены — полный сброс (все в 0, случайный в 1, «проверка»)
+function knightSwitchUse(obj) {
+    if (!knightSwitchReady(obj)) return
+    let kn = link.knight
+    setObjectState(obj, 1)
+    kn.ready = []
+    knightRecompute(kn, obj)
+    if (kn.switches.every(s => s[10] === 1)) {
+        kn.solved = true
+        spawnKnightReward()
+        floatText(status.hero.x - 16 + Math.trunc(Math.random() * 32), status.hero.y + 8, T("float.knightWin"), "#FFD68C", "18px", "none")
+        journalAdd(T("journ.knightWin"), J_STD)
+        return
+    }
+    if (kn.ready.length === 0) {
+        for (let i = 0; i < kn.switches.length; i++) setObjectState(kn.switches[i], 0)
+        let sw = kn.switches[Math.trunc(Math.random() * kn.switches.length)]
+        setObjectState(sw, 1)
+        knightRecompute(kn, sw)
+    }
+}
+//награда — 2 кучки свитков очков характеристик (scroll.png, подбор даёт upStat++) на
+//свободных клетках рядом с героем: кольца r=1..3, как у spawnGoldRing; placeDrop страхует
+//от стен/объектов (спрайт переедет на соседнюю клетку)
+function spawnKnightReward() {
+    let m = status.matrixLevel
+    let hc = [Math.trunc(status.hero.x / 32), Math.trunc(status.hero.y / 32)]
+    let placed = {}
+    let n = 0
+    for (let r = 1; r <= 3 && n < 2; r++) {
+        for (let dy = -r; dy <= r && n < 2; dy++) {
+            for (let dx = -r; dx <= r && n < 2; dx++) {
+                if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue
+                let cx = hc[0] + dx
+                let cy = hc[1] + dy
+                if (!(m[cy] && m[cy][cx] === 1) || placed[cx + "_" + cy]) continue
+                placed[cx + "_" + cy] = 1
+                screenPic.push(worldImage(svgArr[1], cx * 32, cy * 32, 32, 36, "./images/dungeon/drop/scroll.png", {"id": screenPic.length - 1}))
+                //V103: полёт из центра спрайта героя (центр хитбокса, как его видит takeDrop)
+                let el = screenPic[screenPic.length - 1]
+                placeDrop(el, cx * 32, cy * 32, 32, 36)
+                dropFly(el, status.hero.x + 16, status.hero.y + 25)
+                n++
+            }
+        }
+    }
+}
+//каждый тик игры (вызов из gameLoop): ведёт подсветку активируемых переключателей —
+//желает стиль по kn.ready и ЧИТАЕТ фактический стиль спрайта, поэтому сам восстанавливает
+//подсветку после прерванного юза (stopUseObject сбрасывает style в «filter: none») и
+//ставит её, когда спрайты появились (createRoom рисует комнату при входе героя — позже
+//создания комнаты). Спрайта может не быть — комната ещё не отрисована, ждёт следующего тика
+function knightTick() {
+    if (!link || !link.knight) return
+    let kn = link.knight
+    for (let i = 0; i < kn.switches.length; i++) {
+        let sw = kn.switches[i]
+        let img = sw[6] !== undefined ? screenPic[sw[6]] : null
+        if (!img) continue
+        let want = kn.ready.indexOf(sw) !== -1 && !kn.solved
+        let cur = img.getAttribute("style") || ""
+        if (want && cur !== KNIGHT_GLOW) img.setAttribute("style", KNIGHT_GLOW)
+        else if (!want && cur === KNIGHT_GLOW) img.setAttribute("style", "filter: none")
+    }
+}
+//состояние комнаты «ход коня» (тест-харнесс: чтение ready/solved в headless)
+function knightState() {
+    return link && link.knight ? link.knight : null
+}
+
 //спрайт объекта 1×1 (рычаг) «вне createRoom»: комната уже отрисована — рисуем сразу тем же
 //конвейером (id «NO», svg.image дописывает «I», obj[6] = индекс в screenPic)
 function drawObjectSprite(obj) {
@@ -927,4 +1141,5 @@ function resetPortalFx() {
 
 //V109: setObjectState/freeCellNear/teleportHero — экспортированы для квеста
 //«Голос в портале» (portalQuest.js: синий квест-портал, телепорты сети, зачистка)
-export {configPortal, portalUse, portalArenaKill, resetPortalFx, placeRoomObject, puzzleButtonUse, shellTick, shellCupUse, shellCupReady, shellState, setObjectState, freeCellNear, teleportHero, teleportPartners, PORTAL_TYPE, LEVER_TYPE, PORTAL_SPRITE_W, PORTAL_SPRITE_H}
+//V152: knightSwitchUse/knightSwitchReady/knightTick/knightState/SWITCH_TYPE — комната «ход коня»
+export {configPortal, portalUse, portalArenaKill, resetPortalFx, placeRoomObject, puzzleButtonUse, shellTick, shellCupUse, shellCupReady, shellState, knightSwitchUse, knightSwitchReady, knightTick, knightState, setObjectState, freeCellNear, teleportHero, teleportPartners, PORTAL_TYPE, LEVER_TYPE, PORTAL_SPRITE_W, PORTAL_SPRITE_H, SWITCH_TYPE}

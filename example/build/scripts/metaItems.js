@@ -105,18 +105,18 @@ function metaItemsBuild(lose,next) {
         status.meta.miIntro = 1
         const introNodes = []
         introNodes.push(rect(svgArr[2],0,0,1920,1080,"none","0px","black",{"fillOpacity":"0.6","func":()=>{}}))
-        introNodes.push(image(svgArr[2],560,290,800,500,"./images/UI/panels/panel.png"))
+        introNodes.push(image(svgArr[2],560,230,800,600,"./images/UI/panels/panel.png"))
         //V151a: тексты разбиты на строки ≤44 символов (в панель влезает 44) и выстроены
         //шагом 44px шрифтом 36 — 8 строк от baseline 340 до 648, кнопка ниже (660..756)
         for (let i = 0; i < 8; i++) {
             introNodes.push(text(svgArr[2],960,340 + i*44,"0pt","50pt","black","2px",`rgb(204, 153, 102)`,T("mi.intro."+(i+1)),{"id":"delItemText","size":36,"font":"baseFont4","anchor":"middle"}))
         }
-        introNodes.push(image(svgArr[2],1920/2-341/2,660,341,96,"./images/UI/panels/buttons/button.png",{"glow":1,"func":()=>{
+        introNodes.push(image(svgArr[2],1920/2-341/2,670,341,96,"./images/UI/panels/buttons/button.png",{"glow":1,"func":()=>{
             playback(strike[14].vol,0,0,3*status.settings.soundVolume)
             for (let i = 0; i < introNodes.length; i++) introNodes[i].remove()
             tipDel()
         }}))
-        introNodes.push(text(svgArr[2],1920/2,725,"0pt","50pt","black","2px",`rgb(204, 153, 102)`,T("mi.intro.btn"),{"id":"delItemText","size":48,"font":"baseFont4","anchor":"middle"}))
+        introNodes.push(text(svgArr[2],1920/2,735,"0pt","50pt","black","2px",`rgb(204, 153, 102)`,T("mi.intro.btn"),{"id":"delItemText","size":48,"font":"baseFont4","anchor":"middle"}))
     }
 }
 function changeItem(e,obj) {

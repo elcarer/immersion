@@ -27,8 +27,9 @@ import { abilCopyBonus } from "../scripts/relics.js"
 import { openAlchemy } from "../scripts/alchemy.js"
 //V64: портал (18) и рычаг (19) — переключение фаз и телепорт в арену;
 //V83: кнопка загадки (21) — флип себя и соседей по логической сетке;
-//V97: чаша «напёрстков» (22) — выбор чаши (фазы и последствия в portalFx.js)
-import { portalUse, puzzleButtonUse, shellCupUse } from "../scripts/portalFx.js"
+//V97: чаша «напёрстков» (22) — выбор чаши (фазы и последствия в portalFx.js);
+//V152: переключатель «ход коня» (23) — активация (логика в portalFx.js)
+import { portalUse, puzzleButtonUse, shellCupUse, knightSwitchUse } from "../scripts/portalFx.js"
 //V69: дроп из объектов (бочки/двери) не застревает в стенах — dropSafe.js
 import { placeDrop,dropFly } from "../scripts/dropSafe.js"
 //V75: шкафчик с древностями (тип 20) — меню благословений; эхо Хлебосола/Золотого эха на дропе
@@ -101,8 +102,9 @@ function finishUsedObject(obj) {
         return
     }
     //V43: столб (15), статуя (16, V49), алхимический стол (17, V54), портал и рычаг (18/19, V64),
-    //V83: кнопка загадки (21), V97: чаша «напёрстков» (22) — с обычным звуком «использования»
-    (obj[2] === 3||obj[2] === 10||obj[2] === 11||obj[2] === 12||obj[2] === 6||obj[2] === 15||obj[2] === 16||obj[2] === 17||obj[2] === 18||obj[2] === 19||obj[2] === 20||obj[2] === 21||obj[2] === 22) ? playback(strike[13].vol,0,0,2*status.settings.soundVolume) : playback(strike[1].vol,0,0,5*status.settings.soundVolume)
+    //V83: кнопка загадки (21), V97: чаша «напёрстков» (22), V152: переключатель «ход коня» (23)
+    //— с обычным звуком «использования»
+    (obj[2] === 3||obj[2] === 10||obj[2] === 11||obj[2] === 12||obj[2] === 6||obj[2] === 15||obj[2] === 16||obj[2] === 17||obj[2] === 18||obj[2] === 19||obj[2] === 20||obj[2] === 21||obj[2] === 22||obj[2] === 23) ? playback(strike[13].vol,0,0,2*status.settings.soundVolume) : playback(strike[1].vol,0,0,5*status.settings.soundVolume)
     if(obj[2] === 15) {
         //V43: столб в отличие от остальных объектов ПОВТОРЯЕМЫЙ — obj[7] не ставится,
         //повторный юз разрешается после выхода героя из зоны (obj[11], heroMove.checkObject)
@@ -134,6 +136,13 @@ function finishUsedObject(obj) {
         //карточки в Библиотеке нет
         obj[11] = 1
         shellCupUse(obj)
+    } else if(obj[2] === 23) {
+        //V152: переключатель «ход коня» ПОВТОРЯЕМЫЙ (перезарядка obj[11] до выхода из
+        //зоны, как у кнопки 21), но интерактивен только в подсвеченном наборе (guard
+        //heroMove.checkObject → knightSwitchReady): активация и последствия —
+        //portalFx.knightSwitchUse. obj[7] не ставится — неразрушаем, карточки в Библиотеке нет
+        obj[11] = 1
+        knightSwitchUse(obj)
     } else {
         actionsObject(obj)
     }
@@ -147,14 +156,14 @@ function finishUsedObject(obj) {
     //obj[10] — шипы (3) → 14, кислота (4) → 34, огонь (1) → 54; столб — 55. V64: 18/19 — мимо.
     //V67: выход с 4 этажа (13 на «Пустоте») — мимо: карточки obj.73 в Библиотеке нет,
     //обычный спуск уже зачтён как obj.13 на первом этаже. V83: кнопка загадки (21) — мимо.
-    //V97: чаша «напёрстков» (22) — мимо
+    //V97: чаша «напёрстков» (22) — мимо. V152: переключатель «ход коня» (23) — мимо
     let libObj = status.meta.libraryObjects
-    Array.isArray(libObj) && !(obj[2] === 13 && status.levelFloor === 3) && obj[2] !== 18 && obj[2] !== 19 && obj[2] !== 21 && obj[2] !== 22 && (libObj[obj[2] === 15 ? 55 : obj[2] === 14 ? (obj[10] === 3 ? 14 : obj[10] === 4 ? 34 : 54) : obj[2] + status.levelFloor * 20] = 1)
+    Array.isArray(libObj) && !(obj[2] === 13 && status.levelFloor === 3) && obj[2] !== 18 && obj[2] !== 19 && obj[2] !== 21 && obj[2] !== 22 && obj[2] !== 23 && (libObj[obj[2] === 15 ? 55 : obj[2] === 14 ? (obj[10] === 3 ? 14 : obj[10] === 4 ? 34 : 54) : obj[2] + status.levelFloor * 20] = 1)
     stopUseObject()
     //V75: шкафчик (20) тоже мимо — obj[7]=1 ставит только grantBless (взял благословение),
     //до выбора объект остаётся переиспользуемым. V83: кнопка (21) — мимо (повторяемая).
-    //V97: чаша (22) — мимо (повторяемая, неразрушаемая)
-    obj[2] !== 15 && obj[2] !== 17 && obj[2] !== 18 && obj[2] !== 19 && obj[2] !== 20 && obj[2] !== 21 && obj[2] !== 22 && (obj[7] = 1)
+    //V97: чаша (22) — мимо (повторяемая, неразрушаемая). V152: переключатель (23) — мимо
+    obj[2] !== 15 && obj[2] !== 17 && obj[2] !== 18 && obj[2] !== 19 && obj[2] !== 20 && obj[2] !== 21 && obj[2] !== 22 && obj[2] !== 23 && (obj[7] = 1)
     status.attack.current = []
     //V140: гонка — использованный героем объект даёт ему вклад в зачистку комнаты
     hrupQuestObjectUsed(obj)

@@ -108,6 +108,9 @@ function collisionCheckObject(obj) {
 //checkZOrder (heroMove.js): против статичных стен/дверей/объектов раньше не сортировало
 //вовсе. Индекс переиспользуется (тот же, что у collision), записи уникальны — одна
 //стена покрывает несколько клеток прямоугольника.
+//V152: результат РАЗДЕЛЬНЫЙ {walls, objs} — у стен и объектов типы в [2] пересекаются
+//численно (19 — и нижняя стена, и рычаг; 22 — и левая стена, и чаша), а правила
+//сортировки разные: стены сортируются все, плоские объекты (14/19/22) — не сортируются.
 //Выборка берётся по ЛОГИЧЕСКИМ клеткам коллайдеров, расширенным на 2 клетки ВНИЗ и
 //по 1 клетке влево/вправо: у высоких объектов спрайт торчит ВВЕРХ от логической клетки
 //(столб 81px, портал 84px, выход 128px — якорь низа в клетку), и сущность «за» объектом
@@ -119,8 +122,10 @@ function zNear(level, x, y, w, h) {
     const x2 = Math.trunc((x + w - 1 + 32) / 32)
     const y1 = Math.trunc(y / 32)
     const y2 = Math.trunc((y + h - 1 + 64) / 32)
-    const out = []
-    const seen = new Set()
+    const outWalls = []
+    const outObjs = []
+    const seenW = new Set()
+    const seenO = new Set()
     for (let cy = y1; cy <= y2; cy++) {
         for (let cx = x1; cx <= x2; cx++) {
             const key = cy * 4096 + cx
@@ -128,18 +133,18 @@ function zNear(level, x, y, w, h) {
             if (walls) {
                 for (let i = 0; i < walls.length; i++) {
                     const rec = walls[i]
-                    if (!seen.has(rec)) { seen.add(rec); out.push(rec) }
+                    if (!seenW.has(rec)) { seenW.add(rec); outWalls.push(rec) }
                 }
             }
             const objs = objIndex.get(key)
             if (objs) {
                 for (let i = 0; i < objs.length; i++) {
                     const rec = objs[i]
-                    if (!seen.has(rec)) { seen.add(rec); out.push(rec) }
+                    if (!seenO.has(rec)) { seenO.add(rec); outObjs.push(rec) }
                 }
             }
         }
     }
-    return out
+    return {walls: outWalls, objs: outObjs}
 }
 export {collision, zNear}

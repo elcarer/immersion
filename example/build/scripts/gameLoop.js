@@ -57,7 +57,8 @@ import { valkyrieTick } from "../scripts/valkyrie.js"
 //V80: наземные тени героя/врагов/питомцев — синхронизация после всех шагов движения
 import { shadowTick } from "../scripts/groundShadow.js"
 //V97: комната «напёрстков» (вид 3 портала) — фазы показа/перемешивания чаш
-import { shellTick } from "../scripts/portalFx.js"
+//V152: комната «ход коня» (вид 5 портала) — тик подсветки активируемых переключателей
+import { shellTick, knightTick } from "../scripts/portalFx.js"
 //V109: квест «Голос в портале» — тик состояния (исчезновение NPC-портала при выходе
 //из стартовой комнаты, полоска взаимодействия)
 import { portalQuestTick } from "../scripts/portalQuest.js"
@@ -183,6 +184,8 @@ function gameLoop() {
         minimapTick()
         //V97: «напёрстки» — отсчёт показа/перемешивания чаш и их скольжение (portalFx.js)
         shellTick()
+        //V152: «ход коня» — подсветка активируемых переключателей (portalFx.js)
+        knightTick()
         //V109: «Голос в портале» — состояние квеста (portalQuest.js)
         portalQuestTick()
         //V111: «Погоня за пламенем» — состояние квеста (flameQuest.js)

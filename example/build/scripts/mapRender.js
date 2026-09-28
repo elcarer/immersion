@@ -119,7 +119,7 @@ function mapRender(level, tileX, tileY, layer) {
                 }
                 if (!inRoom) continue
                 const objSrc = o[2] === 14 ? trapSpriteSrc(o) :
-                    o[2] === 18 || o[2] === 19 || o[2] === 21 ? portalSpriteSrc(o) :
+                    o[2] === 18 || o[2] === 19 || o[2] === 21 || o[2] === 23 ? portalSpriteSrc(o) :
                     o[2] === 22 ? cupSpriteSrc(o) :
                     o[2] === 15 ? "./images/dungeon/objects/fin"+(o[10]||1)+".png" :
                 o[2] === 16 ? "./images/dungeon/objects/"+(14+status.levelFloor*20)+".png" :
