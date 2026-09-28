@@ -315,6 +315,31 @@ function closeDoorsOnMatrix(n, w, h) {
             }
         }
     }
+    //V151: у ОТКРЫТЫХ дверей крайние клетки спрайта блокируются — проход ИИ только
+    //через 2 центральные клетки, как у героя через collision (collisionCheckDoors).
+    //Закрытые двери заблокированы целиком выше, для них повтор безвреден
+    for (let i = 0; i < doorPics.length; i++) {
+        const p = doorPics[i]
+        if (!p || typeof p.getAttribute !== "function") continue
+        const href = p.getAttribute("href")
+        if (!href) continue
+        const px = p.x.animVal.value
+        const py = p.y.animVal.value
+        const cw = Math.round(p.width.animVal.value / 32)
+        const ch = Math.round(p.height.animVal.value / 32)
+        const x0 = Math.floor(px / 32)
+        const y0 = Math.floor(py / 32)
+        const block = (bx, by) => {
+            if (bx >= 0 && by >= 0 && bx < w && by < h) n[by * w + bx] = 0
+        }
+        if (cw > ch) {
+            // горизонтальная дверь (4×2): крайние клетки по x
+            for (let y = y0; y < y0 + ch; y++) { block(x0, y); block(x0 + cw - 1, y) }
+        } else {
+            // вертикальная дверь (1×4): крайние клетки по y
+            for (let x = x0; x < x0 + cw; x++) { block(x, y0); block(x, y0 + ch - 1) }
+        }
+    }
 }
 
 // ---------- flow-field: один общий BFS от клетки героя по всему открытому этажу ----------
@@ -587,6 +612,8 @@ function bfsPathBoss(from, to) {
 //(только равные ветви), но траектории разных врагов расходятся.
 //Без третьего аргумента (прочие вызовы) поведение совпадает со старым.
 //export: используется тестом v28EnemyDiversity.txt для проверки на синтетической карте
+//V151: экспорт для харнесс-тестов (verify_v151: клетки дверей в navMatrix)
+export { ensureNavMatrix }
 export function buildChasePath(enemyCell, heroCell, enemy) {
     if (!ensureFlowField(enemy, heroCell)) return []
     const dist = flowDist
@@ -1112,11 +1139,15 @@ export function enemyDie(enemy, exp) {
     //прервать хореографию тени, если враг убили во время нырка/всплытия
     cancelShadowFx(enemy)
     enemy.shadowAge = undefined
-    //V80: тень остаётся под трупом (решение пользователя) — кладём её ПОД спрайт трупа:
-    //prepend тени, затем prepend спрайта => порядок [тень, труп, ...]
-    enemy.entShadow && svgArr[1].prepend(enemy.entShadow)
+    //V80: тень остаётся под трупом (решение пользователя) — она была вставлена
+    //insertBefore ПЕРЕД спрайтом владельца при спавне и никуда не двигается:
+    //любой порядок трупа в дереве рисует его ПОСЛЕ тени
     playback(strike[9].vol, 0, 0, status.settings.soundVolume)
-    svgArr[1].prepend(enemy.img)
+    //V151: труп сортируется ПО z-order (препенд под всё давал случайный порядок
+    //трупов: верхний по y перекрывал нижний). Труп остаётся на своей позиции дерева,
+    //checkZOrder (corpse включён в сортируемые типы) расставляет его против статиков
+    //и сущностей по нижней границе спрайтов
+    checkZOrder(enemy)
     //V103: размеры rect врага — для вылета кучки из центра спрайта (dropSafe.dropFly)
     enemy.class.elite === 1 && dropKey(enemy.rect.x.animVal.value, enemy.rect.y.animVal.value, enemy.rect._w, enemy.rect._h)
     //V56: сет «Победитель турниров» (6 надетых): 1% шанс кучки золота на месте убитого

@@ -889,6 +889,11 @@ const PAIRS = [
     ["journ.pq.fight", "Культист бросается в бой!", "The cultist leaps into battle!"],
     ["journ.pq.done", "Квест «Голос в портале» завершён!", "Quest \"Voice in the Portal\" completed!"],
     ["mi.title", "ВЫБЕРИТЕ ПРЕДМЕТЫ ДЛЯ СОХРАНЕНИЯ", "CHOOSE ITEMS TO KEEP"],
+    // ---------- V151: инфо-окно первого входа в меню переноса предметов ----------
+    ["mi.intro.1", "Выберите предмет для переноса в следующую Главу.", "Choose an item to carry over to the next Chapter."],
+    ["mi.intro.2", "Вы сможете увеличить количество переносимых между Главами предметов в таверне.", "You can increase the number of items carried between Chapters at the tavern."],
+    ["mi.intro.3", "Следующие Главы открывают новые этажи подземелья для прохождения, после начальных.", "Subsequent Chapters unlock new dungeon floors to explore, beyond the starting ones."],
+    ["mi.intro.btn", "ПРИСТУПИТЬ", "PROCEED"],
     ["st.title", "СПОСОБНОСТИ", "ABILITIES"],
     ["st.unspent", "Неизрасходованных очков способностей: {0}", "Unspent ability points: {0}"],
     // ---------- достижения ----------

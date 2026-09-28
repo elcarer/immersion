@@ -524,20 +524,24 @@ function createCorridor (cell,tileX,tileY,level) {
 }
 function checkZOrder (obj,hero = 0) {
     let rect1 = obj.rect
-    //Порядок веток ВАЖЕН (V150): сначала СТАТИЧНЫЕ коллайдеры, потом арки, потом
-    //сущности — каждая следующая ветка ставит поверх итогового порядка то, что ниже.
-    //Обратный порядок ломал пары: ветка сущностей поднимала врага над героем, а идущая
-    //следом статичная снова поднимала героя — враг оставался рисоваться под героем.
-    //V150: статичные стены/двери/объекты — клеточный индекс collision.js (только клетки
-    //под спрайтом сущности). Раньше против них сортировки не было вовсе: сущность,
-    //вошедшая в комнату ПОЗЖЕ отрисовки её стен, рисовалась ПОД стенами, а стоящая ЗА
-    //высоким объектом (столб/статуя/портал/шкафчик) — ПОВЕРХ него. Правило обеих сторон —
-    //по нижней границе СПРАЙТОВ (у столба/статуи спрайт выше логической клетки). Плоские
-    //типы (ловушка 14, рычаг 19, чаша 22) лежат на полу; арки открытых дверей (_zOverlay)
-    //сортирует следующая ветка.
+    //V151: СБОР-И-СОРТИРОВКА. Все пересекающиеся с obj спрайты (статичные коллайдеры,
+    //арки дверей, сущности) собираются в список ops с их нижними границами, затем
+    //обрабатываются ОТ ВЕРХНИХ К НИЖНИМ: сначала append(obj) над теми, кто выше, затем
+    //append соседей по возрастанию их низа. Попарный итог корректен НЕЗАВИСИМО от порядка
+    //перебора — прежний (обработка по ходу перебора) давал случайный итог, когда в
+    //пересечении больше двух участников: эффект смерти «выше» трупа поднимал труп
+    //поверх героя, обработанного раньше (репорт: трупы сортируются случайно).
     let zP = rectPos(rect1)
     let zW = rect1.width.animVal.value
     let zH = rect1.height.animVal.value
+    let b1 = zP[1] + zH // нижняя граница obj
+    let ops = []
+    // (1) статичные стены/двери/объекты — клеточный индекс collision.js (V150: против
+    //них раньше не сортировало вовсе: сущность, вошедшая в комнату ПОЗЖЕ отрисовки её
+    //стен, рисовалась ПОД стенами, а стоящая ЗА высоким объектом (столб/статуя/портал/
+    //шкафчик) — ПОВЕРХ него). Правило — по нижней границе СПРАЙТОВ (у столба/статуи
+    //спрайт выше логической клетки). Плоские типы (ловушка 14, рычаг 19, чаша 22) лежат
+    //на полу; арки открытых дверей (_zOverlay) собираются веткой (2).
     let zRecs = zNear(dataGeneric.scenes[status.levelFloor],zP[0],zP[1],zW,zH)
     for (let i = 0; i < zRecs.length; i++) {
         let rec = zRecs[i]
@@ -550,26 +554,23 @@ function checkZOrder (obj,hero = 0) {
         let spx = sp.x.animVal.value, spy = sp.y.animVal.value
         let spw = sp.width.animVal.value, sph = sp.height.animVal.value
         if (checkCollision(zP[0],spx,zW,spw,zP[1],spy,zH,sph)) {
-            if (spy + sph > zP[1] + zH) {
-                svgArr[1].append(sp)
-            } else {
-                svgArr[1].append(obj.img)
-            }
+            ops.push({"b":spy+sph,"run":(spy+sph > b1) ? (()=>svgArr[1].append(sp)) : (()=>svgArr[1].append(obj.img))})
         }
     }
-    //V4: стены-накладки (27/28 на 1-м этаже, 57/58 на 2-м) и кислота — из кэшей,
-    //а не полным проходом по screenPic (там тысячи плиток, и на каждый вызов читался href.animVal)
+    // (2) стены-накладки (27/28 на 1-м этаже, 57/58 на 2-м) — открытые арки дверей:
+    //из кэша, а не полным проходом по screenPic (там тысячи плиток)
     let lengthWalls = wallsOverlay.length
     for (let i = 0; i < lengthWalls; i++) {
         let wall = wallsOverlay[i]
         if (svgArr[1].contains(wall)&&checkCollision(rect1.x.animVal.value,wall.x.animVal.value,rect1.width.animVal.value,wall.width.animVal.value,rect1.y.animVal.value,wall.y.animVal.value,rect1.height.animVal.value,wall.height.animVal.value)) {
-            if (wall.y.animVal.value+wall.height.animVal.value < obj.rect.y.animVal.value+obj.rect.height.animVal.value) {
-                svgArr[1].prepend(wall)
-            } else {
-                svgArr[1].append(wall)
-            }
+            let wb = wall.y.animVal.value + wall.height.animVal.value
+            ops.push({"b":wb,"run":(wb > b1) ? (()=>svgArr[1].append(wall)) : (()=>svgArr[1].append(obj.img))})
         }
     }
+    // (3) сущности: сосед НИЖЕ рисуется ПОВЕРХ obj (V150: раньше порядок был
+    //односторонним — враг, у которого герой прошёл снизу вверх, оставался под героем);
+    //V151: corpse — трупы сортируются тем же правилом. Пули/эффекты (не сортируемые)
+    //не опускаются под obj — они всегда поверх (эффект смерти, снаряд)
     let length = objectValues.length
     for (let i = 0; i < length; i++) {
         if (objectValues[i].img !== obj.img && svgArr[1].contains(objectValues[i].img)) {
@@ -577,18 +578,21 @@ function checkZOrder (obj,hero = 0) {
             //V16: координаты из кэша (rectPos) — animVal не читаем в цикле
             let r2 = rectPos(rect2)
             if (checkCollision(rect1.x.animVal.value,r2[0],rect1.width.animVal.value,rect2.width.animVal.value,rect1.y.animVal.value,r2[1],rect1.height.animVal.value,rect2.height.animVal.value)) {
-                if (r2[1]+rect2.height.animVal.value < rect1.y.animVal.value+rect1.height.animVal.value) {
-                    svgArr[1].append(obj.img)
-                } else if (objectValues[i].type === "hero" || objectValues[i].type === "enemy" || objectValues[i].type === "pet") {
-                    //V150: симметричная ветка — сосед НИЖЕ рисуется ПОВЕРХ obj. Раньше
-                    //порядок был односторонним: движущаяся сущность поднимала себя над
-                    //тем, кто выше, но никто не опускался под того, кто ниже — враг,
-                    //у которого герой прошёл снизу вверх, оставался рисоваться ПОД героем
-                    svgArr[1].append(objectValues[i].img)
+                let b2 = r2[1] + rect2.height.animVal.value
+                if (b2 < b1) {
+                    ops.push({"b":b2,"run":()=>svgArr[1].append(obj.img)})
+                } else if (objectValues[i].type === "hero" || objectValues[i].type === "enemy" ||
+                           objectValues[i].type === "pet" || objectValues[i].type === "corpse") {
+                    ops.push({"b":b2,"run":(()=>svgArr[1].append(objectValues[i].img))})
+                } else {
+                    // не сортируемый сосед — ничего не делаем (он остаётся поверх obj)
+                    continue
                 }
             }
         }
     }
+    ops.sort((a,b) => a.b - b.b)
+    for (let i = 0; i < ops.length; i++) ops[i].run()
 }
 //V16: кислота вынесена из checkZOrder в отдельный потиковый вызов: урон героине и
 //время жизни должны тикать КАЖДЫЙ кадр, даже когда героиня стоит на месте (checkZOrder

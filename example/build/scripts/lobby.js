@@ -170,6 +170,10 @@ function lobby(lose,next,pageChest=0) {
     }
     //V74: все герои открыты сразу — силуэты UI/doll/0-3.png и проверка openHeroes удалены,
     //клик по любому герою выбирает его (спрайты UI/doll/T0-T3.png)
+    //V151: спрайты выделения перекрывают друг друга — ловится клик только по НЕпрозрачной
+    //области (alphaHit: силуэт выделения залит чёрным с 5% прозрачности, прозрачный фон
+    //проваливает клик к соседнему спрайту; раньше прозрачный угол верхнего спрайта выбирал
+    //не того героя). isTaken — просто подложка 0.22, не кликабельна
     //E-17: наведение на куклу открывает карточку героя (heroTip, как карточка врага в
     //enemyHover.js). hoverOpa здесь НЕ ставим: backend перезаписывает им funcShow/funcShowOut
     //V124: на шаге игрока 2 класс игрока 1 недоступен (правило коопа — классы разные)
@@ -177,7 +181,7 @@ function lobby(lose,next,pageChest=0) {
     for (let i = 0; i < heroesArr.length; i++) {
         const isTaken = isCoopStep2 && i === status.players[0].class
         screenPic.push(image(svgArr[2],heroesArr[i].x,heroesArr[i].y,heroesArr[i].w,heroesArr[i].h,"./images/UI/doll/T"+i+".png",
-            isTaken ? {"opacity":"0.22"} : {"func":e=>{svgArr[2].append(e.target);chengeHero(i)},"funcShow":e=>heroTip(i,e),"funcShowOut":heroTipDel,"opacity":"0.01"}))
+            isTaken ? {"opacity":"0.22"} : {"alphaHit":1,"func":e=>{svgArr[2].append(e.target);chengeHero(i)},"funcShow":e=>heroTip(i,e),"funcShowOut":heroTipDel,"opacity":"0.01"}))
         if (isTaken) {
             screenPic.push(text(svgArr[2],heroesArr[i].x + heroesArr[i].w/2,heroesArr[i].y + heroesArr[i].h/2,"0pt","50pt","none","3px","#FF6644",T("lobby.coop.taken"),{"id":"delItemText","size":34,"font":"baseFont4","anchor":"middle"}))
         }

@@ -4,6 +4,7 @@ import { screenPic,del } from "../scripts/del.js"
 import { svgArr,image,text,rect } from "../scripts/svg.js"
 import { tip,tipDel,rarityColor,itemFrameOn,itemGlowOn } from "../scripts/tip.js"
 import { cellPickArr } from "../scripts/doll.js"
+import { playback,strike } from "../scripts/sound.js"
 import { lobby,coopLobby } from "../scripts/lobby.js"
 //E-22: Пробел дублирует кнопку «Далее» на экране взятия предметов
 import { armSpaceNext, clearSpaceNext } from "../scripts/spaceNext.js"
@@ -96,6 +97,25 @@ function metaItemsBuild(lose,next) {
     screenPic.push(image(svgArr[2],1650,63,32,36,"./images/dungeon/drop/item1.png"))
     screenPic.push(text(svgArr[2],1710,95,"0pt","50pt","black","2px",`rgb(204, 153, 102)`,change,{"id":"delItemText","size":42,"font":"baseFont4","anchor":"middle"}))
     invNumText = screenPic[screenPic.length-1]
+    //V151: инфо-окно ПЕРВОГО входа в меню переноса (1 раз за игру, флаг meta.miIntro
+    //живёт между забегами): игроки не понимали, что переносится только один предмет.
+    //Гасящая подложка перехватывает клики (no-op func, как в settings), панель с текстом
+    //и «ПРИСТУПИТЬ» закрывают окно — экран выбора остаётся под ним нетронутым
+    if (status.meta.miIntro !== 1) {
+        status.meta.miIntro = 1
+        const introNodes = []
+        introNodes.push(rect(svgArr[2],0,0,1920,1080,"none","0px","black",{"fillOpacity":"0.6","func":()=>{}}))
+        introNodes.push(image(svgArr[2],560,290,800,500,"./images/UI/panels/panel.png"))
+        introNodes.push(text(svgArr[2],960,370,"0pt","50pt","black","2px",`rgb(204, 153, 102)`,T("mi.intro.1"),{"id":"delItemText","size":40,"font":"baseFont4","anchor":"middle"}))
+        introNodes.push(text(svgArr[2],960,450,"0pt","50pt","black","2px",`rgb(204, 153, 102)`,T("mi.intro.2"),{"id":"delItemText","size":40,"font":"baseFont4","anchor":"middle"}))
+        introNodes.push(text(svgArr[2],960,530,"0pt","50pt","black","2px",`rgb(204, 153, 102)`,T("mi.intro.3"),{"id":"delItemText","size":40,"font":"baseFont4","anchor":"middle"}))
+        introNodes.push(image(svgArr[2],1920/2-341/2,640,341,96,"./images/UI/panels/buttons/button.png",{"glow":1,"func":()=>{
+            playback(strike[14].vol,0,0,3*status.settings.soundVolume)
+            for (let i = 0; i < introNodes.length; i++) introNodes[i].remove()
+            tipDel()
+        }}))
+        introNodes.push(text(svgArr[2],1920/2,705,"0pt","50pt","black","2px",`rgb(204, 153, 102)`,T("mi.intro.btn"),{"id":"delItemText","size":48,"font":"baseFont4","anchor":"middle"}))
+    }
 }
 function changeItem(e,obj) {
     let empty = false

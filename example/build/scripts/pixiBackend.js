@@ -1787,6 +1787,67 @@ function wireGlow(shim, obj) {
     }
 }
 
+// ----------------------------------------------------------------------------
+// V151: alpha-hit — клик по картинке ловится только НЕпрозрачным пикселем
+// (лобби: спрайты выделения героев T0-T3 перекрывают друг друга, стандартный
+// bounds-хитetest выбирал верхнего соседа даже через прозрачную область; спрайты
+// выделения залиты силуэтом с 5% прозрачности — клик по прозрачному должен
+// проваливаться к спрайтам ниже). Кэш ImageData по текстурному source.
+// ----------------------------------------------------------------------------
+const alphaHitCache = new Map()
+function alphaHitData(texture) {
+    const src = texture && texture.source
+    if (!src) return null
+    let e = alphaHitCache.get(src)
+    if (e !== undefined) return e
+    e = null
+    // v8: source.resource — готовый ImageBitmap; иные варианты — HTMLImageElement/CANVAS
+    const r = src.resource
+    let img = null
+    if (r) {
+        img = r.image || r.bitmap || null
+        if (!img) {
+            if (typeof ImageBitmap !== "undefined" && r instanceof ImageBitmap) img = r
+            else if (r.tagName === "IMG" || r.tagName === "CANVAS" || r.tagName === "VIDEO") img = r
+        }
+    }
+    const w = img && (img.naturalWidth || img.width)
+    const h = img && (img.naturalHeight || img.height)
+    if (w && h) {
+        try {
+            const cv = document.createElement("canvas")
+            cv.width = w
+            cv.height = h
+            const ctx = cv.getContext("2d", { willReadFrequently: true })
+            ctx.drawImage(img, 0, 0)
+            e = { data: ctx.getImageData(0, 0, w, h).data, w, h }
+        } catch (err) { e = null }
+    }
+    alphaHitCache.set(src, e)
+    return e
+}
+const alphaHitTmp = { x: 0, y: 0 }
+// порог альфы «непрозрачного» пикселя: заливка выделения 5% прозрачности (alpha ~242),
+// сглаженные края отсекаем
+const ALPHA_HIT_MIN = 8
+// v8 boundary вызывает containsPoint с точкой УЖЕ в локальной системе спрайта
+// (локальные единицы = пиксели исходной текстуры, anchor 0 — левый-верх)
+function alphaHitCP(node, texture, lx, ly) {
+    const orig = texture.orig
+    if (lx < 0 || ly < 0 || lx >= orig.width || ly >= orig.height) return false
+    const e = alphaHitData(texture)
+    if (!e) return true // ресурс не готов — прежнее поведение (весь прямоугольник)
+    const frame = texture.frame
+    const px = Math.min(e.w - 1, Math.floor(frame.x + (lx / orig.width) * frame.width))
+    const py = Math.min(e.h - 1, Math.floor(frame.y + (ly / orig.height) * frame.height))
+    return e.data[(py * e.w + px) * 4 + 3] >= ALPHA_HIT_MIN
+}
+function applyAlphaHit(shim) {
+    const node = shim.node
+    if (!node || node.containsPoint === undefined) return
+    node.containsPoint = point => alphaHitCP(node, node.texture, point.x, point.y)
+    shim._alphaHit = 1
+}
 function createImage(place, x, y, w, h, src, obj = {}) {
     const sprite = new PIXI.Sprite()
     const shim = new El("image", sprite)
@@ -1813,6 +1874,8 @@ function createImage(place, x, y, w, h, src, obj = {}) {
     // настроек не должна пропускать клики к кнопкам меню под собой
     shim._syncInteractive()
     shim.setAttribute("id", idVal !== undefined ? String(idVal) + "I" : "")
+    // V151: alpha-hit — прозрачные пиксели картинки не ловят клик (лобби-выделения)
+    if (obj.alphaHit) applyAlphaHit(shim)
     // двойной клик/правый клик — надеть/снять предмет (doubleClickItem из drag.js);
     // в SVG это были addEventListener("dblclick"/"contextmenu") на элементе
     if (obj.item !== undefined) shim._item = obj.item
@@ -2118,7 +2181,16 @@ function hitTestUI(cx, cy) {
                 const b = c.node.getBounds()
                 // NaN/бесконечные bounds (сломанная геометрия) — не хит
                 if (!isFinite(b.x) || !isFinite(b.width)) continue
-                if (cx >= b.x && cx <= b.x + b.width && cy >= b.y && cy <= b.y + b.height) return c
+                if (cx >= b.x && cx <= b.x + b.width && cy >= b.y && cy <= b.y + b.height) {
+                    // V151: alpha-hit — прозрачная область картинки не ловит курсор/клик.
+                    // Локальная точка — через applyInverse (локальные единицы = пиксели
+                    // исходной текстуры), alphaHitCP считает по ним
+                    if (c._alphaHit) {
+                        const lp = c.node.worldTransform.applyInverse({ x: cx, y: cy }, alphaHitTmp)
+                        if (!alphaHitCP(c.node, c.node.texture, lp.x, lp.y)) continue
+                    }
+                    return c
+                }
             }
         }
         return null

@@ -58,7 +58,7 @@ function collision(x,y,level,ori) {
             if (walls) {
                 for (let i = 0; i < walls.length; i++) {
                     const w = walls[i]
-                    if (collisionCheckDoors(w)&&collisionCheck(x+13+shiftX,y+37+shiftY,14,14,w[0]*32,w[1]*32,w[3]*32,w[4]*32))
+                    if (collisionCheckDoors(w, x + 13 + shiftX, y + 37 + shiftY, 14, 14) && collisionCheck(x+13+shiftX,y+37+shiftY,14,14,w[0]*32,w[1]*32,w[3]*32,w[4]*32))
                     {return false}
                 }
             }
@@ -77,8 +77,24 @@ function collision(x,y,level,ori) {
 function collisionCheck(x1,y1,w1,h1,x2,y2,w2,h2) {
     return x1 < x2 + w2 && x1 + w1 > x2 && y1 < y2 + h2 && y1 + h1 > y2;
 }
-function collisionCheckDoors(door) {
-    return !(door[2]===9||door[2]===12||door[2]===23||door[2]===24)
+//V151: проход через дверь — только 2 ЦЕНТРАЛЬНЫЕ клетки спрайта по его длине:
+//горизонтальные двери (9/12, спрайт 4×2 клетки) — проход по x (клетки 1-2 из 4),
+//вертикальные (23/24, 1×4) — по y. Крайние клетки блокируются как стена.
+//Возврат: true — запись блокирует (не-дверь: проверяется общим collisionCheck по
+//всему rect; дверь: хитбокс задел крайнюю зону — общий check тоже вернёт пересечение).
+function collisionCheckDoors(door, hx, hy, hw, hh) {
+    const t = door[2]
+    if (t === 9 || t === 12 || t === 23 || t === 24) {
+        if (door[3] > door[4]) {
+            // горизонтальная: крайние клетки по x (левая и правая), весь y
+            return collisionCheck(hx,hy,hw,hh,door[0]*32,door[1]*32,32,door[4]*32) ||
+                   collisionCheck(hx,hy,hw,hh,(door[0]+door[3]-1)*32,door[1]*32,32,door[4]*32)
+        }
+        // вертикальная: крайние клетки по y (верхняя и нижняя), весь x
+        return collisionCheck(hx,hy,hw,hh,door[0]*32,door[1]*32,door[3]*32,32) ||
+               collisionCheck(hx,hy,hw,hh,door[0]*32,(door[1]+door[4]-1)*32,door[3]*32,32)
+    }
+    return true
 }
 function collisionCheckObject(obj) {
     //ловушки (тип 14) проходимы — на них можно наступить (урон наносит checkTraps).
