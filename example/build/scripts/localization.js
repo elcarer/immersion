@@ -890,9 +890,15 @@ const PAIRS = [
     ["journ.pq.done", "Квест «Голос в портале» завершён!", "Quest \"Voice in the Portal\" completed!"],
     ["mi.title", "ВЫБЕРИТЕ ПРЕДМЕТЫ ДЛЯ СОХРАНЕНИЯ", "CHOOSE ITEMS TO KEEP"],
     // ---------- V151: инфо-окно первого входа в меню переноса предметов ----------
-    ["mi.intro.1", "Выберите предмет для переноса в следующую Главу.", "Choose an item to carry over to the next Chapter."],
-    ["mi.intro.2", "Вы сможете увеличить количество переносимых между Главами предметов в таверне.", "You can increase the number of items carried between Chapters at the tavern."],
-    ["mi.intro.3", "Следующие Главы открывают новые этажи подземелья для прохождения, после начальных.", "Subsequent Chapters unlock new dungeon floors to explore, beyond the starting ones."],
+    // V151a: строки разбиты до ≤44 символов — в панели окна влезает только 44
+    ["mi.intro.1", "Выберите предмет для переноса", "Choose an item to carry over"],
+    ["mi.intro.2", "в следующую Главу.", "to the next Chapter."],
+    ["mi.intro.3", "Вы сможете увеличить количество", "You can increase the number"],
+    ["mi.intro.4", "переносимых между Главами предметов", "of items carried between"],
+    ["mi.intro.5", "в таверне.", "Chapters at the tavern."],
+    ["mi.intro.6", "Следующие Главы открывают новые", "Subsequent Chapters unlock new"],
+    ["mi.intro.7", "этажи подземелья для прохождения,", "dungeon floors to explore,"],
+    ["mi.intro.8", "после начальных.", "beyond the starting ones."],
     ["mi.intro.btn", "ПРИСТУПИТЬ", "PROCEED"],
     ["st.title", "СПОСОБНОСТИ", "ABILITIES"],
     ["st.unspent", "Неизрасходованных очков способностей: {0}", "Unspent ability points: {0}"],
