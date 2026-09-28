@@ -61,7 +61,8 @@
 // возвратный Портал (8,2) и взведённый Рычаг (9,2). В нижней части — 12 переключателей
 // (тип 23, спрайты push0/push1) сеткой 4×3 с шагом 3 клетки (колонки 1/4/7/10 — крайние
 // ровно по сторонам комнаты, ряды 4/7/10 — нижний прилегает к нижней стене). Один случайный
-// включён (obj[10]=1), остальные выключены. Активируемые = соседи «ходом коня»
+// из РЕШАЕМЫХ включён (obj[10]=1 — из него существует путь «ходом коня» по всем 12; таких
+// стартов только 6 из 12), остальные выключены. Активируемые = соседи «ходом коня»
 // (2 переключателя прямо + 1 вбок — ЛОГИЧЕСКАЯ сетка 4×3, как у кнопок V83) последнего
 // включённого в состоянии 0 — подсвечены жёлтой обводкой (drop-shadow, как чаши V134). Активация подсвеченного: он включается, подсветка гаснет,
 // «проверка» — подсвечиваются его соседи в состоянии 0. Все 12 включены — награда:
@@ -973,11 +974,11 @@ function createKnightRoom(level) {
     lever[10] = 1
     //12 переключателей (тип 23) сеткой 4×3 с шагом 3: колонки 1/4/7/10 (крайние ровно
     //по сторонам комнаты), ряды 4/7/10 (нижний прилегает к нижней стене). Один случайный
-    //включён (obj[10]=1), остальные выключены
+    //из РЕШАЕМЫХ включён (obj[10]=1, из него существует путь по всем 12), остальные выключены
     let switches = []
     const cols = [1, 4, 7, 10]
     const rows = [4, 7, 10]
-    let onIdx = Math.trunc(Math.random() * 12)
+    let onIdx = knightRandomStart()
     for (let r = 0; r < 3; r++) {
         for (let c = 0; c < 4; c++) {
             level.objects.push([nx + cols[c], ny + rows[r], SWITCH_TYPE, 1, 1, undefined])
@@ -998,15 +999,16 @@ function createKnightRoom(level) {
 //прямым углом — шаг по ЛОГИЧЕСКОЙ сетке 4×3 (как у кнопок загадки V83, растянутой по
 //комнате): физический шаг сетки 3 клетки, поэтому смещения (±1,±2)/(±2,±1) — в индексах
 //переключателей (порядок r*4+c в kn.switches), не в клетках пола
+//смещения хода коня по ЛОГИЧЕСКОЙ сетке 4×3 (в индексах переключателей r*4+c)
+const KNIGHT_OFFS = [[1, 2], [2, 1], [-1, 2], [-2, 1], [1, -2], [2, -1], [-1, -2], [-2, -1]]
 function knightNeighbors(sw) {
     let out = []
     let idx = link.knight.switches.indexOf(sw)
     let c = idx % 4
     let r = Math.trunc(idx / 4)
-    const offs = [[1, 2], [2, 1], [-1, 2], [-2, 1], [1, -2], [2, -1], [-1, -2], [-2, -1]]
-    for (let i = 0; i < offs.length; i++) {
-        let nc = c + offs[i][0]
-        let nr = r + offs[i][1]
+    for (let i = 0; i < KNIGHT_OFFS.length; i++) {
+        let nc = c + KNIGHT_OFFS[i][0]
+        let nr = r + KNIGHT_OFFS[i][1]
         if (nc < 0 || nc > 3 || nr < 0 || nr > 2) continue
         out.push(link.knight.switches[nr * 4 + nc])
     }
@@ -1014,6 +1016,44 @@ function knightNeighbors(sw) {
 }
 //шаг «проверки»: активируемые — соседи «ходом коня» переключателя fromSw в состоянии 0.
 //Подсветку рисует knightTick по kn.ready — здесь только логика
+//решаемые старты: индексы переключателей, из которых существует путь «ходом коня» по
+//всем 12 (гамильтонов путь в графе сетки 4×3 — их только 6 из 12: {0,3,4,7,8,11}; со
+//остальных победа невозможна). Считается один раз DFS-перебором и кэшируется — старт
+//гарантированно решаемый и при создании комнаты, и после сброса при тупике
+let knightStarts = null
+function knightGoodStarts() {
+    if (knightStarts) return knightStarts
+    knightStarts = []
+    for (let i = 0; i < 12; i++) knightHamiltonFrom(i) && knightStarts.push(i)
+    return knightStarts
+}
+//поиск гамильтонова пути «ходом коня» из вершины start: каждая следующая — сосед по
+//KNIGHT_OFFS, посещена ровно один раз; true — все 12 покрыты
+function knightHamiltonFrom(start) {
+    let seen = new Array(12)
+    seen[start] = true
+    let walk = function(idx, depth) {
+        if (depth === 12) return true
+        let c = idx % 4
+        let r = Math.trunc(idx / 4)
+        for (let i = 0; i < KNIGHT_OFFS.length; i++) {
+            let nc = c + KNIGHT_OFFS[i][0]
+            let nr = r + KNIGHT_OFFS[i][1]
+            if (nc < 0 || nc > 3 || nr < 0 || nr > 2) continue
+            let n = nr * 4 + nc
+            if (seen[n]) continue
+            seen[n] = true
+            if (walk(n, depth + 1)) return true
+            seen[n] = false
+        }
+        return false
+    }
+    return walk(start, 1)
+}
+function knightRandomStart() {
+    let good = knightGoodStarts()
+    return good[Math.trunc(Math.random() * good.length)]
+}
 function knightRecompute(kn, fromSw) {
     kn.ready = []
     let nb = knightNeighbors(fromSw)
@@ -1028,7 +1068,8 @@ function knightSwitchReady(obj) {
 }
 //юз переключателя (вызов из useObject, тип 23): включается, подсветка гаснет (knightTick),
 //шаг «проверки» — новые активируемые из его соседей. Все 12 включены — награда;
-//активируемых нет, а не все включены — полный сброс (все в 0, случайный в 1, «проверка»)
+//активируемых нет, а не все включены — полный сброс (все в 0, случайный РЕШАЕМЫЙ в 1,
+//«проверка»): игрок мог пойти не тем путём, но новый старт снова гарантирует решение
 function knightSwitchUse(obj) {
     if (!knightSwitchReady(obj)) return
     let kn = link.knight
@@ -1044,7 +1085,7 @@ function knightSwitchUse(obj) {
     }
     if (kn.ready.length === 0) {
         for (let i = 0; i < kn.switches.length; i++) setObjectState(kn.switches[i], 0)
-        let sw = kn.switches[Math.trunc(Math.random() * kn.switches.length)]
+        let sw = kn.switches[knightRandomStart()]
         setObjectState(sw, 1)
         knightRecompute(kn, sw)
     }
