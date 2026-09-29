@@ -569,13 +569,17 @@ function configEmptyRoomObject(room,newData) {
         [17,2,2],
         //V75: шкафчик с древностями (благословение до конца забега) — на всех этажах, шанс
         //1/8 на пустую комнату (пул вырос с 7 до 8); НЕ более 1 на этаж (решение пользователя)
-        [20,1,1]]
-    //стол (17) и шкафчик (20) уже стоят на этаже — исключаются из пула (лимит 1 на этаж каждый)
+        [20,1,1],
+        //V155: алтарь-наковальня (перековка стата за золото) — на всех этажах, 2×2 клетки;
+        //НЕ более 1 на этаж (как у стола/шкафчика; пул вырос с 8 до 9)
+        [24,2,2]]
+    //стол (17), шкафчик (20) и наковальня (24) уже стоят на этаже — исключаются из пула
+    //(лимит 1 на этаж каждый)
     let pool = rareObjArr
     let levelObjects = newData.scenes[status.levelFloor].objects
     let lengthObjects = levelObjects.length
     for (let i = 0; i < lengthObjects; i++) {
-        (levelObjects[i][2] === 17 || levelObjects[i][2] === 20) &&
+        (levelObjects[i][2] === 17 || levelObjects[i][2] === 20 || levelObjects[i][2] === 24) &&
             (pool = pool.filter(t => t[0] !== levelObjects[i][2]))
     }
     let type = Math.trunc(Math.random()*pool.length)

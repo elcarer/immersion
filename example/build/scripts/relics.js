@@ -18,8 +18,10 @@ import { status } from "../scripts/start.js"
 import { tryAutoEquip } from "../scripts/drag.js"
 //V146: «Коллекционер» — добыты все реликвии (пул уникальности опустел)
 import { achRelicCheck } from "../scripts/achievements.js"
+//V155: «Вечный гелиодор» — всплывающий «-N» при оплате урона золотом
+import { floatText } from "../scripts/floatText.js"
 
-//семь реликвий (индекс = номер спрайта /items/5/N.png и поле relic у предмета)
+//девять реликвий (индекс = номер спрайта /items/5/N.png и поле relic у предмета)
 export const RELICS = [
     {"title":"rel.0.name","desc":"rel.0.desc","img":"./images/items/5/0.png"}, //Вечный изумруд
     {"title":"rel.1.name","desc":"rel.1.desc","img":"./images/items/5/1.png"}, //Вечный цитрин
@@ -28,6 +30,9 @@ export const RELICS = [
     {"title":"rel.4.name","desc":"rel.4.desc","img":"./images/items/5/4.png"}, //Вечный жемчуг (V68)
     {"title":"rel.5.name","desc":"rel.5.desc","img":"./images/items/5/5.png"}, //Вечный рубин (V68)
     {"title":"rel.6.name","desc":"rel.6.desc","img":"./images/items/5/6.png"}, //Вечный алмаз (E-16)
+    //V155: эффект «цаворита» — enemyAI.poisonBurst (хук в enemyDie), «гелиодора» — goldDamage ниже
+    {"title":"rel.7.name","desc":"rel.7.desc","img":"./images/items/5/7.png"}, //Вечный цаворит (V155)
+    {"title":"rel.8.name","desc":"rel.8.desc","img":"./images/items/5/8.png"}, //Вечный гелиодор (V155)
 ]
 
 function isRelic(item) {
@@ -47,6 +52,40 @@ function relicCount(kind) {
 
 function hasRelic(kind) {
     return relicCount(kind) > 0
+}
+
+//V155: надета ли реликвия kind на ЛЮБОГО из игроков (кооп). Способности, срабатывающие
+//на глобальных событиях (смерть врага — «Вечный цаворит»), не привязаны к контекстному
+//игроку: hasRelic читает status.inventory (указатель контекстного), а здесь перебираем
+//куклы всех игроков. В соло players.length === 1 — та же проверка
+function relicOnAnyPlayer(kind) {
+    let players = status.players
+    if (!Array.isArray(players)) return hasRelic(kind)
+    for (let i = 0; i < players.length; i++) {
+        let doll = players[i] && players[i].inventory && players[i].inventory.doll
+        if (!Array.isArray(doll)) continue
+        for (let j = 0; j < doll.length; j++) {
+            let d = doll[j]
+            if (isRelic(d) && d.relic === kind) return true
+        }
+    }
+    return false
+}
+
+//V155 «Вечный гелиодор» (relic 8): пока у героя есть золото, входящий урон вычитается
+//ИЗ ЗОЛОТА, а не из ХП; не хватает золота на весь урон — остаток возвращается вызывающему
+//и идёт в ХП «как раньше». Всплывающий текст — в стиле подбора золота (жёлтый 18px),
+//но с минусом (решение пользователя). Возвращает ОСТАТОК урона (0 — всё оплачено золотом).
+//Вызывается в контексте получающего урон игрока (status.info.gold — его золото); плата
+//кровавых алтарей и лава квеста «Погоня за пламенем» гелиодором не покрываются (не урон)
+function goldDamage(damage, x, y) {
+    if (!hasRelic(8) || !(damage > 0)) return damage
+    let gold = status.info.gold
+    if (!(gold > 0)) return damage
+    let paid = Math.min(gold, damage)
+    status.info.gold -= paid
+    floatText(x, y, "-" + paid, "#FFCC66", "18px", "none")
+    return damage - paid
 }
 
 //сколько реликвий ещё НЕ выпадало (пул уникальности V68). Меты нет/старый сейв до
@@ -154,4 +193,4 @@ function diamondStatBonus(base) {
     return hasRelic(6) ? Math.ceil(base * 0.1) : 0
 }
 
-export {isRelic,relicCount,hasRelic,relicGenerate,relicPoolLeft,sapphireSource,sapphireDamage,sapphireStat,sapphireDop,sapphireArmor,sapphireBelt,abilCopyBonus,diamondStatBonus}
+export {isRelic,relicCount,hasRelic,relicOnAnyPlayer,relicGenerate,relicPoolLeft,goldDamage,sapphireSource,sapphireDamage,sapphireStat,sapphireDop,sapphireArmor,sapphireBelt,abilCopyBonus,diamondStatBonus}

@@ -16,7 +16,8 @@ import { buffArmorBonus } from "../scripts/buffFx.js"
 import { setArmorBonus } from "../scripts/sets.js"
 //V67: «Вечный сапфир» — копия брони щита из 1-й ячейки инвентаря (как своя броня)
 //V68: «Вечный жемчуг» (relic 4) — 25% входящего урона уходят врагу-источнику (relicReflect)
-import { sapphireArmor, hasRelic } from "../scripts/relics.js"
+//V155: «Вечный гелиодор» (relic 8) — урон по золоту (goldDamage)
+import { sapphireArmor, hasRelic, goldDamage } from "../scripts/relics.js"
 //V75: благословения шкафчика — «Стальная кожа» (кап 16) и «Второе дыхание» (спасение с 1 ХП)
 import { blessActive,spendBless } from "../scripts/blessFx.js"
 //V115: кооператив — суффиксы DOM-id полос по игроку (hpBarI0/lvlText1…)
@@ -104,7 +105,11 @@ function takeDamage(damage, srcName, srcEnemy) {
         //V75 «Стальная кожа» (шкафчик): атака или магия врага не может отнять больше 16 ХП.
         //Ловушки/горение/яд идут мимо takeDamage (свои строки) — не ограничены, как задумано
         blessActive(1) && damage > 16 && (damage = 16)
-        floatText(Math.trunc(Math.random() * 32) + x,y+8,damage,"#CD5C5C","12px","none")
+        //V155 «Вечный гелиодор» (relic 8): финальный урон (после брони/уклона/блока/щитов
+        //и капов) покуда есть золото уходит В ЗОЛОТО — остаток при нехватке идёт в ХП
+        //«как раньше». Всё оплачено золотом (остаток 0) — ХП/журнал/еда не задеваются
+        damage = goldDamage(damage, x + 16, y - 8)
+        damage > 0 && floatText(Math.trunc(Math.random() * 32) + x,y+8,damage,"#CD5C5C","12px","none")
         //V37 журнал: красная строка — враг смог нанести урон герою (фактический урон по ХП)
         srcName && journalAdd(T("journ.herodmg",T(srcName),damage), J_RED)
         playEffect(status.hero.obj,data.effects[1])

@@ -86,6 +86,8 @@ import { dashTryTrigger, dashFlyTick, endDashFlight } from "../scripts/dashFx.js
 import { charmTryTrigger } from "../scripts/charmFx.js"
 // V38 «вой» Хаунда (stats.howl): зоны живут в howlFx.js, сюда — точка смерти
 import { howlDie } from "../scripts/howlFx.js"
+//V155: «Вечный цаворит» (relic 7) — яд взрывается при смерти врага (poisonBurst ниже)
+import { relicOnAnyPlayer } from "../scripts/relics.js"
 //V90: еда «удачи» питомца — появляется на нём самом, когда он остановился у героя
 //(пробег за едой живёт в pets.js)
 import { petLuckyTick } from "../scripts/pets.js"
@@ -1130,6 +1132,9 @@ export function enemyDie(enemy, exp) {
     enemy.type = "corpse"
     //V52: «Массовик-затейник» — смерть врага в окно ~0.5с «одной атаки»
     achKill()
+    //V155: «Вечный цаворит» (relic 7, надет на любого игрока) — смерть врага с ядом
+    //создаёт ядовитый взрыв: все враги в зоне 3×3 получают его количество яда
+    enemy.poison > 0 && relicOnAnyPlayer(7) && poisonBurst(enemy)
     //мёртвый враг не должен остаться красным (ярость)
     endRage(enemy)
     enemy.rageAge = undefined
@@ -1204,6 +1209,35 @@ export function enemyDie(enemy, exp) {
     //V91: Гриб пустоты (id 27) — финал по смерти БОССА; мини-грибы из спор — клоны
     //без тега boss, этаж не завершают (споры гасятся внутри voidBossFinale)
     enemy.class.id === 27 && enemy.class.boss === 1 && voidBossFinale(enemy)
+}
+
+// ---------- V155: «Вечный цаворит» (relic 7) — ядовитый взрыв ----------
+//Эффект кислотного облака ловушки (effects/cloudAcid.png, 4 кадра 96×96 — зона 3×3
+//клетки), играется с центром на умершем; каждый ЖИВОЙ враг, чей центр попал в зону
+//96×96, получает на себя яд в количестве, бывшем на умершем (poisonTime += 30 — как
+//при наложении яда оружием в damage.js). Цепочка разрешена: задетый, умерев отравленным,
+//взорвётся сам (enemyDie снова вызовет poisonBurst). Умерший исключён — он уже corpse
+const ACID_CLOUD = data.effects.find(f => f.img === "./images/effects/cloudAcid.png")
+function poisonBurst(enemy) {
+    let rectM = enemy.rect
+    ACID_CLOUD && playEffect({"rect": rectM}, ACID_CLOUD)
+    let cPos = rectPos(rectM)
+    let cx = cPos[0] + rectM._w / 2
+    let cy = cPos[1] + rectM._h / 2
+    let dose = enemy.poison
+    let lengthEnemy = objectValues.length
+    for (let i = 0; i < lengthEnemy; i++) {
+        let e = objectValues[i]
+        if (e.type !== "enemy" || e === enemy) continue
+        let ePos = rectPos(e.rect)
+        let ex = ePos[0] + e.rect._w / 2
+        let ey = ePos[1] + e.rect._h / 2
+        if (Math.abs(ex - cx) <= 48 && Math.abs(ey - cy) <= 48) {
+            !e.poison && (e.poison = 0)
+            e.poison += dose
+            e.poisonTime = (e.poisonTime || 0) + 30
+        }
+    }
 }
 
 // ---------- воскрешение Mummy (reanimate) ----------

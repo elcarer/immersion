@@ -60,10 +60,11 @@ function normShared(meta) {
     //V49: 57 слотов (максимальный id объекта — 56: статуя героя 3-го этажа, тип 16).
     //V54: 58 слотов — алхимический стол 3-го этажа имеет id 57 (тип 17).
     //V75: 81 слот — шкафчик с древностями 4-го этажа имеет id 80 (тип 20)
+    //V155: 85 слотов — алтарь-наковальня 4-го этажа имеет id 84 (тип 24)
     if (!Array.isArray(meta.libraryObjects)) {
-        meta.libraryObjects = new Array(81).fill(0)
-    } else if (meta.libraryObjects.length < 81) {
-        meta.libraryObjects.push(...new Array(81 - meta.libraryObjects.length).fill(0))
+        meta.libraryObjects = new Array(85).fill(0)
+    } else if (meta.libraryObjects.length < 85) {
+        meta.libraryObjects.push(...new Array(85 - meta.libraryObjects.length).fill(0))
     }
     //V52: достижения (8 слотов, V146 — 12: добавились «Архивариус»/«Коллекционер»/
     //«Одетый»/«Дуэт») и классы гибели «Перебора» (4 слота) — живут между забегами,
@@ -84,12 +85,12 @@ function normShared(meta) {
         meta.bossesSlain = []
     }
     //V68: пул уникальных реликвий (какие kind уже выпадали) — у старых сохранений поля нет,
-    //создаём/добиваем до 7 слотов (семь реликвий = RELICS в relics.js, kind 0..6:
-    //жемчуг добавлен в V68 (kind 4), алмаз в E-16 (kind 6))
+    //создаём/добиваем до 9 слотов (девять реликвий = RELICS в relics.js, kind 0..8:
+    //жемчуг добавлен в V68 (kind 4), алмаз в E-16 (kind 6), цаворит/гелиодор в V155 (7/8))
     if (!Array.isArray(meta.obtainedRelics)) {
-        meta.obtainedRelics = new Array(7).fill(0)
-    } else if (meta.obtainedRelics.length < 7) {
-        meta.obtainedRelics.push(...new Array(7 - meta.obtainedRelics.length).fill(0))
+        meta.obtainedRelics = new Array(9).fill(0)
+    } else if (meta.obtainedRelics.length < 9) {
+        meta.obtainedRelics.push(...new Array(9 - meta.obtainedRelics.length).fill(0))
     }
     //V53: уровень мета-апгрейда «Идентификация легенд» (сеты) — у старых сохранений поля нет
     if (typeof meta.identLegends !== "number") {

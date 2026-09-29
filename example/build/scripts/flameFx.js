@@ -16,6 +16,8 @@ import { floatText } from "../scripts/floatText.js"
 import { changeHP, checkFood } from "../scripts/takeDamage.js"
 import { endGame } from "../scripts/endGame.js"
 import { journalAdd, J_FIRE } from "../scripts/journal.js"
+//V155: «Вечный гелиодор» — урон горения уходит в золото
+import { goldDamage } from "../scripts/relics.js"
 
 const FLAME_SRC = "./images/effects/flame.png"
 const FLAME_SIZE = 32 //flame.png — лист 32×32, одиночный кадр
@@ -73,9 +75,11 @@ function flameOnHeroAttack() {
     if (!status.hero.obj || status.hero.obj.type !== "hero") return
     const damage = status.info.burningPower || 2
     const pos = rectPos(status.hero.obj.rect)
-    status.info.hp -= damage
+    //V155: «Вечный гелиодор» — урон горения тоже уходит в золото (остаток — в ХП)
+    let hpDamage = goldDamage(damage, pos[0] + 16, pos[1])
+    status.info.hp -= hpDamage
     status.info.hp <= 0 && (status.info.hp = 0)
-    floatText(pos[0] + Math.trunc(Math.random() * 32), pos[1] + 8, damage, "#FF8800", "12px", "none")
+    hpDamage > 0 && floatText(pos[0] + Math.trunc(Math.random() * 32), pos[1] + 8, hpDamage, "#FF8800", "12px", "none")
     changeHP(ctxBar("hp"),ctxTx("hp"),"hp")
     checkFood()
     status.info.hp <= 0 && endGame()

@@ -17,6 +17,8 @@ import { alchemyDel,alchemyTemp } from "../scripts/alchemy.js"
 import { controlsDel,controlsTemp } from "../scripts/controls.js"
 //V75: шкафчик с древностями — закрывается так же, объект не расходуется
 import { ancientDel,ancientTemp } from "../scripts/blessFx.js"
+//V155: алтарь-наковальня — закрывается общим closePanels, объект не расходуется
+import { anvilDel,anvilTemp } from "../scripts/anvil.js"
 import { tipDel } from "../scripts/tip.js"
 import { lvlFlashDrop } from "../scripts/lvlFlashFx.js"
 //V117: кооператив — панели per-owner (контекст игрока на время панели)
@@ -52,10 +54,14 @@ function closePanels(nomusic=0) {
     //(alchemyTemp пуст): обычный путь выше alchemyDel не зовёт и пауза висит вечно.
     //alchemyDel на пустом temp безопасен — только сбрасывает флаги и музыку
     alchemyTemp.length === 0 && status.panels === 9 && alchemyDel(nomusic)
+    //V155: та же страховка от «залипшей» наковальни (panels=13)
+    anvilTemp.length === 0 && status.panels === 13 && anvilDel(nomusic)
     //V126: панель «Управление»
     controlsTemp.length > 0 && controlsDel(nomusic)
     //V75: шкафчик с древностями — выход БЕЗ расхода объекта (благословение не выдано)
     ancientTemp.length > 0 && ancientDel(nomusic)
+    //V155: алтарь-наковальня — выход БЕЗ расхода объекта (перековка не сделана)
+    anvilTemp.length > 0 && anvilDel(nomusic)
     tipDel()
     status.hero !== status.players[0] && setContext(status.players[0])
 }

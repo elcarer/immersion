@@ -1213,6 +1213,19 @@ const PAIRS = [
 ["lobby.coop.taken","Занято игроком 1","Taken by player 1"],
 //V124: раздельные экраны коопа — подпись игрока (очки/предметы/лобби)
 ["coop.pn","ИГРОК {0}","PLAYER {0}"],
+//V155: реликвии «Вечный цаворит» (kind 7) и «Вечный гелиодор» (kind 8)
+["rel.7.name", "Вечный цаворит", "Eternal Tsavorite"],
+["rel.7.desc", "Смерть врага с ядом на нём создаёт ядовитый взрыв 3×3 клетки с центром на этом враге: все задетые взрывом враги получают на себя это же количество яда.", "When an enemy with poison on it dies, a poison burst erupts in a 3×3 tile area centered on that enemy: every enemy caught in the burst gets that same amount of poison applied to it."],
+["rel.8.name", "Вечный гелиодор", "Eternal Heliodor"],
+["rel.8.desc", "Пока у героя есть золото, весь получаемый урон вычитается из золота вместо ХП. Когда золото закончится, урон снова будет вычитаться из ХП.", "As long as the hero has gold, all damage taken is subtracted from gold instead of HP. Once the gold runs out, damage is subtracted from HP as usual."],
+//V155: алтарь-наковальня (объект 24) — перековка основного стата предмета за золото
+["obj.24.name", "Алтарь-наковальня", "Anvil Altar"],
+["obj.24.desc", "Перековывает один основной стат предмета: 10 золота за каждую единицу стата, новый стат выбирается случайно из остальных. Предмет остаётся у героя.", "Reforges one of an item's primary stats: 10 gold per stat point, with the new stat chosen at random from the others. The item stays with the hero."],
+["anvil.title", "АЛТАРЬ-НАКОВОЛЬНЯ", "ANVIL ALTAR"],
+["anvil.hint", "Выберите предмет: один его основной стат заменится на случайный другой той же величины (10 золота за единицу).", "Pick an item: one of its primary stats will be replaced by a random different one of the same value (10 gold per point)."],
+["anvil.reforge", "ПЕРЕКОВАТЬ ({0})", "REFORGE ({0})"],
+["anvil.nogold", "НЕ ХВАТАЕТ ЗОЛОТА ({0})", "NOT ENOUGH GOLD ({0})"],
+["anvil.will", "{0} +{1} → случайный другой стат той же величины", "{0} +{1} → random different stat of the same value"],
 // === V58: END OF DICTIONARY (новые пары добавлять ВЫШЕ этой строки) ===
 ]
 

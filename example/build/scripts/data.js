@@ -1030,4 +1030,10 @@ data.objectsLib.push({"id": 55, "name": "obj.55.name", "w": 32, "h": 81, "desc":
 for (let f = 0; f < 4; f++) {
     data.objectsLib.push({"id": 20 + f * 20, "name": "obj.20.name", "rom": ROMAN[f] || " IV", "w": 64, "h": 42, "desc": "obj.20.desc", "img": "./images/dungeon/objects/101.png"})
 }
+//V155: алтарь-наковальня (тип 24) — один спрайт 103.png на ВСЕ этажи (спрайты юзера,
+//как у шкафчика), карточка на каждый этаж: id = 24 + этаж*20 → 24/44/64/84
+//(слоты libraryObjects расширены до 85)
+for (let f = 0; f < 4; f++) {
+    data.objectsLib.push({"id": 24 + f * 20, "name": "obj.24.name", "rom": ROMAN[f] || " IV", "w": 64, "h": 64, "desc": "obj.24.desc", "img": "./images/dungeon/objects/103.png"})
+}
 export {data}

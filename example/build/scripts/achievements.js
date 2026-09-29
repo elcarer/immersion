@@ -219,14 +219,14 @@ function achQuestCheck() {
     achUnlock(8)
 }
 
-//--- 9 «Коллекционер» (V146): добыты все 7 реликвий — пул уникальности (meta.obtainedRelics)
-//опустел, боссы больше не дают реликвий. Список = RELICS (relics.js), kind 0..6; новый
-//вид реликвий продлит normShared и потребует увеличить порог здесь. Зовётся из
+//--- 9 «Коллекционер» (V146): добыты все реликвии — пул уникальности (meta.obtainedRelics)
+//опустел, боссы больше не дают реликвий. Список = RELICS (relics.js); было kind 0..6,
+//V155: девять реликвий — kind 0..8 («Вечный цаворит», «Вечный гелиодор»). Зовётся из
 //relics.relicGenerate сразу после записи выпавшей kind в мету
 function achRelicCheck() {
     let got = status.meta.obtainedRelics
     if (!Array.isArray(got)) return
-    for (let i = 0; i < 7; i++) {
+    for (let i = 0; i < 9; i++) {
         if (!got[i]) return
     }
     achUnlock(9)

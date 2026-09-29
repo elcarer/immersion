@@ -315,6 +315,8 @@ function createRoom (level,i0,tileX,tileY) {
         //V64: портал (18) и рычаг (19) — спрайты по фазе objects[i3][10] (portalSprite.js)
         //V67: выход с 4 этажа (тип 13 на этаже «Пустота») — спрайт 4exit.png
         //V75: шкафчик с древностями (тип 20) — спрайт 101|101d.png по использованию
+        //V155: алтарь-наковальня (тип 24) — спрайт 103|103d.png по использованию
+        //(один вид на все этажи, спрайты юзера)
         //V83: портал вида 2 (obj[12]=2, 100a.png), кнопка загадки (21, push0/push1) —
         //там же, в portalSprite.js; V152: вид 5 (100e.png) и переключатель «ход коня» (23)
         let objSrc = o[2] === 13 && status.levelFloor === 3 ?
@@ -333,7 +335,9 @@ function createRoom (level,i0,tileX,tileY) {
                         "./images/dungeon/objects/"+(15+status.levelFloor*20)+".png" :
                         o[2] === 20 ?
                             "./images/dungeon/objects/"+(o[7] ? "101d" : "101")+".png" :
-                            "./images/dungeon/objects/"+(o[2]+status.levelFloor*20)+".png"
+                            o[2] === 24 ?
+                                "./images/dungeon/objects/"+(o[7] ? "103d" : "103")+".png" :
+                                "./images/dungeon/objects/"+(o[2]+status.levelFloor*20)+".png"
         //столб 32×81 рисуется 1:1 с якорем низа в клетку объекта (логика — клетка 1×1)
         let isPillar = o[2] === 15
         //статуя (сетка 1×2) рисуется 1:1 натуральной высоты (65/69/48) с якорем низа

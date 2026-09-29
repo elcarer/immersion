@@ -37,6 +37,8 @@ import { trapSpriteSrc } from "../scripts/trapSprite.js"
 import { playback, strike } from "../scripts/sound.js"
 //V116: кооператив — ловушки бьют КАЖДОГО живого игрока
 import { forAlive } from "../scripts/players.js"
+//V155: «Вечный гелиодор» — урон ловушек/облака уходит в золото
+import { goldDamage } from "../scripts/relics.js"
 
 const STATE_TICKS = 125  //фаза состояния шипов/огня: 2с (~62.5 тика/с)
 const CLOUD_TICKS = 64   //жизнь облака кислоты ~1с (анимация 4 кадра × 16 тиков, speed 3.75)
@@ -144,10 +146,12 @@ function trapHeroTickFor(traps) {
         let damage = obj[10] === 3 ? Math.trunc(Math.random() * 6) + 6
             : obj[13] === 1 ? Math.trunc(Math.random() * 7) + 4
             : Math.trunc(Math.random() * 8) + 1
+        //V155: «Вечный гелиодор» — урон ловушки тоже уходит в золото (остаток — в ХП)
+        damage = goldDamage(damage, hx + 16, hy)
         status.info.hp -= damage
         status.info.hp <= 0 && (status.info.hp = 0)
         firstStep && journalAdd(T("journ.trap",damage), J_RED)
-        floatText(hx + Math.trunc(Math.random() * 32),hy + 8,damage,"#CD5C5C","12px","none")
+        damage > 0 && floatText(hx + Math.trunc(Math.random() * 32),hy + 8,damage,"#CD5C5C","12px","none")
         playEffect(status.hero.obj,data.effects[1])
         playback(strike[7].vol,0,0,3*status.settings.soundVolume)
         changeHP(ctxBar("hp"),ctxTx("hp"),"hp")
@@ -249,10 +253,12 @@ function cloudDamage(obj) {
         if(status.hero.obj.type === "hero" && !(wingsActive() || dashInvulnActive()) &&
            checkCollision(p[0]+13, ax, 14, 96, p[1]+37, ay, 14, 96)) {
             let damage = Math.trunc(Math.random() * 3) + 1
+            //V155: «Вечный гелиодор» — урон облака тоже уходит в золото (остаток — в ХП)
+            damage = goldDamage(damage, p[0] + 16, p[1])
             status.info.hp -= damage
             status.info.hp <= 0 && (status.info.hp = 0)
             !obj[16] && (obj[16] = 1, journalAdd(T("journ.trap",damage), J_RED))
-            floatText(p[0] + Math.trunc(Math.random() * 32),p[1] + 8,damage,"#CD5C5C","12px","none")
+            damage > 0 && floatText(p[0] + Math.trunc(Math.random() * 32),p[1] + 8,damage,"#CD5C5C","12px","none")
             playEffect(status.hero.obj,data.effects[1])
             playback(strike[7].vol,0,0,3*status.settings.soundVolume)
             changeHP(ctxBar("hp"),ctxTx("hp"),"hp")

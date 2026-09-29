@@ -15,6 +15,8 @@ import { playback,strike } from "../scripts/sound.js"
 import { endGame } from "../scripts/endGame.js"
 import { changeBossHP } from "../scripts/hpBar.js"
 import { wingsActive,dashInvulnActive } from "../scripts/valkyrie.js"
+//V155: «Вечный гелиодор» — тик яда уходит в золото
+import { goldDamage } from "../scripts/relics.js"
 
 //V115: checkBuffs — ПЕР-ИГРОКОВАЯ часть (вызывается из gameLoop в контексте каждого
 //игрока: своё горение/яд/невидимость/шипы-копилки/автокасты/щит/отражение).
@@ -107,11 +109,13 @@ function checkPoisonHero() {
         let skipPoison = status.info.poisonSkipCarry >= 100
         skipPoison && (status.info.poisonSkipCarry -= 100)
         let takePoison = skipPoison ? 0 : status.info.poison
-        status.info.hp -= takePoison
-        status.info.hp <= 0 && (status.info.hp = 0)
         let rectM = status.hero.obj.rect
         let x = rectM.x.animVal.value + rectM.width.animVal.value/2
         let y = rectM.y.animVal.value
+        //V155: «Вечный гелиодор» — тик яда тоже уходит в золото (остаток — в ХП)
+        takePoison = goldDamage(takePoison, x, y - 8)
+        status.info.hp -= takePoison
+        status.info.hp <= 0 && (status.info.hp = 0)
         takePoison > 0 && floatText(x,y,takePoison,"#339966","12px","none")
         status.info.poison = Math.trunc(status.info.poison / 2)
         status.info.poisonTime = 30

@@ -32,7 +32,7 @@ function defaultMeta() {
         "points":0,
         "killedEnemes":new Array(21).fill(0),
         "library":new Array(21).fill(0),
-        "libraryObjects":new Array(58).fill(0),
+        "libraryObjects":new Array(85).fill(0),
         "invNum":1,"inv":[null,null,null],
         "page":1,"pageMax":1,"openPage":[0,0,0],
         "metaInvLen":3,"startKey":0,"dopHP":0,"startStat":0,"metaPageNum":1,"identLegends":0,
@@ -44,7 +44,8 @@ function defaultMeta() {
         //забегами, как libraryObjects; полная «Новая игра» сбрасывает профиль целиком.
         //V121: 7 слотов = все kind 0..6 (жемчуг V68, алмаз E-16) — раньше шаблон был на 6
         //и добивался normMeta'ой до 7 только при загрузке сейва
-        "obtainedRelics":new Array(7).fill(0),
+        //V155: 9 слотов = все kind 0..8 («Вечный цаворит», «Вечный гелиодор»)
+        "obtainedRelics":new Array(9).fill(0),
         //V106: одноразовые (сюжетные) квесты — 1 = выполнен, больше не предлагается
         "quests":{"wolf":0}
     }))
