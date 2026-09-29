@@ -123,6 +123,12 @@ export function slimeQuestNewGame(next) {
 }
 function clearSession() {
     trackerHide()
+    hideUseBar()
+}
+//V159 (репорт юзера): полоска юза гасится ЦЕЛИКОМ и везде, где Слаймэн исчезает или
+//перестаёт быть мирным («ПОДОЖДАТЬ»/«НАПАСТЬ») — тик полоски (npcUseBarTick) при
+//state=3 больше не зовётся, без явной чистки fill+фрейм висели на экране вечно
+function hideUseBar() {
     useBarFill && useBarFill.remove()
     useBarFill = null
     useBarBack && useBarBack.remove()
@@ -234,11 +240,7 @@ function removeStartObjects(q) {
     }
     q.portal = null
     q.lever = null
-    useBarFill && useBarFill.remove()
-    useBarFill = null
-    useBarBack && useBarBack.remove()
-    useBarBack = null
-    useT = 0
+    hideUseBar()
 }
 
 // ---------- тик (gameLoop, после flameQuestTick) ----------
@@ -546,6 +548,7 @@ function waitEnd(q) {
     idx !== -1 && objectValues.splice(idx, 1)
     releaseSprite(e.img)
     q.npc = null
+    hideUseBar()
     screenPic.push(worldImage(svgArr[1], p[0] + 16, p[1] + 40, 32, 32, CLOD_SRC, {"id": screenPic.length - 1}))
     const el = screenPic[screenPic.length - 1]
     placeDrop(el, p[0] + 16, p[1] + 40, 32, 32)
@@ -554,7 +557,11 @@ function waitEnd(q) {
     journalAdd(T("journ.slime.clod"), J_STD)
     questDone(q)
     trackerHide()
-    status.questSlime = null
+    //V159 (репорт юзера: «нельзя покинуть комнату»): квест НЕ обнуляем — возвратная
+    //пара комнаты (backPortal/backLever) обслуживается хуком slimeQuestUse, который
+    //при q=null умирал и запирал игрока. state=3: тик/кормление/доп. дроп выключены,
+    //а рычаг и портал выхода продолжают работать (цикл как у арены V64)
+    q.state = 3
 }
 //НАПАСТЬ: Слаймэн становится обычным врагом (штатный ИИ, ближняя атака 26);
 //q не обнуляем — съеденные предметы вернутся в slimeQuestEnemyDie
@@ -565,6 +572,7 @@ function fight(q) {
     e.noticed = 1
     e.called = 1
     q.state = 3
+    hideUseBar()
     journalAdd(T("journ.slime.fight"), J_RED)
     questDone(q)
     trackerHide()
@@ -585,7 +593,8 @@ export function slimeQuestEnemyDie(enemy) {
         dropFly(el, p[0] + enemy.rect._w / 2, p[1] + enemy.rect._h / 2)
         itemDrops.set(el, it)
     }
-    status.questSlime = null
+    //V159: финализация вместо обнуления — возвратная пара комнаты должна работать
+    q.state = 3
 }
 //подбор Кома слизи: эффект «слизь» — предмету в ЛЕВОЙ руке (слот куклы 12).
 //Левая рука пуста — подбор проходит, накладывать нечего (решение пользователя,
