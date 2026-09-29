@@ -107,9 +107,19 @@ function checkEndAnim (d) {
     //исполняются в ЕГО контексте (в соло — тот же единственный герой)
     const ownP = ownerPlayer(d)
     ownP && setContext(ownP)
-    if (d.type === "hero" && d.currentAnim.img === "./images/hero/rogue/others/wait.png") {
+    //V157 (репорт юзера: Телепорт, полученный Валькирией в комнате загадки, не работал):
+    //способности «стоянием» (Невидимость skill.0.1, Телепорт skill.1.9) активируются по
+    //WAIT-АНИМАЦИИ КЛАССА ВЛАДЕЛЬЦА анимации, а не по захардкоженным путям rogue/sorca —
+    //через портал загадки способность получает любой класс (grantForeignSkill), у которого
+    //wait.png другой, и активация не срабатывала никогда. Контекст выше уже ownP —
+    //класс владельца это status.hero.class; wait-поза у всех героев anims[2].others[2].
+    if (d.type === "hero" && d.currentAnim.img === data.heroes[status.hero.class].anims[2].others[2].img) {
         let i = status.info.activeSkills.findIndex(f => f.skill.title === "skill.0.1.title")
         if(i !== -1 && status.info.invisible === 0 && status.info.activeSkills[i].cooldown === 0) {
+            useSkill(status.info.activeSkills[i])
+        }
+        i = status.info.activeSkills.findIndex(f => f.skill.title === "skill.1.9.title")
+        if(i !== -1 && status.info.activeSkills[i].cooldown === 0) {
             useSkill(status.info.activeSkills[i])
         }
     }
@@ -121,12 +131,6 @@ function checkEndAnim (d) {
     if (d.type === "hero" && /\/attack\//.test(d.currentAnim.img)) {
         let i = status.info.activeSkills.findIndex(f => f.skill.title === "skill.1.6.title")
         if(i !== -1 && !status.info.meteorTime && status.info.activeSkills[i].cooldown === 0) {
-            useSkill(status.info.activeSkills[i])
-        }
-    }
-    if (d.type === "hero" && d.currentAnim.img === "./images/hero/sorca/others/wait.png") {
-        let i = status.info.activeSkills.findIndex(f => f.skill.title === "skill.1.9.title")
-        if(i !== -1 && status.info.activeSkills[i].cooldown === 0) {
             useSkill(status.info.activeSkills[i])
         }
     }

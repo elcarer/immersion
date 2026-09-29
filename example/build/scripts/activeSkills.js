@@ -71,7 +71,8 @@ function activeSkills() {
         //окружность, V110) оставлял светлыми края и углы квадрата иконки. Новый радиус —
         //полудиагональ 48·√2 ≈ 68: «пирог» накрывает весь квадрат, маска больше спрайта
         //безвредна (кламп в createNativeSector удалён)
-        let sector = nativeSector(svgArr[2], xIcon + 48, yIcon + 48, 68, 96, {"id": pi + "_" + i})
+        //V157 (поправка юзера): радиус круга затенения кулдауна ×1.5 — 68 → 102
+        let sector = nativeSector(svgArr[2], xIcon + 48, yIcon + 48, 102, 96, {"id": pi + "_" + i})
         const dark = image(svgArr[2],xIcon,yIcon,96,96,sk.img,{})
         dark.node.tint = 0
         dark.node.alpha = 0.65
