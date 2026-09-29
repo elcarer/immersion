@@ -119,6 +119,11 @@ function activeSkillsCD(withUI = true) {
     //V56: сет «Учёная волшебница» (4 надетых): −5% кулдауна всех способностей — та же
     //механика ставки, складывается со статом «Находчивость» и бафом статуи сложением
     cdRate += setCdRateBonus()
+    //V154: «Интенсивность» предметов (эпик+): кулдауны всех активных способностей
+    //сокращаются ровно на 3% за каждый надетый предмет (-3%/-6%/-9%... — множитель
+    //ставки 1/(1-0.03·n); копия «Вечного сапфира» считается надетым предметом)
+    let intensity = (status.info.intensityus || 0) + abilCopyBonus("intensityus")
+    intensity && (cdRate /= 1 - 0.03 * intensity)
     for (let i = 0; i < lengthActiveSkills; i++) {
         //V16: узел из кэша; fallback getElementById — если скилл добавили без пересборки UI
         let sector = null

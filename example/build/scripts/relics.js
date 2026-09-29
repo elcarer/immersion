@@ -139,7 +139,7 @@ function sapphireBelt(pi) {
 
 //копия доп-способности (postfix, V56): счётчики героя читают +abilCopyBonus(counter).
 //counter — имя поля status.info, ключ способности тот же, что проверяет equip (drag.js)
-const ABIL_COUNTER = {"poisonus":"iabil.0.desc","expous":"iabil.1.desc","lifeus":"iabil.2.desc","luckus":"iabil.3.desc","fameus":"iabil.4.desc","greedus":"iabil.5.desc"}
+const ABIL_COUNTER = {"poisonus":"iabil.0.desc","expous":"iabil.1.desc","lifeus":"iabil.2.desc","luckus":"iabil.3.desc","fameus":"iabil.4.desc","greedus":"iabil.5.desc","intensityus":"iabil.6.desc"}
 function abilCopyBonus(counter) {
     let s = sapphireSource()
     return s && s.abil && s.abil.desc === ABIL_COUNTER[counter] ? sapphireMult() : 0

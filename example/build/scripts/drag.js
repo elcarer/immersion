@@ -363,6 +363,11 @@ function equip(item) {
     if(item.abil && item.abil.desc === "iabil.5.desc") {
         status.info.greedus++
     }
+    //V154: «интенсивность» (iabil.6) — счётчик надетых предметов, эффект применяет
+    //activeSkillsCD (кулдауны всех способностей -3% за предмет)
+    if(item.abil && item.abil.desc === "iabil.6.desc") {
+        status.info.intensityus++
+    }
     //V146: «Одетый» — 6 предметов одного сета на кукле (активен 6-й сетовой бонус); кукла
     //к этому месту уже несёт надетый предмет — все пути постановки зовут equip после записи
     achDressCheck(item)
@@ -454,6 +459,10 @@ function unEquip(item) {
     }
     if(item.abil && item.abil.desc === "iabil.5.desc") {
         status.info.greedus--
+    }
+    //V154: «интенсивность» — см. equip
+    if(item.abil && item.abil.desc === "iabil.6.desc") {
+        status.info.intensityus--
     }
 }
 function changeDopStat() {

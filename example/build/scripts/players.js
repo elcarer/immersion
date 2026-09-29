@@ -20,7 +20,7 @@ import { status } from "../scripts/start.js"
 //забегные статы игрока — бывший шаблон status.info (start.js / sceneGenerate.js);
 //upStat/keys заполняет sceneGenerate из меты при новом забеге
 function defaultInfo() {
-    return {"stats":[],"exp":0,"lvl":1,"abilPoints":0,"gold":0,"hp":0,"beltCell":0,"beltCellArr":[],"armor":0,"upStat":0,"keys":0,"skills":[],"poisonus":0,"poisonusMult":1,"expous":0,"lifeus":0,"viewus":1,"invisible":0,"invisibleTime":0,"activeSkills":[],"pins":0,"backStab":1,"cloudeTime":0,"multSpeed":1,"killHeal":0,"keyLock":0,"pinsAdd":0,"pinsStan":false,"bossKill":0,"time":0,"luckus":0,"fameus":0,"greedus":0,"poison":0,"poisonTime":0,"stoneCurse":0,"goldroom":0,"reflect":1,"energyShotCharge":0,"charm":0,"blesses":[],"log":[],"puzzleUsed":0,"shellUsed":0}
+    return {"stats":[],"exp":0,"lvl":1,"abilPoints":0,"gold":0,"hp":0,"beltCell":0,"beltCellArr":[],"armor":0,"upStat":0,"keys":0,"skills":[],"poisonus":0,"poisonusMult":1,"expous":0,"lifeus":0,"viewus":1,"invisible":0,"invisibleTime":0,"activeSkills":[],"pins":0,"backStab":1,"cloudeTime":0,"multSpeed":1,"killHeal":0,"keyLock":0,"pinsAdd":0,"pinsStan":false,"bossKill":0,"time":0,"luckus":0,"fameus":0,"greedus":0,"intensityus":0,"poison":0,"poisonTime":0,"stoneCurse":0,"goldroom":0,"reflect":1,"energyShotCharge":0,"charm":0,"blesses":[],"log":[],"puzzleUsed":0,"shellUsed":0}
 }
 //инвентарь игрока — бывший шаблон status.inventory: кукла 14 слотов (оружие 11/12) + рюкзак 24
 function defaultInventory() {

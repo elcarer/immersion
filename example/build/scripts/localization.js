@@ -733,6 +733,10 @@ const PAIRS = [
     ["ipost.5", " корыстности", " of Greed"],
     ["iabil.5.desc", "корыстность", "greed"],
     ["iabil.5.desc2", "жадность приносит плоды: 20% шанс найти 1 золото в новой комнате", "greed bears fruit: 20% chance to find 1 gold in a new room"],
+    //V154: «интенсивность» — кулдауны всех способностей тают быстрее (activeSkillsCD)
+    ["ipost.6", " интенсивности", " of Intensity"],
+    ["iabil.6.desc", "интенсивность", "intensity"],
+    ["iabil.6.desc2", "снижает кулдаун всех способностей на 3%", "reduces the cooldown of all abilities by 3%"],
     ["journal.fame", "Известность: +{0} очк. мета-прогресса", "Fame: +{0} meta-progression points"],
     ["slot.0", "голова", "head"],
     ["slot.1", "спина", "back"],
