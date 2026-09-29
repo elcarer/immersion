@@ -199,6 +199,11 @@ function wolfAllyTick(wolf) {
     //V105: постоянный ХП-бар — игрок всегда видит состояние Волка (каждый тик
     //освежает lifetime бара enemyHpBarFx)
     showEnemyHpBar(wolf)
+    //V156: кулдаун укуса тикает и ВНЕ боя (раньше декремент жил в combatTick и значение
+    //застывало на простое — недоигранный кулдаун прошлым боем заставлял Волк столбеть
+    //у цели первого укуса нового боя). Во время замаха не тикает — боевой ритм
+    //«замах + пауза у цели» прежний
+    !wolf.attacking && wolf.stats.attacksCd[0] > 0 && wolf.stats.attacksCd[0]--
     //V105: замах укуса — Волк СТОИТ, анимация атаки доигрывается целиком. Раньше
     //позу атаки сразу перебивала ходьба (followTick после гибели цели от первого
     //укуса / stepAlongPath по пути к герою) — сами анимации атаки не были видны.
@@ -354,17 +359,19 @@ function followTick(wolf) {
         if (!idle) wolf.stop = 1
         wolf.idleT = idle + 1
     }
+    //V156 (репорт юзера: «волк замер и перестал следовать»): сброс stop при wait-позе
+    //обязан быть БЕЗУСЛОВНЫМ. Гвард «поза уже wait — не трогаем» пропускал stop=0, когда
+    //wait-позу поставил конец замаха (ветка attacking выше) — а stop=1 к тому моменту
+    //успел поставить animPlay (конец once-анимации; Волк — type "pet", раньше фолбэку
+    //«stop»). Итог: вечный stop=1 — замороженный кадр и стояние даже у цели пути.
     if (wolf.idleT === IDLE_WAIT_TICKS) {
         const wait = waitPose(wolf)
-        if (wolf.currentAnim !== wait) {
-            wolf.stop = 0
-            setEnemyPose(wolf, wait)
-        }
+        if (wolf.currentAnim !== wait) setEnemyPose(wolf, wait)
+        wolf.stop = 0
     }
 }
 
 function combatTick(wolf, foe) {
-    wolf.stats.attacksCd[0] > 0 && wolf.stats.attacksCd[0]--
     const wp = rectPos(wolf.rect)
     const fp = rectPos(foe.rect)
     const dx = (fp[0] + 16) - (wp[0] + 16)

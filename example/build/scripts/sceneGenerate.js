@@ -8,7 +8,12 @@ import { portalSpriteSrc, cupSpriteSrc } from "../scripts/portalSprite.js"
 //V75: шкафчик с древностями — ряд иконок-подсказок активных благословений пересобирается на этаже
 import { renderBlessHints } from "../scripts/blessFx.js"
 import { T } from "../scripts/localization.js"
-import { svgArr,image,worldImage } from "../scripts/svg.js"
+//V156: пересортировка статиков комнаты — rectPos (нижние границы), checkZOrder
+//(восстановление сущностей против статиков; цикл импортов с heroMove легален —
+//вызовы только в рантайме) и checkCollision (зона комнаты против сущностей)
+import { svgArr,image,worldImage,rectPos } from "../scripts/svg.js"
+import { checkCollision } from "../scripts/damage.js"
+import { checkZOrder } from "../scripts/heroMove.js"
 //V104: открытый диалог (quest.js) блокирует хоткеи панелей — панель поверх диалога недопустима
 import { dialogIsOpen } from "../scripts/dialog.js"
 //V62: импорт map.js удалён вместе с map-веткой createRoom — отрисовка карты
@@ -288,6 +293,8 @@ function createRoom (level,i0,tileX,tileY) {
         arr.push(o)
     }
     //стена: спрайт + индекс в screenPic (walls[j][6]) + кэши Z-сортировки/дверей
+    //V156: спрайт запоминается для пересортировки по нижней границе (ниже)
+    const roomStatics = []
     const drawWall = (w) => {
         screenPic.push(worldImage(layer1,
             w[0]*tileX,
@@ -295,6 +302,7 @@ function createRoom (level,i0,tileX,tileY) {
             w[3]*tileX,
             w[4]*tileY,"./images/dungeon/walls/"+(w[2]+status.levelFloor*30)+".png",{"id":screenPic.length+"W"}))
         w[6] = screenPic.length-1
+        roomStatics.push(screenPic[screenPic.length-1])
         //V4: стены-накладки (27/28) — в кэш Z-сортировки («;» обязательна: строка
         //начинается с «(» — без неё ASI склеивает с присваиванием выше); V150: метка
         //_zOverlay — статичный проход checkZOrder их пропускает (это работа ветки выше)
@@ -365,6 +373,7 @@ function createRoom (level,i0,tileX,tileY) {
             isPillar ? 32 : isPortalObj ? 64 : isStatue ? 32 : isExit4 ? 96 : isAncient ? 64 : o[3]*tileX,
             isPillar ? 81 : isPortalObj ? 84 : isStatue ? statueH : isExit4 ? 128 : isAncient ? 42 : o[4]*tileY,objSrc,{"id":screenPic.length+"O"}))
         o[6] = screenPic.length-1
+        roomStatics.push(screenPic[screenPic.length-1])
         //V80: наземная тень под объектом (тип 14 — ловушка-плитка: лежит на полу,
         //тень не нужна; V97: чаша 22 — переезжает при перемешивании, статичная тень
         //осталась бы на старом месте). При выключенных тенях хост запоминает groundShadow.js
@@ -395,6 +404,32 @@ function createRoom (level,i0,tileX,tileY) {
         if (w[0] >= roomRec[0] && w[0] < roomRec[0] + roomRec[2] &&
             w[1] >= roomRec[1] && w[1] <= roomRec[1] + roomRec[3]) continue
         drawWall(w)
+    }
+    //V156 (репорт юзера: «z-order объектов в комнатах нарушен, выше стоящие перекрывают
+    //нижние»): тайловый цикл рисует КОЛОНКАМИ (x внешним, y внутренним) — объект из
+    //верхней строки правой колонки аппендился ПОЗЖЕ объекта из нижней строки левой и
+    //ложился ПОВЕРХ него. Пересортировка статиков комнаты (стены+объекты) по нижней
+    //границе СПРАЙТОВ — то же правило painter's algorithm, что у checkZOrder (у столба/
+    //статуи/портала спрайт выше логической клетки). Порядок в screenPic НЕ меняется —
+    //только порядок отрисовки (пере-append), индексы objects[i][6]/walls[j][6] валидны.
+    //После сортировки сущностям, пересекающимся с комнатой (герой у двери, Волк, трупы),
+    //восстанавливается их порядок против статиков — checkZOrder каждого.
+    roomStatics.sort((a,b) =>
+        (a.y.animVal.value + a.height.animVal.value) - (b.y.animVal.value + b.height.animVal.value))
+    for (let k = 0; k < roomStatics.length; k++) svgArr[1].append(roomStatics[k])
+    const zrx = roomRec[0]*tileX, zry = roomRec[1]*tileY
+    const zrw = roomRec[2]*tileX, zrh = (roomRec[3]+1)*tileY
+    for (let k = 0; k < objectValues.length; k++) {
+        const ent = objectValues[k]
+        if (!ent || !ent.img || !ent.rect || !svgArr[1].contains(ent.img)) continue
+        //сортируемые типы, как в checkZOrder; снаряды/эффекты всегда поверх — мимо
+        const et = ent.type
+        if (et !== "hero" && et !== "enemy" && et !== "pet" && et !== "corpse") continue
+        const ep = rectPos(ent.rect)
+        if (checkCollision(zrx, ep[0], zrw, ent.rect.width.animVal.value,
+                           zry, ep[1], zrh, ent.rect.height.animVal.value)) {
+            checkZOrder(ent)
+        }
     }
 }
 export {sceneGenerate,createRoom,dataGeneric,buttonInit,floorTexture,createMatrix}
