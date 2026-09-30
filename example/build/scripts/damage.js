@@ -363,9 +363,11 @@ function countDamage(enemy,bullet,x,y) {
     hasRelic(5) && rubyMissing > 0 && (damage = Math.round(damage * (1 + Math.min(rubyMissing,1))))
     let color = "white"
     //V67 «Вечный изумруд»: герой больше не наносит критических ударов — бросок на крит
-    //не делается вовсе (сами проценты крита ушли в макс. ХП, countDopStats)
+    //не делается вовсе (сами проценты крита ушли в макс. ХП, countDopStats).
+    //V163 «критичность»: мощь крита стала дробной (157.5%) — parseFloat вместо parseInt,
+    //иначе дробная часть отбрасывалась и предмет недодавал урон
     if(!hasRelic(0) && Math.trunc(Math.random() * 100) < parseInt(status.info.stats[1].dops[0].value2.slice(0,-1))) {
-        damage = Math.trunc(damage*(parseInt(status.info.stats[1].dops[1].value2.slice(0,-1))/100))
+        damage = Math.trunc(damage*(parseFloat(status.info.stats[1].dops[1].value2.slice(0,-1))/100))
         color = "red"
     }
     if(enemy.direction === bullet.direction && status.info.backStab > 1) {

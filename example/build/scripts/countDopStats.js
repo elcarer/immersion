@@ -1,6 +1,6 @@
 import { status } from "../scripts/start.js"
 //V67: «Вечный изумруд» (крит → макс. ХП) и «Вечный сапфир» (копия параметров 1-й ячейки)
-import { hasRelic, sapphireDamage, sapphireStat, sapphireDop, diamondStatBonus } from "../scripts/relics.js"
+import { hasRelic, sapphireDamage, sapphireStat, sapphireDop, diamondStatBonus, abilCopyBonus } from "../scripts/relics.js"
 //V75: «Кровавый пакт» (шкафчик) — максимум ХП ×0.8
 import { blessMaxHpMult } from "../scripts/blessFx.js"
 
@@ -43,8 +43,11 @@ function countDopStats() {
             (status.info.stats[i].dops[j].value2 = (emeraldOn ? 0 : countLog(Math.trunc(status.info.stats[i].dops[j].value1/2)))+"%")
             i===1&&j===1&&
             (status.info.stats[i].dops[j].value1 = statValue1(i,j))&&
-            //V110 «Вечный изумруд»: и база 100% мощи крита тоже ушла в ХП — 0%
-            (status.info.stats[i].dops[j].value2 = (emeraldOn ? 0 : 100+2*countLog(status.info.stats[i].dops[j].value1))+"%")
+            //V110 «Вечный изумруд»: и база 100% мощи крита тоже ушла в ХП — 0%.
+            //V163 «критичность»: итог умножается на (1 + 0.05·предметов) — 150% → 157.5%;
+            //дробные десятые округляются (двоичные хвосты 150×1.05 = 157.49999…), бросок
+            //крита в damage.js читает тот же value2 через parseFloat — показ и урон совпадают
+            (status.info.stats[i].dops[j].value2 = (emeraldOn ? 0 : Math.round((100+2*countLog(status.info.stats[i].dops[j].value1))*critPowerMult()*10)/10)+"%")
             i===1&&j===2&&
             (status.info.stats[i].dops[j].value1 = statValue1(i,j))&&
             (status.info.stats[i].dops[j].value2 = (countLog(Math.trunc(status.info.stats[i].dops[j].value1/2)))+"%")
@@ -95,6 +98,13 @@ function barbMoveBonus() {
 }
 function countLog(i) {
         return (Math.trunc(((1 + 40/i)**(i/40) - 1) / (Math.exp(1) - 1) * 100))
+}
+//V163 «критичность» (iabil.7, эпик+): множитель мощи крита — 1 + 0.05·надетых предметов
+//(формула юзера: 150% → 150% + 150%·5% = 157.5%); копия «Вечного сапфира» считается как
+//свой предмет. «Вечный изумруд» криты отключает — способность спит: в emeraldHpBonus
+//(конвертация мощи крита в макс. ХП) множитель НЕ входит, изумруд переводит базовую мощь
+function critPowerMult() {
+    return 1 + 0.05 * ((status.info.criticalus || 0) + abilCopyBonus("criticalus"))
 }
 //V67 «Вечный изумруд» (relic 0): прибавка к макс. ХП — полные итоговые проценты крита:
 //шанс крита (countLog от value1) + мощь крита (100 + 2·countLog от value1), формулы те же,

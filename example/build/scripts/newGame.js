@@ -33,6 +33,14 @@ function newGame(next) {
     //(решается заново при завершении этажа 3 — до комикса спуска)
     next === false && (status.levelFloor = 0, status.voidBossId = null)
     let newData = generateGame()
+    //V163: исходный размер сцены для масштаба панели «Карта» (map.js). Комнаты-«острова»,
+    //порождаемые порталами ПОСЛЕ генерации (арена/загадка/напёрстки/конь в portalFx.js),
+    //растят scene.h — без фиксации базовой высоты карта этажа сжималась бы при их создании.
+    //Старые сейвы поля не знают — map.js падает обратно на текущие w/h
+    for (let s = 0; s < newData.scenes.length; s++) {
+        newData.scenes[s].baseW = newData.scenes[s].w
+        newData.scenes[s].baseH = newData.scenes[s].h
+    }
     sceneGenerate(newData,next)
     //V64a: связка портал/рычаг регистрируется ПОСЛЕ sceneGenerate — её del() сбрасывает
     //link (resetPortalFx); раньше вызов стоял в generateGame и рычаг «использовался вхолостую»

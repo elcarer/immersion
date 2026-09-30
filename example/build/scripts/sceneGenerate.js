@@ -78,7 +78,7 @@ function sceneGenerate(data,next=false) {
             for (let i = 0; i < length; i++) {
                 hero.anims[1].attack[i].new.anim[0] = weapon.attack
             }
-            P.info = {"stats":JSON.parse(JSON.stringify(hero.stats)),"exp":0,"lvl":1,"abilPoints":0,"gold":0,"hp":0,"beltCell":0, "beltCellArr":[],"armor":0,"upStat":status.meta.startStat,"keys":status.meta.startKey,"skills":[],"poisonus":0,"poisonusMult":1,"expous":0,"lifeus":0,"viewus":1,"invisible":0,"invisibleTime":0,"activeSkills":[],"pins":0,"backStab":1,"cloudeTime":0,"multSpeed":1,"killHeal":0,"keyLock":0,"pinsAdd":0,"pinsStan":false,"bossKill":0,"time":0,"luckus":0,"fameus":0,"greedus":0,"intensityus":0,"poison":0,"poisonTime":0,"stoneCurse":0,"goldroom":0,"reflect":1,"energyShotCharge":0,"charm":0,"blesses":[],"log":[],"puzzleUsed":0,"shellUsed":0,"knightUsed":0}
+            P.info = {"stats":JSON.parse(JSON.stringify(hero.stats)),"exp":0,"lvl":1,"abilPoints":0,"gold":0,"hp":0,"beltCell":0, "beltCellArr":[],"armor":0,"upStat":status.meta.startStat,"keys":status.meta.startKey,"skills":[],"poisonus":0,"poisonusMult":1,"expous":0,"lifeus":0,"viewus":1,"invisible":0,"invisibleTime":0,"activeSkills":[],"pins":0,"backStab":1,"cloudeTime":0,"multSpeed":1,"killHeal":0,"keyLock":0,"pinsAdd":0,"pinsStan":false,"bossKill":0,"time":0,"luckus":0,"fameus":0,"greedus":0,"intensityus":0,"criticalus":0,"poison":0,"poisonTime":0,"stoneCurse":0,"goldroom":0,"reflect":1,"energyShotCharge":0,"charm":0,"blesses":[],"log":[],"puzzleUsed":0,"shellUsed":0,"knightUsed":0}
             //правило players.js: P.info заменён ЦЕЛИКОМ — пересадить указатели контекста,
             //иначе countDopStats запишет вычисленные статы в старый объект
             setContext(P)

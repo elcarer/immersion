@@ -247,7 +247,7 @@ let data = {"heroes":[
             {"speed":5,"times":4,"w":128,"h":51,"img":"./images/enemy/ogr/others/wait.png"}
         ]}
     ]}],
-    [{"id":4,"name":"enemy.4.name","boss":1,"stats":{"hp":40,"dmg":[5,6],"exp":10,"speed":10,"range":7,"attacksCd":[],"noStunTime":120,"rage": 8,"desc":"enemy.4.desc"},"attacks":[9],"elite":1,"effects":{"takeDamage":1},"anims":[
+    [{"id":4,"name":"enemy.4.name","boss":1,"stats":{"hp":40,"dmg":[5,6],"exp":10,"speed":11,"range":7,"attacksCd":[],"noStunTime":120,"rage": 8,"desc":"enemy.4.desc"},"attacks":[9],"elite":1,"effects":{"takeDamage":1},"anims":[
         {"move":[
             {"speed":5,"times":4,"w":256,"h":64,"img":"./images/enemy/lider/move/back.png"},
             {"speed":5,"times":4,"w":256,"h":64,"img":"./images/enemy/lider/move/front.png"},
@@ -266,7 +266,7 @@ let data = {"heroes":[
             {"speed":5,"times":4,"w":256,"h":64,"img":"./images/enemy/lider/others/wait.png"}
         ]}
     ]}],
-    [{"id":5,"name":"enemy.5.name","stats":{"hp":20,"dmg":[2,6],"exp":6,"speed":8,"range":6,"attacksCd":[],"noStunTime":120, "reanimate": 0.5,"desc":"enemy.5.desc"},"attacks":[7],"elite":1,"effects":{"takeDamage":1},"anims":[
+    [{"id":5,"name":"enemy.5.name","stats":{"hp":20,"dmg":[2,6],"exp":6,"speed":9,"range":6,"attacksCd":[],"noStunTime":120, "reanimate": 0.5,"desc":"enemy.5.desc"},"attacks":[7],"elite":1,"effects":{"takeDamage":1},"anims":[
         {"move":[
             {"speed":5,"times":4,"w":128,"h":51,"img":"./images/enemy/mummy/move/back.png"},
             {"speed":5,"times":4,"w":128,"h":51,"img":"./images/enemy/mummy/move/front.png"},

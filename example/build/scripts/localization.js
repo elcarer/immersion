@@ -737,6 +737,10 @@ const PAIRS = [
     ["ipost.6", " интенсивности", " of Intensity"],
     ["iabil.6.desc", "интенсивность", "intensity"],
     ["iabil.6.desc2", "снижает кулдаун всех способностей на 3%", "reduces the cooldown of all abilities by 3%"],
+    //V163: «критичность» — итоговая мощь крита растёт на 5% за предмет (стакается, countDopStats)
+    ["ipost.7", " критичности", " of Criticality"],
+    ["iabil.7.desc", "критичность", "criticality"],
+    ["iabil.7.desc2", "увеличивает итоговую мощь крита на 5% (эффект складывается за несколько предметов)", "increases final crit power by 5% (stacks across multiple items)"],
     ["journal.fame", "Известность: +{0} очк. мета-прогресса", "Fame: +{0} meta-progression points"],
     ["slot.0", "голова", "head"],
     ["slot.1", "спина", "back"],

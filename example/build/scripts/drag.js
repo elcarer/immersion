@@ -320,6 +320,12 @@ function equip(item) {
             break
         }
     }
+    //V163: «критичность» (iabil.7) — счётчик ДО пересчёта: множитель мощи крита входит
+    //в формулу value2 внутри countDopStats (остальные способности читают счётчики в бою,
+    //им порядок не важен). Гвард ||0: сейвы до V163 поля не имеют
+    if(item.abil && item.abil.desc === "iabil.7.desc") {
+        status.info.criticalus = (status.info.criticalus || 0) + 1
+    }
     changeDopStat()
     if(item.stat === 5) {
         status.info.beltCell+=item.statCount
@@ -421,6 +427,10 @@ function unEquip(item) {
             dollTemp[i].textContent = status.info.stats[item.stat].value
             break
         }
+    }
+    //V163: «критичность» — счётчик ДО пересчёта, см. equip
+    if(item.abil && item.abil.desc === "iabil.7.desc") {
+        status.info.criticalus = Math.max(0, (status.info.criticalus || 0) - 1)
     }
     changeDopStat()
     if(item.stat === 5) {

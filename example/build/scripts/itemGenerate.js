@@ -199,8 +199,9 @@ let prefixArr = ["ipfx.0","ipfx.1","ipfx.2","ipfx.3","ipfx.4","ipfx.5","ipfx.6",
 //V66: способности эпических предметов (выдаются редкостям 3-4): 0 «ядовитость» (attack.js),
 //1 «учёность» (openRoom), 2 «живучесть» (лечение), 3 «везучесть» (дроп),
 //4 «известность» (damage.js checkExp — очки меты за уровни), 5 «корыстность» (openRoom — золото),
-//V154: 6 «интенсивность» (activeSkillsCD — кулдауны всех способностей, -3% за предмет)
-let postfixArr = [{"postfix":"ipost.0","abil":{"desc":"iabil.0.desc","desc2":"iabil.0.desc2"}},{"postfix":"ipost.1","abil":{"desc":"iabil.1.desc","desc2":"iabil.1.desc2"}},{"postfix":"ipost.2","abil":{"desc":"iabil.2.desc","desc2":"iabil.2.desc2"}},{"postfix":"ipost.3","abil":{"desc":"iabil.3.desc","desc2":"iabil.3.desc2"}},{"postfix":"ipost.4","abil":{"desc":"iabil.4.desc","desc2":"iabil.4.desc2"}},{"postfix":"ipost.5","abil":{"desc":"iabil.5.desc","desc2":"iabil.5.desc2"}},{"postfix":"ipost.6","abil":{"desc":"iabil.6.desc","desc2":"iabil.6.desc2"}}]
+//V154: 6 «интенсивность» (activeSkillsCD — кулдауны всех способностей, -3% за предмет),
+//V163: 7 «критичность» (countDopStats — мощь крита, +5% за предмет, стакается)
+let postfixArr = [{"postfix":"ipost.0","abil":{"desc":"iabil.0.desc","desc2":"iabil.0.desc2"}},{"postfix":"ipost.1","abil":{"desc":"iabil.1.desc","desc2":"iabil.1.desc2"}},{"postfix":"ipost.2","abil":{"desc":"iabil.2.desc","desc2":"iabil.2.desc2"}},{"postfix":"ipost.3","abil":{"desc":"iabil.3.desc","desc2":"iabil.3.desc2"}},{"postfix":"ipost.4","abil":{"desc":"iabil.4.desc","desc2":"iabil.4.desc2"}},{"postfix":"ipost.5","abil":{"desc":"iabil.5.desc","desc2":"iabil.5.desc2"}},{"postfix":"ipost.6","abil":{"desc":"iabil.6.desc","desc2":"iabil.6.desc2"}},{"postfix":"ipost.7","abil":{"desc":"iabil.7.desc","desc2":"iabil.7.desc2"}}]
 function createTitle(type,rarity) {
     let rand = Math.trunc(Math.random() * titleArr[type][rarity].length)
     return [titleArr[type][rarity][rand],rand]
