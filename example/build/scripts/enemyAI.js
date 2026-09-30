@@ -344,6 +344,42 @@ function closeDoorsOnMatrix(n, w, h) {
     }
 }
 
+// ---------- V164: ближайшая свободная клетка ИИ ----------
+// Кольцевой поиск (чокебышевские кольца r=1,2,3…) от заданной клетки по navMatrix:
+// возвращает саму клетку, если она проходима (и проходит доп-предикат), иначе
+// ближайшую проходимую; внутри кольца — ближайшая к точке отсчёта (евклид).
+// Поиск идёт ПО ЛЮБЫМ клеткам, включая стены/пустоту: точка отсчёта сама может быть
+// стеной (посадка босса-паука в стену), а соседняя комната за стеной не выигрывает —
+// кандидатом может стать только проходимая клетка (nav===1, двери учтены).
+// isFree(x, y) — необязательный доп-фильтр (например, «без блокирующих объектов»).
+// Пола ИИ нет вовсе или свободных клеток нет — null
+function nearestFreeCell(cx, cy, isFree) {
+    const nav = ensureNavMatrix()
+    if (!nav) return null
+    const w = navW
+    const h = navH
+    if (cx < 0 || cy < 0 || cx >= w || cy >= h) return null
+    const good = (x, y) => x >= 0 && y >= 0 && x < w && y < h &&
+        nav[y * w + x] === 1 && (!isFree || isFree(x, y))
+    if (good(cx, cy)) return [cx, cy]
+    for (let r = 1; r < Math.max(w, h); r++) {
+        let best = null
+        let bd = Infinity
+        for (let dy = -r; dy <= r; dy++) {
+            for (let dx = -r; dx <= r; dx++) {
+                if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue
+                const x = cx + dx
+                const y = cy + dy
+                if (!good(x, y)) continue
+                const d = dx * dx + dy * dy
+                if (d < bd) { bd = d; best = [x, y] }
+            }
+        }
+        if (best) return best
+    }
+    return null
+}
+
 // ---------- flow-field: один общий BFS от клетки героя по всему открытому этажу ----------
 let flowNavRef = null
 let flowCenter = [-1, -1]
@@ -615,7 +651,7 @@ function bfsPathBoss(from, to) {
 //Без третьего аргумента (прочие вызовы) поведение совпадает со старым.
 //export: используется тестом v28EnemyDiversity.txt для проверки на синтетической карте
 //V151: экспорт для харнесс-тестов (verify_v151: клетки дверей в navMatrix)
-export { ensureNavMatrix }
+export { ensureNavMatrix, nearestFreeCell }
 export function buildChasePath(enemyCell, heroCell, enemy) {
     if (!ensureFlowField(enemy, heroCell)) return []
     const dist = flowDist

@@ -4,6 +4,9 @@ import { screenPic,objectValues,acidArr } from "../scripts/del.js"
 import { data } from "../scripts/data.js"
 import { createCells } from "../scripts/encounters.js"
 import { dataGeneric } from "../scripts/sceneGenerate.js"
+//V164: проверка клетки приземления босса — ближайшая свободная по полю ИИ + объекты
+import { nearestFreeCell } from "../scripts/enemyAI.js"
+import { collisionCheckObject } from "../scripts/collision.js"
 let boss
 let bossAttack = []
 let eggsArr = []
@@ -96,8 +99,34 @@ function bossDown() {
             const dy = ty - e.rect.y.animVal.value
             const step = moveSpeed * 3
             if (Math.abs(dx) <= step && dy <= step) {
-                //цель в одном шаге — сажаем ТОЧНО в снятую точку
-                moveSprite(e.img, dx, dy)
+                //V164 (репорт юзера): перед посадкой проверяем КЛЕТКУ ПРИЗЕМЛЕНИЯ.
+                //Клетка врага для ИИ — якорь (+16/+25) от левого-верхнего угла спрайта
+                //(enemyCellOf в enemyAI), а босс садится ЦЕНТРОМ на героя: при ширине
+                //256 его якорь оказывается на ~3 клетки ЛЕВЕЕ героя, и у левой стены
+                //якорь попадал в стену — путь из клетки-стены не строится, CHASE
+                //недостижим, босс «ничего не может сделать». Клетка занята (стена или
+                //блокирующее препятствие — правила героя, типы 14/19/22 проходимы) —
+                //сажаем в ближайшую свободную: якорь (+16/+25) точно в её угол,
+                //тогда enemyCellOf после посадки даст именно эту клетку
+                const lv = dataGeneric.scenes[status.levelFloor]
+                const ax0 = Math.trunc((bossDownTarget[0] + 16 - w / 2 + 16) / 32)
+                const ay0 = Math.trunc((bossDownTarget[1] - 32 + 25) / 32)
+                const free = nearestFreeCell(ax0, ay0, (x, y) => {
+                    for (let i = 0; i < lv.objects.length; i++) {
+                        const o = lv.objects[i]
+                        if (x >= o[0] && x < o[0] + o[3] && y >= o[1] && y < o[1] + o[4] && collisionCheckObject(o)) return false
+                    }
+                    return true
+                })
+                if (!free || (free[0] === ax0 && free[1] === ay0)) {
+                    //клетка приземления свободна (или пола ИИ нет вовсе) — точная
+                    //посадка в снятую точку, как раньше
+                    moveSprite(e.img, dx, dy)
+                } else {
+                    moveSprite(e.img,
+                        free[0] * 32 - 16 - e.rect.x.animVal.value,
+                        free[1] * 32 - 25 - e.rect.y.animVal.value)
+                }
                 e.type = "enemy"
                 //V68: спуск завершён — спрайт снова виден (прятали в bossUp перед фазой дождя)
                 e.img.setAttribute("visibility", "visible")

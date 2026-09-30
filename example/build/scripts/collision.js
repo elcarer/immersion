@@ -147,4 +147,4 @@ function zNear(level, x, y, w, h) {
     }
     return {walls: outWalls, objs: outObjs}
 }
-export {collision, zNear}
+export {collision, zNear, collisionCheckObject}
