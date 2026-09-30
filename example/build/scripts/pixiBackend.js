@@ -124,6 +124,9 @@ function applyTextureRetro(src, tex) {
     pendingShims.delete(src)
     for (const shim of arr) {
         if (shim._dead || !shim.node) continue
+        // шим мог сменить href, пока текстура грузилась (свап «использован» у
+        // объектов мира) — устаревшую подмену не применяем
+        if (shim.attrs && shim.attrs.href !== undefined && String(shim.attrs.href) !== src) continue
         if (shim.kind === "image") {
             shim.node.texture = tex
             applySize(shim)
@@ -1309,6 +1312,11 @@ class WorldSprite {
         switch (name) {
             case "href": {
                 this.node.texture = getTexture(String(value))
+                // V162: текстура вне манифеста (арт добавлен без resources-update.py)
+                // грузится асинхронно — свап href на живом объекте (103→103d у
+                // наковальни) получал Texture.EMPTY НАВСЕГДА: спрайт исчезал.
+                // Регистрируем в pendingShims — applyTextureRetro донесёт текстуру
+                if (this.node.texture === PIXI.Texture.EMPTY) registerPending(String(value), this)
                 this.node.width = +this.attrs.width || this.node.texture.width
                 this.node.height = +this.attrs.height || this.node.texture.height
                 syncShadowCopies(this)

@@ -53,6 +53,10 @@ function flameTick() {
     if (flameImg && !flameImg.isConnected) flameImg = null
     if (!flameImg) {
         flameImg = image(svgArr[1], 0, 0, FLAME_SIZE, FLAME_SIZE, FLAME_SRC, {})
+        //V162: созданный спрайт ОБЯЗАН вернуться в слот — слот-то пуст, иначе новый
+        //спрайт на КАЖДОМ тике (старые остаются на прошлых позициях героя — «хвост»
+        //копий, репорт на Валькирии под ожогом паука), а hideFlame гасит только слот
+        flameImgs[status.hero.idx || 0] = flameImg
     }
     const r = status.hero.obj.rect
     const pos = rectPos(r)
