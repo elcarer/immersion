@@ -13,6 +13,14 @@ let tempTip = []
 let statArr = ["stat.0.0","stat.0.1","stat.0.2","stat.0.3","stat.0.4","ui.stat.cells","ui.stat.armor"]
 let statArrDop = ["dop.0.0.0","dop.0.0.1","dop.0.0.2","dop.0.1.0","dop.0.1.1","dop.0.1.2","dop.0.2.0","dop.0.2.1","dop.0.2.2","dop.0.3.0","dop.0.3.1","dop.0.3.2","dop.0.4.0","dop.0.4.1","dop.0.4.2"]
 let statArrDopDesc = ["dopdesc.0","dopdesc.1","dopdesc.2","dopdesc.3","dopdesc.4","dopdesc.5","dopdesc.6","dopdesc.7","dopdesc.8","dopdesc.9","dopdesc.10","dopdesc.11","dopdesc.12","dopdesc.13","dopdesc.14"]
+//V161: квестовые эффекты предметов (метки-оверлеи slime/grow/barb на иконке): в тултипе
+//строка «Эффект: …» над художественным описанием + окошко слева с именем и описанием
+//эффекта (образец — окно свойства «Броня» helpWord3, позиция — ниже него)
+let itemFxArr = [
+    ["slime","effect.slime.name","effect.slime.desc"],
+    ["grow","effect.grow.name","effect.grow.desc"],
+    ["barb","effect.barb.name","effect.barb.desc"]
+]
 //V29: цвет рамки по редкости — один источник для всех окон (основной тулип,
 //окно сравнения, карточка предмета); раньше блок повторялся трижды
 //V67: редкость 4 — реликвия, КРАСНЫЙ (решение пользователя)
@@ -245,6 +253,25 @@ function tip (e,obj) {
         tempTip.push(text(svgArr[2],x+200,y+365+strokeNum*35,"0pt","50pt","none","2px","#FF8800",T("tip.fire"),{"id":"itemName","size":32,"font":"baseFont4","anchor":"middle"}))
         strokeNum++
     }
+    //V161: эффекты предмета — строка «Эффект: …» НА СТРОЧКУ ВЫШЕ художественного
+    //описания (на свободном месте; у плотного блока характеристик — продолжение блока;
+    //у реликвии — под её переносным описанием). Плюс окошки эффектов слева от тултипа —
+    //в позиции ниже окна «Броня» (helpWord3), решение пользователя
+    const fxs = []
+    for (let i = 0; i < itemFxArr.length; i++) obj[itemFxArr[i][0]] && fxs.push(itemFxArr[i])
+    if (fxs.length) {
+        let names = T(fxs[0][1])
+        for (let i = 1; i < fxs.length; i++) names += ", " + T(fxs[i][1])
+        let ey = y + 545
+        if (obj.relic !== undefined) {
+            ey = y + 404 + itWrap(T(obj.desc), 24, 364).length * 28 + 8
+        } else if (strokeNum > 4) {
+            ey = y + 365 + strokeNum * 35
+        }
+        tempTip.push(text(svgArr[2],x+200,ey,"0pt","50pt","none","2px","#66FF66",T("lib.effect",names),{"id":"itemName","size":32,"font":"baseFont4","anchor":"middle"}))
+        let fxY = y + 270
+        for (let i = 0; i < fxs.length; i++) fxY += effectWord(color,fxs[i],x-16,fxY) + 15
+    }
     obj.abil && obj.rarity > 1 && obj.rarity < 5 && helpWord2(color,obj.abil,x-16,y+255)
     //V110: реликвии — описание (rel.N.desc) рисуется ОТДЕЛЬНЫМ блоком под спрайтом
     //с переносом по строкам. Прежняя одна строка 26px на y+580 у длинного
@@ -439,6 +466,24 @@ function helpWord3(color,stat,x,y) {
     tempTip.push(rect(svgArr[2],x-300,y-250,300,250,color,"4px","black",{"id":"tip","rx":"6px"}))
     tempTip.push(text(svgArr[2],x-150,y-205,"0pt","50pt","none","2px","#CC9900",T(statArr[stat]),{"id":"wordName","size":38,"font":"baseFont4","anchor":"middle"}))
     tempTip.push(nativeHtml(svgArr[2],x-280,y-190,260,280,"none","2px","#CCCCCC",T(superStatArr[stat-5]),{"id":"wordNameText","size":32,"font":"baseFont4","anchor":"middle"}))
+}
+//V161: окошко эффекта предмета слева от тултипа — стиль окна «Броня» (helpWord3):
+//заголовок 38px #CC9900, описание 32px #CCCCCC; вызывается в позиции НИЖЕ окна
+//«Брони» (решение пользователя), несколько эффектов — стопкой с зазором 15px.
+//Высота — по факту переносов описания (паттерн setTip: itWrap + текст-строки):
+//фикс 250px не вмещал длинные описания — текст вылезал за нижнюю рамку.
+//Возвращает высоту окна (для стопки следующих)
+function effectWord(color,fx,x,y) {
+    const rows = itWrap(T(fx[2]), 32, 260)
+    const H = Math.max(250, rows.length * 38 + 66)
+    tempTip.push(rect(svgArr[2],x-300,y,300,H,color,"4px","black",{"id":"tip","rx":"6px"}))
+    tempTip.push(text(svgArr[2],x-150,y+45,"0pt","50pt","none","2px","#CC9900",T(fx[1]),{"id":"wordName","size":38,"font":"baseFont4","anchor":"middle"}))
+    let ry = y + 88
+    for (let i = 0; i < rows.length; i++) {
+        tempTip.push(text(svgArr[2],x-150,ry,"0pt","50pt","none","2px","#CCCCCC",rows[i],{"id":"wordNameText","size":32,"font":"baseFont4","anchor":"middle"}))
+        ry += 38
+    }
+    return H
 }
 function addToSkill(x,y,descFull,color) {
     //MIGRATION: шрифт 40px не влезал во фрейм тултипа способности (репорт) — уменьшен до 32

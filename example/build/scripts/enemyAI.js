@@ -2081,7 +2081,13 @@ export function enemyTick(enemy) {
     // стены и не машет в пустоту: цель всегда достижима и в зоне реального попадания
     if (enemy.state === ENEMY_STATE.CHASE) {
         // V32: в полёте рывка прицел не берётся — атака прервала бы механику полёта
-        if (!enemy.dashFly) enemyTryAttack(enemy)
+        if (!enemy.dashFly) {
+            //V161: культист «Голоса в портала» (cultFight) не даёт герою встать вплотную:
+            //герой рядом — культист отбегает на клетку (32px) от него, после отхода
+            //штатный ИИ атакует; true — этот тик полностью занят отходом
+            if (enemy.cultFight && cultRetreatTick(enemy)) return
+            enemyTryAttack(enemy)
+        }
         if (enemy.state === ENEMY_STATE.ATTACK) return
         // V32 «рывок» нетопыря (stats.dash): периодический триггер у преследователя,
         // видящего героя; пока длится полёт, движение chaseStep полностью заменяется им
@@ -2192,4 +2198,68 @@ function entSpiderTick(enemy) {
         if (!enemy.path || !enemy.path.length) return   //упёрся — повторит попытку
     }
     stepAlongPath(enemy)
+}
+
+// ---------- V161: культист «Голоса в портала» — отход от героя вплотную ----------
+//В бою (cultFight, выбор «НАПАСТЬ») культист не даёт герою встать вплотную: герой
+//рядом (<56px между центрами — порог «рядом» полоски юза cultUseBarTick) — отбегает
+//на 1 клетку (32px) от него по проходимой клетке (кандидаты — 4 соседа, берётся
+//максимально удаляющаяся от героя), кулдауны атак тикают, после отхода штатный ИИ
+//стреляет. Отступать некуда (стены/угол) — стоит и бьёт как раньше. Хук из enemyTick
+//до enemyTryAttack (уход приоритетнее атаки); true — тик ИИ полностью заменён отходом
+function cultRetreatTick(enemy) {
+    const qp = status.questPortal
+    if (!qp || qp.state !== 4) { enemy.cultFight = 0; return false }
+    if (enemy.stop === 1 || enemy.cold) return false
+    const H = curTarget(enemy)
+    if (!H || !H.obj || H.obj.type !== "hero") { enemy._cultRet = null; return false }
+    const ePos = rectPos(enemy.rect)
+    const dx = (H.x + 16) - (ePos[0] + 16)
+    const dy = (H.y + 25) - (ePos[1] + 25)
+    if (!enemy._cultRet) {
+        if (Math.hypot(dx, dy) >= 56) return false
+        const nav = ensureNavMatrix()
+        const walkable = (cx, cy) => !!(nav && nav[cy * navW + cx] === 1)
+        //клетки героев — не кандидаты на отход (иначе в углу единственный «свободный»
+        //сосед — клетка героя, и культист отступил бы В героя)
+        const busy = new Set()
+        for (let i = 0; i < status.players.length; i++) {
+            const P = status.players[i]
+            if (P.obj.type !== "hero") continue
+            busy.add(Math.trunc(P.x / 32) + "," + Math.trunc(P.y / 32))
+        }
+        const mx = ePos[0] + 16
+        const my = ePos[1] + 25
+        let best = null
+        const dirs = [[0, -1], [0, 1], [-1, 0], [1, 0]]
+        for (let k = 0; k < 4; k++) {
+            const sx = dirs[k][0]
+            const sy = dirs[k][1]
+            const nx = Math.trunc((mx + sx * 16) / 32)
+            const ny = Math.trunc((my + sy * 16) / 32)
+            if (!walkable(nx, ny) || busy.has(nx + "," + ny)) continue
+            const d = Math.hypot(dx - sx * 32, dy - sy * 32)
+            if (!best || d > best.d) best = { sx, sy, d }
+        }
+        if (!best) return false   //отступать некуда — стоит и бьёт как раньше
+        enemy._cultRet = { sx: best.sx, sy: best.sy, left: 32 }
+    }
+    const r = enemy._cultRet
+    //клетка впереди перепроверяется каждый тик: стан мог сдвинуть культиста,
+    //и старое направление может упирать в стену — отход прекращаем
+    const nav = ensureNavMatrix()
+    const ax = Math.trunc((ePos[0] + 16 + r.sx) / 32)
+    const ay = Math.trunc((ePos[1] + 25 + r.sy) / 32)
+    if (!(nav && nav[ay * navW + ax] === 1)) {
+        enemy._cultRet = null
+        return true
+    }
+    tickAttackCd(enemy)
+    const mv = Math.min(stepBudget(enemy), r.left)
+    for (let s = 0; s < mv; s++) shiftEnemy(enemy, r.sx, r.sy)
+    r.left -= mv
+    setMovePose(enemy, r.sx > 0 ? 3 : r.sx < 0 ? 2 : r.sy > 0 ? 1 : 0)
+    checkZOrder(enemy)
+    if (r.left <= 0) enemy._cultRet = null
+    return true
 }

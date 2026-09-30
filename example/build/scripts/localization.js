@@ -1164,6 +1164,13 @@ const PAIRS = [
     ["float.flameWeapon", "Пламя!", "Flame!"],
     //V111: метка зачарованного оружия в подсказке
     ["tip.fire", "огненное", "flame"],
+    //V161: квестовые эффекты предметов — строка в тултипе + окошко слева с описанием
+    ["effect.slime.name", "слизь", "slime"],
+    ["effect.slime.desc", "Предмет покрыт живой слизью из Кома слизи. Враги, попавшие по герою, слабеют: максимум их атаки снижается на 1.", "The item is coated in living slime from the Slime Clod. Enemies that hit the hero weaken: their maximum attack drops by 1."],
+    ["effect.grow.name", "рост", "growth"],
+    ["effect.grow.desc", "Предмет напитан силой Древоброда. Пока он надет в слоте тела: +10 к максимуму здоровья героя.", "The item is filled with the Treant's power. While worn in the body slot: +10 to the hero's maximum health."],
+    ["effect.barb.name", "повязка", "headband"],
+    ["effect.barb.desc", "Предмет стянут повязкой варвара. Пока он надет в слоте пояса: +5% к передвижению героя.", "The item is strapped with the barbarian's headband. While worn in the belt slot: +5% to the hero's movement."],
     //V112: окошко «завершённые квесты» в лобби + названия сюжетных квестов
     ["lobby.questsDone", "Завершённые квесты", "Completed quests"],
     ["quest.wolf.title", "Сопроводить Волка", "Accompany the Wolf"],
