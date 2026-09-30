@@ -46,7 +46,7 @@ import { status } from "../scripts/start.js"
 import { T } from "../scripts/localization.js"
 import { data } from "../scripts/data.js"
 import { dataGeneric } from "../scripts/sceneGenerate.js"
-import { checkCollision, playEffect, dropKey, checkExp, reanimateCheck, spikeFlyTick } from "../scripts/damage.js"
+import { checkCollision, playEffect, dropKey, checkExp, reanimateCheck, spikeFlyTick, peacefulEnemy } from "../scripts/damage.js"
 import { svgArr, image, worldImage, spritePos, moveSprite, rectPos, releaseSprite } from "../scripts/svg.js"
 import { checkZOrder } from "../scripts/heroMove.js"
 //V115: кооператив — цель врага, цикл по живым игрокам, контекст
@@ -1228,7 +1228,8 @@ function poisonBurst(enemy) {
     let lengthEnemy = objectValues.length
     for (let i = 0; i < lengthEnemy; i++) {
         let e = objectValues[i]
-        if (e.type !== "enemy" || e === enemy) continue
+        //V160: мирный квестовый NPC рядом с умирающим отравленным врагом яда не получает
+        if (e.type !== "enemy" || e === enemy || peacefulEnemy(e)) continue
         let ePos = rectPos(e.rect)
         let ex = ePos[0] + e.rect._w / 2
         let ey = ePos[1] + e.rect._h / 2
@@ -1282,6 +1283,8 @@ export function damageEnemy(enemy, damage) {
 }
 // отражение атаки аурой-щитом героя
 function checkReflect(enemy) {
+    //V160: мирный квестовый NPC у ауры-отражения героя урон не получает
+    if (peacefulEnemy(enemy)) return
     const r = enemy.rect
     const x1 = r.x.animVal.value
     const y1 = r.y.animVal.value

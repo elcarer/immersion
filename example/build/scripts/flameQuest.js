@@ -195,6 +195,11 @@ export function flameQuestTick() {
 //полоска взаимодействия: герой рядом — растёт полоска (как у культиста); после
 //диалога/перебежки — recharge, снимается выходом героя из зоны (репорт V109)
 function npcUseBarTick(q, e) {
+    //V160 (аудит квестов): полоска только для мирных фаз (1 диалог, 2 погоня). В бою
+    //(«НАПАСТЬ», state 3) герой в ближнем бою постоянно в зоне 56px — бар дорастал до
+    //конца и interact() уводил Огнементя ПЕРЕБЕЖКОЙ посреди боя (или открывал финальный
+    //диалог, если бой шёл в комнате выхода)
+    if (q.state !== 1 && q.state !== 2) return
     const wp = rectPos(e.rect)
     //V117: полоску растит ближайший к Огнементю живой герой
     const HQ = nearestPlayer(wp[0], wp[1])
@@ -498,9 +503,16 @@ export function flameQuestTakePile(el) {
 
 // ---------- смена сцены (del.js) ----------
 export function flameQuestDel() {
-    //бафф «Огненное оружие» жил только до завершения этажа
+    //бафф «Огненное оружие» жил только до завершения этажа. V160 (аудит квестов):
+    //снимается у ВСЕХ игроков — навешивался forAlive обоим (V117), а чистился только
+    //контекстный status.info: в коопе игрок 2 носил бафф на следующие этажи
     const q = status.questFlame
-    if (q && q.floorBuff && status.info) status.info.buffFireT = 0
+    if (q && q.floorBuff) {
+        for (let i = 0; i < status.players.length; i++) {
+            const P = status.players[i]
+            P.info && (P.info.buffFireT = 0)
+        }
+    }
     clearSession()
     status.questFlame = null
 }

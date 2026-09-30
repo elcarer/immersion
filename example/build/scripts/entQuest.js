@@ -178,6 +178,14 @@ function removeNpc(q) {
     const idx = objectValues.indexOf(e)
     idx !== -1 && objectValues.splice(idx, 1)
     releaseSprite(e.img)
+    //V160 (аудит квестов): полоска гаснет ЦЕЛИКОМ везде, где Древоброд исчезает —
+    //уход из комнаты до разговора с недоросшей полоской оставлял её висеть вечно
+    //(тик умирал вместе с questEnt, как у Слаймэна в V159)
+    useBarFill && useBarFill.remove()
+    useBarFill = null
+    useBarBack && useBarBack.remove()
+    useBarBack = null
+    useT = 0
     q.npc = null
 }
 

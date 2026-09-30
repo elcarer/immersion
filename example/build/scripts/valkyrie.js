@@ -11,7 +11,7 @@ import { status } from "../scripts/start.js"
 import { ctxBar,ctxTx } from "../scripts/players.js"
 import { objectValues } from "../scripts/del.js"
 import { svgArr, image, spritePos, moveSprite, releaseSprite, rectPos } from "../scripts/svg.js"
-import { checkCollision } from "../scripts/damage.js"
+import { checkCollision, peacefulEnemy } from "../scripts/damage.js"
 import { damageEnemy } from "../scripts/enemyAI.js"
 import { collision } from "../scripts/collision.js"
 import { data } from "../scripts/data.js"
@@ -175,7 +175,7 @@ function dashTick() {
     const hrPos = rectPos(hr)
     for (let i = 0; i < objectValues.length; i++) {
       const e = objectValues[i]
-      if (e.type !== "enemy" || e.stats.hp <= 0) continue
+      if (e.type !== "enemy" || e.stats.hp <= 0 || peacefulEnemy(e)) continue
       if (!d.hits.has(e.id)) {
         const ePos = rectPos(e.rect)
         if (checkCollision(hrPos[0], ePos[0], hr._w, e.rect._w, hrPos[1], ePos[1], hr._h, e.rect._h)) {
@@ -329,7 +329,7 @@ function whirlTick() {
     //враги
     for (let j = 0; j < objectValues.length && !removed; j++) {
       const e = objectValues[j]
-      if (e.type !== "enemy" || e.stats.hp <= 0) continue
+      if (e.type !== "enemy" || e.stats.hp <= 0 || peacefulEnemy(e)) continue
       if (checkCollision(dx, e.rect.x.animVal.value, 14, e.rect.width.animVal.value, dy, e.rect.y.animVal.value, 32, e.rect.height.animVal.value)) {
         damageEnemy(e, dartDamage(e))
         removeWhirlDart(w, i)
@@ -407,7 +407,7 @@ function dartsTick() {
     let hit = false
     for (let j = 0; j < objectValues.length && !hit; j++) {
       const e = objectValues[j]
-      if (e.type !== "enemy" || e.stats.hp <= 0) continue
+      if (e.type !== "enemy" || e.stats.hp <= 0 || peacefulEnemy(e)) continue
       if (checkCollision(dart.x, e.rect.x.animVal.value, dart.w, e.rect.width.animVal.value, dart.y, e.rect.y.animVal.value, dart.h, e.rect.height.animVal.value)) {
         damageEnemy(e, dartDamage(e))
         releaseSprite(dart.img)
@@ -585,7 +585,8 @@ function justiceStrike(room) {
   if (!info.justiceAbil) return
   for (let i = 0; i < objectValues.length; i++) {
     const e = objectValues[i]
-    if (e.type === "enemy" && e.room === room && Math.random() < (info.justiceChance || 0.25)) { //V42: ур.2 — 40%
+    //V160: мирный квестовый NPC «Высшей справедливостью» не задевается
+    if (e.type === "enemy" && !peacefulEnemy(e) && e.room === room && Math.random() < (info.justiceChance || 0.25)) { //V42: ур.2 — 40%
       damageEnemy(e, 1 + Math.trunc(Math.random() * info.stats[4].dops[0].value1))
       const r = e.rect
       info.justiceFx = info.justiceFx || []
@@ -622,7 +623,7 @@ function shieldKnockback() {
   const matrix = status.matrixLevel
   for (let i = 0; i < objectValues.length; i++) {
     const e = objectValues[i]
-    if (e.type !== "enemy" || e.stats.hp <= 0) continue
+    if (e.type !== "enemy" || e.stats.hp <= 0 || peacefulEnemy(e)) continue
     const r = e.rect
     const cx = r.x.animVal.value + r.width.animVal.value / 2
     const cy = r.y.animVal.value + r.height.animVal.value / 2

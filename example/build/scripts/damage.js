@@ -44,6 +44,17 @@ let dmgSplash9 = []
 let dmgSplash13 = []
 let dmgGrid = new Map()
 let dmgSeen = new Set()
+//V160 (правило пользователя): мирные квестовые NPC — Слаймэн, Древоброд, Хруп,
+//культист «Голоса в портале», мирный Огнементаль — не подвержены атакам И способностям
+//героя, пока с ними не начат бой (флаги *Npc=1; снимаются выбором боя, у Древоброда
+//стоит до конца — боя с ним не бывает). Волк-союзник безопасен и так (findFoe требует
+//noticed/called/боевое состояние). Хелпер один — гварды в attack.js (выбор цели),
+//damage() (снаряды/взмахи/сплэш-зоны 9/13), createSplash, checkReflect, poisonBurst,
+//способностях валькирии и активках.
+function peacefulEnemy(o) {
+    return o.type === "enemy" && (o.slimeNpc === 1 || o.entNpc === 1 ||
+        o.hrupNpc === 1 || o.cultNpc === 1 || o.flameNpc === 1)
+}
 function damage() {
     //V2/V7: один проход по objectValues — собираем списки врагов/снарядов/сплэшей.
     //Раньше был вложенный цикл «враги × весь массив» с чтением href.animVal на каждой паре.
@@ -101,7 +112,7 @@ function damage() {
         let hitList = []
         let bPos = rectPos(rectB)
         candidates.forEach(function(cand) {
-            if (cand.type !== "enemy") return
+            if (cand.type !== "enemy" || peacefulEnemy(cand)) return
             const cPos = rectPos(cand.rect)
             if (checkCollision(cPos[0],bPos[0],
                 cand.rect._w,rectB._w,
@@ -174,7 +185,7 @@ function damage() {
     //сплэш-эффекты: бьют всех врагов в зоне
     for (let i = 0; i < lengthEnemies; i++) {
         let enemy = dmgEnemies[i]
-        if (enemy.type !== "enemy") continue
+        if (enemy.type !== "enemy" || peacefulEnemy(enemy)) continue
         for (let j = 0; j < dmgSplash9.length; j++) {
             let eff = dmgSplash9[j]
             //удаление врага от повторного урона
@@ -477,8 +488,9 @@ function createSplash(enemy,effect,damage,other=0,range=0,selfTo=0,srcName=undef
         const o = DATA.bag[snap[i]]
         if (!o) continue
         //V79: неуязвимость (Циклоп, invulnActive) — сплэш способностей не проходит.
-        //V113: мирный Огнементаль — тоже (квест «Погоня за пламенем»)
-        if (o.type !== "enemy" || (o === enemy && !selfTo) || o.invulnActive || o.flameNpc === 1) continue
+        //V160: мирные квестовые NPC — тоже (правило: атаки/способности до боя мимо;
+        //раньше был только мирный Огнементаль V113)
+        if (o.type !== "enemy" || (o === enemy && !selfTo) || o.invulnActive || peacefulEnemy(o)) continue
         const oPos = rectPos(o.rect)
         if (checkCollision(ePos[0]-range,oPos[0],enemy.rect._w+range*2,o.rect._w,
             ePos[1]-(range-(o.rect._h-32)),oPos[1],
@@ -709,4 +721,4 @@ function playEffect(obj,effect,rectAs=1) {
     }
     return objectValues[objectValues.length - 1].img
 }
-export {damage,checkCollision,playEffect,dropKey,checkExp,createSplash,callAllies,reanimateCheck,relicReflect,spikeFlyTick}
+export {damage,checkCollision,playEffect,dropKey,checkExp,createSplash,callAllies,reanimateCheck,relicReflect,spikeFlyTick,peacefulEnemy}

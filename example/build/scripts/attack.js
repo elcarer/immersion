@@ -1,7 +1,7 @@
 import { status } from "../scripts/start.js"
 import { data } from "../scripts/data.js"
 import { screenPic,objectValues } from "../scripts/del.js"
-import { checkCollision } from "../scripts/damage.js"
+import { checkCollision, peacefulEnemy } from "../scripts/damage.js"
 import { dataGeneric } from "../scripts/sceneGenerate.js"
 import { addAnim } from "../scripts/animPlay.js"
 import { playback,strike } from "../scripts/sound.js"
@@ -113,12 +113,11 @@ function checkEnemy(attack) {
     }
     let len = objectValues.length
     for (let i = 0; i < len; i++) {
-        //V113: мирный Огнементаль (квест «Погоня за пламенем», выбор не сделан) —
-        //не цель для атак героя; после «НАПАСТЬ» flameNpc сбрасывается и он бьётся
-        //V135: то же для мирного Слаймэна (квест «Корм слизи»)
-        if (objectValues[i].type === "enemy" && objectValues[i].flameNpc !== 1 &&
-            objectValues[i].slimeNpc !== 1 && objectValues[i].entNpc !== 1 &&
-            objectValues[i].hrupNpc !== 1) {
+        //V113/V135: мирные Огнементаль/Слаймэн — не цели атак героя. V160 (правило
+        //пользователя): ЕДИНЫЙ хелпер для ВСЕХ мирных квестовых NPC (добавлен культист
+        //«Голоса в портале» — без гварда автоатака V148 убивала его до диалога);
+        //после «НАПАСТЬ» флаг сбрасывается и NPC бьётся
+        if (objectValues[i].type === "enemy" && !peacefulEnemy(objectValues[i])) {
             let rect = objectValues[i].rect
             let x1 = rect.x.animVal.value
             let y1 = rect.y.animVal.value
@@ -143,12 +142,11 @@ function checkEnemy(attack) {
 function checkMagic(attack) {
     let len = objectValues.length
     for (let i = 0; i < len; i++) {
-        //V113: мирный Огнементаль (квест «Погоня за пламенем», выбор не сделан) —
-        //не цель для атак героя; после «НАПАСТЬ» flameNpc сбрасывается и он бьётся
-        //V135: то же для мирного Слаймэна (квест «Корм слизи»)
-        if (objectValues[i].type === "enemy" && objectValues[i].flameNpc !== 1 &&
-            objectValues[i].slimeNpc !== 1 && objectValues[i].entNpc !== 1 &&
-            objectValues[i].hrupNpc !== 1) {
+        //V113/V135: мирные Огнементаль/Слаймэн — не цели атак героя. V160 (правило
+        //пользователя): ЕДИНЫЙ хелпер для ВСЕХ мирных квестовых NPC (добавлен культист
+        //«Голоса в портале» — без гварда автоатака V148 убивала его до диалога);
+        //после «НАПАСТЬ» флаг сбрасывается и NPC бьётся
+        if (objectValues[i].type === "enemy" && !peacefulEnemy(objectValues[i])) {
             let rect = objectValues[i].rect
             let x1 = rect.x.animVal.value
             let y1 = rect.y.animVal.value
