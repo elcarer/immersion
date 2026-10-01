@@ -51,7 +51,7 @@ import { svgArr, image, worldImage, spritePos, moveSprite, rectPos, releaseSprit
 import { checkZOrder } from "../scripts/heroMove.js"
 //V115: кооператив — цель врага, цикл по живым игрокам, контекст
 import { forAlive,setContext } from "../scripts/players.js"
-import { enemyOnTrail } from "../scripts/valkyrie.js"
+import { enemyTrailSlow } from "../scripts/valkyrie.js"
 import { checkRat } from "../scripts/encounters.js"
 import { floatText } from "../scripts/floatText.js"
 //V90: снятие полосы ХП босса при смерти владельца (полоса оставалась после убийства)
@@ -1435,7 +1435,7 @@ function startPatrolLoop(enemy) {
 // открытый этаж (navMatrix), а прицельное позиционирование (блок ниже) — часть
 // атаки и тикает каждый тик, путь не трогает.
 function chaseStep(enemy) {
-    if (enemyOnTrail(enemy) && status.time % 5 === 0) return
+    if (enemyTrailSlow(enemy)) return
     if (enemy.cold) {
         enemy.cold--
         return
@@ -1556,7 +1556,7 @@ function chaseStep(enemy) {
 
 // ---------- шаг по пути (1px/тик с частотой 12/speed) ----------
 function stepAlongPath(enemy) {
-    if (enemyOnTrail(enemy) && status.time % 5 === 0) return // вихревой след валькирии: −20%
+    if (enemyTrailSlow(enemy)) return // вихревой след валькирии: −40% (V167)
     if (enemy.cold) {
         enemy.cold--
         return
@@ -1812,7 +1812,7 @@ function buildFleePath(enemy, pivot) {
 // тик раненого: атака проверяется каждый тик (п.1 ТЗ — огрызается и на отходе),
 // движение — по фазе flee/sneak; героя нет — обычный патруль
 function fleeTick(enemy, sees) {
-    if (enemyOnTrail(enemy) && status.time % 5 === 0) return
+    if (enemyTrailSlow(enemy)) return
     if (enemy.cold) {
         enemy.cold--
         return

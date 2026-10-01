@@ -216,9 +216,10 @@ function dashTick() {
   if (d.dist <= 0) endDash()
 }
 function dashDamage() {
-  //1 + 1 за каждые 10 Подвижности (Подвижность — % из value2)
+  //1 + 1 за каждые 5 Подвижности (Подвижность — % из value2). V167 (поправка юзера):
+  //скейл урона от Подвижности вдвое эффективнее (было 1 за каждые 10)
   const mobility = parseInt(status.info.stats[3].dops[0].value2.slice(0, -1))
-  return 1 + Math.trunc(mobility / 10)
+  return 1 + Math.trunc(mobility / 5)
 }
 function endDash() {
   const info = status.info
@@ -439,7 +440,8 @@ function trailsTick() {
     }
   }
 }
-//враг стоит на следе? (замедление 20% — враг пропускает каждый 5-й свой тик движения)
+//враг стоит на следе? (V167 (поправка юзера): замедление 40% — враг пропускает 2 из 5
+//тиков движения, было 20% — 1 из 5; пропуск 2 тиков размазан по циклу status.time%5)
 function enemyOnTrail(enemy) {
   const info = status.info
   if (!info.trails || !info.trails.length) return false
@@ -450,6 +452,12 @@ function enemyOnTrail(enemy) {
     if (info.trails[i].x === cx && info.trails[i].y === cy) return true
   }
   return false
+}
+//единая точка «стоит на следе И тик движения пропускается» — все места движения врага
+//(chaseStep/stepAlongPath/fleeTick в enemyAI) обязаны читать только её: правка % замедления
+//меняется в ОДНОМ месте. Паттерн пропуска по циклу 5 тиков: S,M,M,S,M (тики 0 и 2)
+function enemyTrailSlow(enemy) {
+  return enemyOnTrail(enemy) && (status.time % 5 === 0 || status.time % 5 === 2)
 }
 
 //==================== КРЫЛЬЯ / АУРА ====================
@@ -640,6 +648,12 @@ function shieldKnockback() {
       moveSprite(e.img, tx, ty)
       e.xCell = cellX
       e.yCell = cellY
+      //V167 (поправка юзера): отброшенный щитом враг получает урон от допстата
+      //«Контрмагия» героя — 1 урона за каждые 3 значения (число % с куклы, как
+      //Подвижность в dashDamage). Урон только у РЕАЛЬНО отброшенных (в стену не
+      //затолкнули — не отброшен). При 0 урона damageEnemy не зовём
+      const cmDmg = Math.trunc(parseInt(info.stats[4].dops[2].value2.slice(0, -1)) / 3)
+      cmDmg > 0 && damageEnemy(e, cmDmg)
     }
   }
 }
@@ -689,4 +703,4 @@ function resetValkyrie() {
 function dashInvulnActive() {
   return (status.info.dashInvuln || 0) > 0
 }
-export { valkyrieTick, dashPress, updateRazgon, consumeImpulse, battleDanceHit, enemyOnTrail, justiceStrike, shieldKnockback, auraMissEnd, auraDodgeHeal, wingsActive, dashInvulnActive, resetValkyrie, grantDashShield }
+export { valkyrieTick, dashPress, updateRazgon, consumeImpulse, battleDanceHit, enemyOnTrail, enemyTrailSlow, justiceStrike, shieldKnockback, auraMissEnd, auraDodgeHeal, wingsActive, dashInvulnActive, resetValkyrie, grantDashShield }
