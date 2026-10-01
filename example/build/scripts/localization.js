@@ -1233,7 +1233,7 @@ const PAIRS = [
 ["obj.24.name", "Алтарь-наковальня", "Anvil Altar"],
 ["obj.24.desc", "Перековывает один основной стат предмета: 10 золота за каждую единицу стата, новый стат выбирается случайно из остальных. Предмет остаётся у героя.", "Reforges one of an item's primary stats: 10 gold per stat point, with the new stat chosen at random from the others. The item stays with the hero."],
 ["anvil.title", "АЛТАРЬ-НАКОВОЛЬНЯ", "ANVIL ALTAR"],
-["anvil.hint", "Выберите предмет: один его основной стат заменится на случайный другой той же величины (10 золота за единицу).", "Pick an item: one of its primary stats will be replaced by a random different one of the same value (10 gold per point)."],
+["anvil.hint", "Выберите предмет: один его основной стат заменится на случайный другой той же величины (5 золота за единицу).", "Pick an item: one of its primary stats will be replaced by a random different one of the same value (5 gold per point)."],
 ["anvil.reforge", "ПЕРЕКОВАТЬ ({0})", "REFORGE ({0})"],
 ["anvil.nogold", "НЕ ХВАТАЕТ ЗОЛОТА ({0})", "NOT ENOUGH GOLD ({0})"],
 ["anvil.will", "{0} +{1} → случайный другой стат той же величины", "{0} +{1} → random different stat of the same value"],

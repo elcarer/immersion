@@ -45,9 +45,9 @@ function countDopStats() {
             (status.info.stats[i].dops[j].value1 = statValue1(i,j))&&
             //V110 «Вечный изумруд»: и база 100% мощи крита тоже ушла в ХП — 0%.
             //V163 «критичность»: итог умножается на (1 + 0.05·предметов) — 150% → 157.5%;
-            //дробные десятые округляются (двоичные хвосты 150×1.05 = 157.49999…), бросок
+            //V166 (поправка юзера): число % мощи крита округляется до ЦЕЛЫХ, бросок
             //крита в damage.js читает тот же value2 через parseFloat — показ и урон совпадают
-            (status.info.stats[i].dops[j].value2 = (emeraldOn ? 0 : Math.round((100+2*countLog(status.info.stats[i].dops[j].value1))*critPowerMult()*10)/10)+"%")
+            (status.info.stats[i].dops[j].value2 = (emeraldOn ? 0 : Math.round((100+2*countLog(status.info.stats[i].dops[j].value1))*critPowerMult()))+"%")
             i===1&&j===2&&
             (status.info.stats[i].dops[j].value1 = statValue1(i,j))&&
             (status.info.stats[i].dops[j].value2 = (countLog(Math.trunc(status.info.stats[i].dops[j].value1/2)))+"%")

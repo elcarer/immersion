@@ -1088,7 +1088,12 @@ function pathPoints(d) {
         const lam = (x1p * x1p) / (rx * rx) + (y1p * y1p) / (ry * ry)
         if (lam > 1) { const s = Math.sqrt(lam); rx *= s; ry *= s }
         const num0 = rx * rx * ry * ry - rx * rx * y1p * y1p - ry * ry * x1p * x1p
-        const co = (largeArc !== sweep ? 1 : -1) * Math.sqrt(Math.max(0, num0 / (rx * rx * ry * ry)))
+        // V166 (репорт юзера: «затенение кулдауна не покрывает низ иконки»): знаменатель
+        // под корнем — по W3C F.6.5.4 (rx²·y1p² + ry²·x1p²), НЕ rx²·ry²: прежняя формула
+        // занижала |co| (для хорды 90° — 0.707 вместо 1), центр дуги съезжал с исходного,
+        // и развёрнутые точки уходили вне круга — маска-«пирог» затеняла произвольную
+        // часть иконки (у full-circle двухдужного пути — только первая половина)
+        const co = (largeArc !== sweep ? 1 : -1) * Math.sqrt(Math.max(0, num0 / (rx * rx * y1p * y1p + ry * ry * x1p * x1p)))
         const cxp = co * rx * y1p / ry
         const cyp = -co * rx * x1p / ry
         const ccx = cosP * cxp - sinP * cyp + (x1 + x2) / 2
@@ -1595,13 +1600,20 @@ function getSectorPath(angleDeg,cx,cy,r,clockwise = false) {
     if (angleDeg <= 0) {
         return ''; // ничего не рисуем, затемнение полностью открыто
     }
-    // Угол в радианах (0 – верх, по часовой)
-    const rad = (angleDeg - 90) * Math.PI / 180;
-    const x = cx + r * Math.cos(rad);
-    const y = cy + r * Math.sin(rad);
+    //V166 (репорт юзера: «затенение не покрывает иконку в нижней части»): пирог
+    //закреплён у 12 часов и охватывает РОВНО angleDeg, конечная точка идёт В СТОРОНУ
+    //sweep (по часовой при clockwise, против — иначе); largeArc = 1 для углов > 180.
+    //Прежний код считал конечную точку всегда по часовой, а largeArc был инвертирован
+    //(`angleDeg > 180 ? 0 : 1` + повторная инверсия для clockwise): кулдауны тикают с
+    //clockwise=false (sweep=0), и дуга между «12 часов» и по-часовой-точкой в направлении
+    //против часовой существует только вокруг СМЕЩЁННОГО центра (W3C F.6.5) — маска
+    //рисовала мусор, не покрывающий часть иконки (у длительностей с clockwise=true
+    //двойная инверсия случайно компенсировалась — они выглядели верно)
+    const rad = angleDeg * Math.PI / 180;
+    const x = clockwise ? cx + r * Math.sin(rad) : cx - r * Math.sin(rad);
+    const y = cy - r * Math.cos(rad);
     // Флаг большой дуги (1 если угол > 180 градусов)
-    let largeArc = angleDeg > 180 ? 0 : 1;
-    clockwise ? largeArc = (largeArc == 0 ? 1 : 0) : false;
+    const largeArc = angleDeg > 180 ? 1 : 0;
     // sweep-флаг: 1 = по часовой, 0 = против часовой.
     const sweep = clockwise ? 1 : 0;
     return `M ${cx} ${cy} L ${cx} ${cy - r} A ${r} ${r} 0 ${largeArc} ${sweep} ${x} ${y} Z`;

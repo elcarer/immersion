@@ -17,7 +17,7 @@ import { playback,strike,musicDuck } from "../scripts/sound.js"
 //БЕЗ перетаскивания — только ячейки, тултипы и выделение. Игра на паузе (pause=1, panels=13).
 //Выбирается ОДИН предмет, у которого есть ОСНОВНОЙ стат (stat 0-4: Сила/Ловкость/Здоровье/
 //Скорость/Мудрость — statCount > 0). Реликвии (stat нет), пояса (stat 5) и щиты/книги
-//(stat 6) не перековываются. Цена = 10 золота за КАЖДУЮ единицу стата (решение пользователя);
+//(stat 6) не перековываются. Цена = 5 золота за КАЖДУЮ единицу стата (решение пользователя; V166 — было 10);
 //стат заменяется на СЛУЧАЙНЫЙ из остальных четырёх той же величины (statCount сохраняется).
 //Перековка гасит объект (obj[7]=1, спрайт 103d.png); сет «Исследователь пустоты» (3 надетых)
 //с шансом 10% оставляет его переиспользуемым (obj[11]=1, rollVoidReuse) — как у алхимии.
@@ -116,7 +116,7 @@ function toggleAnvilSelect(e,src,idx,item,cx,cy) {
 }
 
 //кнопка перековки: видна при выделенном предмете; активна при достаточном золоте —
-//цена 10 золота за каждую единицу стата. Неактивная называет причину текстом
+//цена 5 золота за каждую единицу стата (V166, было 10). Неактивная называет причину текстом
 //V155: строка выбранного стата — «Сила +4» + куда заменится, над кнопкой
 function refreshReforgeButton() {
     let length = reforgeBtn.length
@@ -126,7 +126,7 @@ function refreshReforgeButton() {
     reforgeBtn = []
     if (!anvilSelect) return
     let item = anvilSelect.item
-    let cost = 10 * item.statCount
+    let cost = 5 * item.statCount
     let can = status.info.gold >= cost
     reforgeBtn.push(text(svgArr[2],1055,948,"0pt","50pt","black","2px",`rgb(204, 153, 102)`,T("anvil.will",T(statKey(item.stat)),item.statCount),{"id":"anvilWillText","size":28,"font":"baseFont4","anchor":"middle"}))
     reforgeBtn.push(image(svgArr[2],865,980,380,57,"./images/UI/panels/buttons/button.png",can ? {"glow":1,"func":reforgeSelected} : {"opacity":"0.25"}))
@@ -141,7 +141,7 @@ function statKey(stat) {
 function reforgeSelected() {
     if (!anvilSelect || !anvilObj) return
     let item = anvilSelect.item
-    let cost = 10 * item.statCount
+    let cost = 5 * item.statCount
     if (status.info.gold < cost) return
     //замена/оплата/гашение — в try/finally: меню обязано закрыться при любом сбое
     try {
