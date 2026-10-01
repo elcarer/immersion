@@ -1068,9 +1068,11 @@ function redrawCircle(shim) {
     }
 }
 // парсер d: M/L/H/V/Z + A/a (эллиптическая дуга — радиальные секторы кулдаунов
-// способностей: getSectorPath в activeSkills). Дуга сэмплируется полилинией
-function pathPoints(d) {
-    const pts = []
+// способностей: getSectorPath в activeSkills). Дуга сэмплируется полилинией.
+//V169: возвращает МАССИВ ПОДПУТЕЙ — каждый M начинает новый контур (SVG-семантика)
+function pathSubpaths(d) {
+    const subs = []
+    let pts = []
     const tokens = String(d).match(/[MLHVZAmlhvza]|[-+]?[\d.]+(?:e[-+]?\d+)?/g) || []
     let i = 0, cx = 0, cy = 0, cmd = ""
     let sx = 0, sy = 0
@@ -1125,7 +1127,16 @@ function pathPoints(d) {
         switch (cmd.toLowerCase()) {
             case "m": case "l": {
                 const x = +tokens[i] + (rel ? cx : 0), y = +tokens[i + 1] + (rel ? cy : 0)
-                if (cmd.toLowerCase() === "m" && pts.length === 0) { sx = x; sy = y }
+                if (cmd.toLowerCase() === "m") {
+                    //V169 (репорт юзера: пиксельный переход rectShadow выглядел «взрывом
+                    //из центра»): все точки d раньше шли в один плоский массив, т.е. 300
+                    //квадратов перехода рисовались ОДНИМ самопересекающимся полигоном —
+                    //«молнии» через экран, плотные в середине случайного блуждания.
+                    //Каждый M начинает новый контур, Z замыкает СВОЙ подпуть (раньше —
+                    //старт первого), рисование по подпутям — в redrawPath
+                    if (pts.length > 0) { subs.push(pts); pts = [] }
+                    sx = x; sy = y
+                }
                 pts.push(x, y); cx = x; cy = y; i += 2
                 // неявные L после M
                 if (cmd === "M" || cmd === "m") cmd = rel ? "l" : "L"
@@ -1141,18 +1152,34 @@ function pathPoints(d) {
             default: i++
         }
     }
-    return pts
+    if (pts.length > 0) subs.push(pts)
+    return subs
+}
+// плоское перечисление точек всех подпутей — для одно-подпутевых d (секторы
+// кулдаунов, нативные полигоны) поведение в точности прежнее
+function pathPoints(d) {
+    const out = []
+    const subs = pathSubpaths(d)
+    for (let s = 0; s < subs.length; s++) {
+        for (let k = 0; k < subs[s].length; k++) out.push(subs[s][k])
+    }
+    return out
 }
 function redrawPath(shim) {
     const g = shim.node
-    const pts = pathPoints(shim.attrs.d)
+    const subs = pathSubpaths(shim.attrs.d)
     const fill = shim.attrs.fill !== undefined ? shim.attrs.fill : "rgba(0, 0, 0, 0.65)"
     const stroke = shim.attrs.stroke, sw = num(shim.attrs["stroke-width"])
     g.clear()
-    if (pts.length >= 6) {
-        const p = g.poly(pts)
-        if (fill && fill !== "none") p.fill({ color: fill })
-        if (stroke && stroke !== "none" && sw > 0) p.stroke({ width: sw, color: stroke })
+    //V169: каждый подпуть — отдельный полигон (контуры настоящего SVG); один
+    //общий полигон из всех точек превращал многоугольные d в «молнии»
+    for (let s = 0; s < subs.length; s++) {
+        const pts = subs[s]
+        if (pts.length >= 6) {
+            const p = g.poly(pts)
+            if (fill && fill !== "none") p.fill({ color: fill })
+            if (stroke && stroke !== "none" && sw > 0) p.stroke({ width: sw, color: stroke })
+        }
     }
 }
 
