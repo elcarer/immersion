@@ -1,7 +1,7 @@
 import { status } from "../scripts/start.js"
 import { T } from "../scripts/localization.js"
 import { svgArr,image,picById,text,rect,uiRightEdge,uiBottomEdge } from "../scripts/svg.js"
-import { tip,tipDel,rarityColor,itemFrameOn,itemGlowOn } from "../scripts/tip.js"
+import { tip,tipDel,rarityColor,itemFrameOn,itemGlowOn,tipHoverStart } from "../scripts/tip.js"
 import { cellPickArr } from "../scripts/doll.js"
 //V54: объединение трёх предметов одного качества — снятие с куклы только через unEquip
 //V67: «Вечный сапфир» — состав inv[0] изменился (удаление/новый предмет), копия пересчитывается
@@ -50,7 +50,7 @@ function openAlchemy(obj) {
             //V95: рамку/свечение можно отключить в Настройках
             let rc = rarityColor(objShow.rarity)
             itemFrameOn() && alchemyTemp.push(rect(svgArr[2],cx,cy,"128px","128px",rc,"2px","none",{"rx":"3px"}))
-            let aDollOpts = {"id":"aDe"+i,"func":e => toggleAlchemySelect(e,"doll",i,item,cx,cy),"funcShow":e => {e.buttons !== 1 ? tip(e,objShow) : tipDel()},"funcShowOut":tipDel,"item":item}
+            let aDollOpts = {"id":"aDe"+i,"func":e => toggleAlchemySelect(e,"doll",i,item,cx,cy),"funcShow":e => {e.buttons !== 1 ? tipHoverStart(e, ev => tip(ev,objShow)) : tipDel()},"funcShowOut":tipDel,"item":item}
             itemGlowOn() && (aDollOpts.blur = "filter: drop-shadow(0 0 4px "+rc+")")
             alchemyTemp.push(image(svgArr[2],cx,cy,"128px","128px",item.img,aDollOpts))
         } else {
@@ -80,7 +80,7 @@ function openAlchemy(obj) {
                 //V95: рамку/свечение можно отключить в Настройках
                 let rc = rarityColor(objShow.rarity)
                 itemFrameOn() && alchemyTemp.push(rect(svgArr[2],cx,cy,128,128,rc,"2px","none",{"rx":"3px"}))
-                let aInvOpts = {"id":"aIe"+idx,"func":e => toggleAlchemySelect(e,"inv",idx,item,cx,cy),"funcShow":e => {e.buttons !== 1 ? tip(e,objShow) : tipDel()},"funcShowOut":tipDel,"item":item}
+                let aInvOpts = {"id":"aIe"+idx,"func":e => toggleAlchemySelect(e,"inv",idx,item,cx,cy),"funcShow":e => {e.buttons !== 1 ? tipHoverStart(e, ev => tip(ev,objShow)) : tipDel()},"funcShowOut":tipDel,"item":item}
                 itemGlowOn() && (aInvOpts.blur = "filter: drop-shadow(0 0 4px "+rc+")")
                 alchemyTemp.push(image(svgArr[2],cx,cy,128,128,item.img,aInvOpts))
             }

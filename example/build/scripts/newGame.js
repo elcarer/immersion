@@ -518,6 +518,26 @@ function createWalls(newData) {
         //roomsArr[0]) ловушек не ставим вообще — только во всех последующих
         i > 0 && configTrapObject(roomsArr[i],newData)
     }
+    //V165 (репорт юзера: «порталы пропали с этажей при перепрохождении, возможно плохой
+    //рандом»): портал (18) кладёт ТОЛЬКО общий пул объектов в комнатах с врагами — при
+    //невыдаче рандомом ни в одной комнате configPortal молча выходит, и этаж остаётся
+    //без бонус-связки портал/рычаг. Гарантия: портала на этаже нет — ставим его
+    //placeRoomObject'ом в случайную враг-комнату (та же свободная клетка, что при
+    //выпадении из пула); перебираем перемешанный список — одна комната отказала,
+    //пробуем следующую. 4 этаж («Пустота») выше уже вернулся — порталов там нет по дизайну
+    {
+        const lvNow = newData.scenes[status.levelFloor]
+        let hasPortal = false
+        for (let io = 0; io < lvNow.objects.length; io++) lvNow.objects[io][2] === 18 && (hasPortal = true)
+        if (!hasPortal) {
+            const en = []
+            for (let i = 0; i < roomsArr.length; i++) Math.trunc(roomsArr[i][1]/40) > 1 && en.push(roomsArr[i])
+            en.sort(() => Math.random() - 0.5)
+            for (let i = 0; i < en.length; i++) {
+                if (placeRoomObject(lvNow, en[i], 18, 0)) break
+            }
+        }
+    }
     //V43: столбы призыва босса — только на 3 этаже; 4 разные комнаты, кроме стартовой
     //(finPillars.js). roomsArr к этому моменту собран полностью.
     status.levelFloor === 2 && configFinPillars(newData.scenes[status.levelFloor])

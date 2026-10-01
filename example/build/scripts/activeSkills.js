@@ -21,7 +21,7 @@ import { hasRelic, abilCopyBonus } from "../scripts/relics.js"
 //V67: общий щит неуязвимости (как после рывка Валькирии)
 import { grantDashShield } from "../scripts/valkyrie.js"
 //E-19: подсказка на иконках активных способностей (та же, что в дереве способностей)
-import { tip,tipDel } from "../scripts/tip.js"
+import { tip,tipDel,tipHoverStart } from "../scripts/tip.js"
 //E-22: телепорт — снап камеры по фактическим половинам окна зума; открытие посадки
 //через checkNewRoom (комнаты/коридор вокруг точки высадки рисуются сразу)
 import { worldViewW, worldViewH } from "../scripts/zoomFx.js"
@@ -55,9 +55,11 @@ function activeSkills() {
         let yUp = 0
         i >= 5 && (yUp = 110)
         let xIcon = 960 + bx - 268 + (i >= 5 ? i - 5 : i) * 110
-        let yIcon = 806 - yUp // нижний ряд вплотную над lvlBack полосок (910)
+        //V165 (поправка юзера): ряд способностей и всё сопутствующее (затенение кулдаунов —
+        //сектор-маска и тёмная копия считаются от yIcon) на 30 пикселей НИЖЕ — у всех игроков
+        let yIcon = 836 - yUp // нижний ряд над lvlBack полосок (910)
         const ic = image(svgArr[2],xIcon,yIcon,96,96,sk.img,
-            {"funcShow":e => tip(e,sk),"funcShowOut":tipDel})
+            {"funcShow":e => tipHoverStart(e, ev => tip(ev,sk)),"funcShowOut":tipDel})
         activeSkillsTemp.push(ic)
         //R4.4: нативный сектор (Graphics) вместо path()+clipPath. V110: радиус 46 —
         //вписанная в иконку 96×96 окружность. V122 (репорт юзера: «круг затемнения
@@ -455,4 +457,4 @@ function useSkill(skill) {
     //автокасты (checkBuffs), и срабатывающие по событию реакции (казнь/противодействие)
     hasRelic(1) && grantDashShield()
 }
-export {activeSkills,activeSkillsCD,useSkill,activeSkillsDel}
+export {activeSkills,activeSkillsCD,useSkill,activeSkillsDel,activeSkillsTemp}

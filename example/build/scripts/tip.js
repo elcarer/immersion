@@ -7,6 +7,45 @@ import { SETS,itemSet,isSetItem,setCount } from "../scripts/sets.js"
 import { T,itemName } from "../scripts/localization.js"
 
 let tempTip = []
+//V165 (репорт юзера: «информационные окна перекрывают события мыши, не позволяя
+//кликнуть на предмет в инвентаре»): КАЖДЫЙ узел тултипа принудительно прозрачен
+//для мыши — клики обязаны проваливаться сквозь окно на предмет/ячейку под ним.
+//Раньше полагались на отсутствие обработчиков (eventMode none/passive по умолчанию),
+//но у пуловых текстов и переиспользуемых нод режим мог сохраняться прежним, а
+//синтетический hitTestUI бэкенда опирается на _interactive, а не на eventMode.
+//Двойная гарантия: eventMode="none" на Pixi-узле (федеративный хит-тест) и метка
+//_noHit (hitTestUI её пропускает)
+function tpush(node) {
+    node.node && (node.node.eventMode = "none")
+    node._noHit = 1
+    tempTip.push(node)
+    return node
+}
+//V165 (поправка юзера): инфо-окно показывается не сразу при наведении, а через 0.5с
+//УДЕРЖАНИЯ курсора на предмете — проведение курсором по ряду предметов не выбрасывает
+//окна. Отмена: уход с предмета (funcShowOut → tipDel → cancel), клик (buttons===1),
+//перерисовка панели (шим-цель умер — проверка isConnected при срабатывании)
+const TIP_HOVER_DELAY = 500
+let tipHoverTimer = null
+let tipHoverPending = null
+function tipHoverStart(e, showFn) {
+    tipHoverCancel()
+    if (e.buttons === 1) { tipDel(); return }
+    tipHoverPending = { e, showFn }
+    tipHoverTimer = setTimeout(() => {
+        tipHoverTimer = null
+        const p = tipHoverPending
+        tipHoverPending = null
+        if (!p) return
+        const t = p.e.target
+        if (!t || t._dead || t.isConnected === false) return
+        p.showFn(p.e)
+    }, TIP_HOVER_DELAY)
+}
+function tipHoverCancel() {
+    if (tipHoverTimer) { clearTimeout(tipHoverTimer); tipHoverTimer = null }
+    tipHoverPending = null
+}
 //V58: подписи статов/допов/их описаний — КЛЮЧИ локализации (вместо русских литералов).
 //stat 5/6 («Ячейки», «Броня») — отдельные ключи ui.stat.*; слова допов общие для классов —
 //берутся из строки допов класса 0 (слова во всех классах одинаковые)
@@ -111,17 +150,17 @@ const TIP_TITLE_W = 364    //внутренняя ширина окна 400 − 
 function tipTitle(x,y,color,name,id) {
     const s = String(name)
     if (s.length <= TIP_TITLE_MAX) {
-        tempTip.push(text(svgArr[2],x,y,"0pt","50pt","none","2px",color,s,{"id":id,"size":38,"font":"baseFont4","anchor":"middle"}))
+        tpush(text(svgArr[2],x,y,"0pt","50pt","none","2px",color,s,{"id":id,"size":38,"font":"baseFont4","anchor":"middle"}))
         return
     }
     const parts = splitTitleBalanced(s)
     let size = 30
     while (size > 22 && parts.some(p => itMeasure(p,size) > TIP_TITLE_W)) size -= 2
     if (parts.length === 1) {
-        tempTip.push(text(svgArr[2],x,y,"0pt","50pt","none","2px",color,parts[0],{"id":id,"size":size,"font":"baseFont4","anchor":"middle"}))
+        tpush(text(svgArr[2],x,y,"0pt","50pt","none","2px",color,parts[0],{"id":id,"size":size,"font":"baseFont4","anchor":"middle"}))
     } else {
-        tempTip.push(text(svgArr[2],x,y-15,"0pt","50pt","none","2px",color,parts[0],{"id":id,"size":size,"font":"baseFont4","anchor":"middle"}))
-        tempTip.push(text(svgArr[2],x,y+15,"0pt","50pt","none","2px",color,parts[1],{"id":id,"size":size,"font":"baseFont4","anchor":"middle"}))
+        tpush(text(svgArr[2],x,y-15,"0pt","50pt","none","2px",color,parts[0],{"id":id,"size":size,"font":"baseFont4","anchor":"middle"}))
+        tpush(text(svgArr[2],x,y+15,"0pt","50pt","none","2px",color,parts[1],{"id":id,"size":size,"font":"baseFont4","anchor":"middle"}))
     }
 }
 //деление названия на две части по словам с минимальной разницей длин (одно слово — без деления)
@@ -164,29 +203,29 @@ function showItemTip(obj) {
     const H = 94 - 8 + rowTitles.length * 32 + 4 + rows.length * 28 + 8 + rowDesc.length * 24 + 16
     const X = 1920 - IT_W - 12 //отступы 12px от правого и нижнего краёв viewBox 1920×1080
     const Y = 1080 - H - 12
-    tempTip.push(rect(svgArr[2], X, Y, IT_W, H, color, "3px", "black", {"id":"itemDropTip","rx":"5px"}))
-    tempTip.push(image(svgArr[2], X + (IT_W - 56) / 2, Y + 8, 56, 56, obj.img, {"blur":"filter: drop-shadow(0 0 4px "+color+")"}))
+    tpush(rect(svgArr[2], X, Y, IT_W, H, color, "3px", "black", {"id":"itemDropTip","rx":"5px"}))
+    tpush(image(svgArr[2], X + (IT_W - 56) / 2, Y + 8, 56, 56, obj.img, {"blur":"filter: drop-shadow(0 0 4px "+color+")"}))
     //V111: оверлей пламени на иконке огненного оружия (карточка поднятого предмета)
-    obj.fire && tempTip.push(image(svgArr[2], X + (IT_W - 56) / 2, Y + 8, 56, 56, "./images/effects/flameWeapon.png", {}))
+    obj.fire && tpush(image(svgArr[2], X + (IT_W - 56) / 2, Y + 8, 56, 56, "./images/effects/flameWeapon.png", {}))
     //V133: оверлей слизи на иконке предмета с эффектом «слизь» (карточка поднятого предмета)
-    obj.slime && tempTip.push(image(svgArr[2], X + (IT_W - 56) / 2, Y + 8, 56, 56, "./images/effects/slimeShield.png", {}))
+    obj.slime && tpush(image(svgArr[2], X + (IT_W - 56) / 2, Y + 8, 56, 56, "./images/effects/slimeShield.png", {}))
     //V138: оверлей роста на иконке предмета с эффектом «рост» (карточка поднятого предмета)
-    obj.grow && tempTip.push(image(svgArr[2], X + (IT_W - 56) / 2, Y + 8, 56, 56, "./images/effects/plantGrow.png", {}))
+    obj.grow && tpush(image(svgArr[2], X + (IT_W - 56) / 2, Y + 8, 56, 56, "./images/effects/plantGrow.png", {}))
     //V140: оверлей «повязки» на иконке (инвентарная ячейка)
-    obj.barb && tempTip.push(image(svgArr[2], X + (IT_W - 56) / 2, Y + 8, 56, 56, "./images/effects/barbTrue.png", {}))
+    obj.barb && tpush(image(svgArr[2], X + (IT_W - 56) / 2, Y + 8, 56, 56, "./images/effects/barbTrue.png", {}))
     let cy = Y + 94
     for (let i = 0; i < rowTitles.length; i++) {
-        tempTip.push(text(svgArr[2], X + IT_W / 2, cy, "0pt","50pt","none","1px", color, rowTitles[i], {"id":"itemName","size":IT_F_TITLE,"font":"baseFont4","anchor":"middle"}))
+        tpush(text(svgArr[2], X + IT_W / 2, cy, "0pt","50pt","none","1px", color, rowTitles[i], {"id":"itemName","size":IT_F_TITLE,"font":"baseFont4","anchor":"middle"}))
         cy += 32
     }
     cy += 4
     for (let i = 0; i < rows.length; i++) {
-        tempTip.push(text(svgArr[2], X + IT_W / 2, cy, "0pt","50pt","none","1px", rows[i][0], rows[i][1], {"id":"itemName","size":IT_F_ROW,"font":"baseFont4","anchor":"middle"}))
+        tpush(text(svgArr[2], X + IT_W / 2, cy, "0pt","50pt","none","1px", rows[i][0], rows[i][1], {"id":"itemName","size":IT_F_ROW,"font":"baseFont4","anchor":"middle"}))
         cy += 28
     }
     cy += 8
     for (let i = 0; i < rowDesc.length; i++) {
-        tempTip.push(text(svgArr[2], X + IT_W / 2, cy, "0pt","50pt","none","1px", color, rowDesc[i], {"id":"itemName","size":IT_F_DESC,"font":"baseFont4","anchor":"middle"}))
+        tpush(text(svgArr[2], X + IT_W / 2, cy, "0pt","50pt","none","1px", color, rowDesc[i], {"id":"itemName","size":IT_F_DESC,"font":"baseFont4","anchor":"middle"}))
         cy += 24
     }
     itemTipLeft = ITEM_TIP_TICKS
@@ -206,51 +245,51 @@ function tip (e,obj) {
     //V53: у идентифицированной легендарки под основным окном будет окошко сета — кламп Y жёстче
     const [x,y] = tipCoords(e, isSetItem(obj) ? 1 : 0)
     const color = rarityColor(obj.rarity)
-    tempTip.push(rect(svgArr[2],x,y,400,600,color,"4px","black",{"id":"tip","rx":"6px"}))
+    tpush(rect(svgArr[2],x,y,400,600,color,"4px","black",{"id":"tip","rx":"6px"}))
     //V60: длинное название — меньше шрифт и до двух строк (см. tipTitle)
     tipTitle(x+200,y+45,color,itemName(obj),"itemName")
-    tempTip.push(rect(svgArr[2],x+71,y+66,258,258,color,"2px","black",{"id":"tip","rx":"6px"}))
-    tempTip.push(image(svgArr[2],x+72,y+67,256,256,obj.img,{"blur":'filter: drop-shadow(0 0 4px '+color+')'}))
+    tpush(rect(svgArr[2],x+71,y+66,258,258,color,"2px","black",{"id":"tip","rx":"6px"}))
+    tpush(image(svgArr[2],x+72,y+67,256,256,obj.img,{"blur":'filter: drop-shadow(0 0 4px '+color+')'}))
     //V111: огненное оружие — оверлей пламени поверх иконки (подсказки/инвентарь/кукла)
-    obj.fire && tempTip.push(image(svgArr[2],x+72,y+67,256,256,"./images/effects/flameWeapon.png",{}))
+    obj.fire && tpush(image(svgArr[2],x+72,y+67,256,256,"./images/effects/flameWeapon.png",{}))
     //V133: эффект «слизь» — оверлей слизи поверх иконки (подсказки/инвентарь/кукла)
-    obj.slime && tempTip.push(image(svgArr[2],x+72,y+67,256,256,"./images/effects/slimeShield.png",{}))
+    obj.slime && tpush(image(svgArr[2],x+72,y+67,256,256,"./images/effects/slimeShield.png",{}))
     //V138: эффект «рост» — оверлей роста поверх иконки (подсказки/инвентарь/кукла)
-    obj.grow && tempTip.push(image(svgArr[2],x+72,y+67,256,256,"./images/effects/plantGrow.png",{}))
+    obj.grow && tpush(image(svgArr[2],x+72,y+67,256,256,"./images/effects/plantGrow.png",{}))
     //V140: оверлей «повязки» (подсказка/окно сравнения)
-    obj.barb && tempTip.push(image(svgArr[2],x+72,y+67,256,256,"./images/effects/barbTrue.png",{}))
+    obj.barb && tpush(image(svgArr[2],x+72,y+67,256,256,"./images/effects/barbTrue.png",{}))
     let strokeNum = 0
     if (obj.type!==undefined) {
         let desc
         obj.type.desc2 ? desc = T(obj.type.desc1)+" - "+T(obj.type.desc2) : desc = T(obj.type.desc1)
-        tempTip.push(text(svgArr[2],x+200,y+365+strokeNum*35,"0pt","50pt","none","2px","#CC9900",desc,{"id":"itemName","size":32,"font":"baseFont4","anchor":"middle"}))
+        tpush(text(svgArr[2],x+200,y+365+strokeNum*35,"0pt","50pt","none","2px","#CC9900",desc,{"id":"itemName","size":32,"font":"baseFont4","anchor":"middle"}))
         strokeNum++
     }
     if (obj.damage) {
-        tempTip.push(text(svgArr[2],x+200,y+365+strokeNum*35,"0pt","50pt","none","2px","#cc9966",T("tip.damage",obj.damage),{"id":"itemName","size":32,"font":"baseFont4","anchor":"middle"}))
+        tpush(text(svgArr[2],x+200,y+365+strokeNum*35,"0pt","50pt","none","2px","#cc9966",T("tip.damage",obj.damage),{"id":"itemName","size":32,"font":"baseFont4","anchor":"middle"}))
         strokeNum++
     }
     if (obj.attack !== undefined) {
-        tempTip.push(text(svgArr[2],x+200,y+365+strokeNum*35,"0pt","50pt","none","2px","#cc9966",T("tip.attack",T(basicData.data.attacks[obj.attack].name),basicData.data.attacks[obj.attack].cooldown),{"id":"itemName","size":32,"font":"baseFont4","anchor":"middle"}))
+        tpush(text(svgArr[2],x+200,y+365+strokeNum*35,"0pt","50pt","none","2px","#cc9966",T("tip.attack",T(basicData.data.attacks[obj.attack].name),basicData.data.attacks[obj.attack].cooldown),{"id":"itemName","size":32,"font":"baseFont4","anchor":"middle"}))
         strokeNum++
     }
     if (obj.stat!==undefined) {
-        tempTip.push(text(svgArr[2],x+200,y+365+strokeNum*35,"0pt","50pt","none","2px","#999999",T(statArr[obj.stat]) + " +" + obj.statCount,{"id":"itemName","size":32,"font":"baseFont4","anchor":"middle"}))
+        tpush(text(svgArr[2],x+200,y+365+strokeNum*35,"0pt","50pt","none","2px","#999999",T(statArr[obj.stat]) + " +" + obj.statCount,{"id":"itemName","size":32,"font":"baseFont4","anchor":"middle"}))
         strokeNum++
     }
     if (obj.dopType!==undefined) {
-        tempTip.push(text(svgArr[2],x+200,y+365+strokeNum*35,"0pt","50pt","none","2px","#9999FF",T(statArrDop[obj.dopType]) + " +" + obj.dop,{"id":"itemName","size":32,"font":"baseFont4","anchor":"middle"}))
+        tpush(text(svgArr[2],x+200,y+365+strokeNum*35,"0pt","50pt","none","2px","#9999FF",T(statArrDop[obj.dopType]) + " +" + obj.dop,{"id":"itemName","size":32,"font":"baseFont4","anchor":"middle"}))
         strokeNum++
         helpWord(color,obj.dopType,x-16,y)
     }
     if (obj.abil!==undefined) {
-        tempTip.push(text(svgArr[2],x+200,y+365+strokeNum*35,"0pt","50pt","none","2px","#9933CC",T(obj.abil.desc),{"id":"itemName","size":32,"font":"baseFont4","anchor":"middle"}))
+        tpush(text(svgArr[2],x+200,y+365+strokeNum*35,"0pt","50pt","none","2px","#9933CC",T(obj.abil.desc),{"id":"itemName","size":32,"font":"baseFont4","anchor":"middle"}))
         strokeNum++
     }
     //V111: огненное оружие — оранжевая надпись «огненное» во фрейме характеристик,
     //чуть выше художественного описания
     if (obj.fire) {
-        tempTip.push(text(svgArr[2],x+200,y+365+strokeNum*35,"0pt","50pt","none","2px","#FF8800",T("tip.fire"),{"id":"itemName","size":32,"font":"baseFont4","anchor":"middle"}))
+        tpush(text(svgArr[2],x+200,y+365+strokeNum*35,"0pt","50pt","none","2px","#FF8800",T("tip.fire"),{"id":"itemName","size":32,"font":"baseFont4","anchor":"middle"}))
         strokeNum++
     }
     //V161: эффекты предмета — строка «Эффект: …» НА СТРОЧКУ ВЫШЕ художественного
@@ -268,7 +307,7 @@ function tip (e,obj) {
         } else if (strokeNum > 4) {
             ey = y + 365 + strokeNum * 35
         }
-        tempTip.push(text(svgArr[2],x+200,ey,"0pt","50pt","none","2px","#66FF66",T("lib.effect",names),{"id":"itemName","size":32,"font":"baseFont4","anchor":"middle"}))
+        tpush(text(svgArr[2],x+200,ey,"0pt","50pt","none","2px","#66FF66",T("lib.effect",names),{"id":"itemName","size":32,"font":"baseFont4","anchor":"middle"}))
         let fxY = y + 270
         for (let i = 0; i < fxs.length; i++) fxY += effectWord(color,fxs[i],x-16,fxY) + 15
     }
@@ -280,11 +319,11 @@ function tip (e,obj) {
         const relicRows = itWrap(T(obj.desc), 24, 364)
         let ry = y + 404
         for (let i = 0; i < relicRows.length; i++) {
-            tempTip.push(text(svgArr[2],x+200,ry,"0pt","50pt","none","2px",color,relicRows[i],{"id":"itemName","size":24,"font":"baseFont4","anchor":"middle"}))
+            tpush(text(svgArr[2],x+200,ry,"0pt","50pt","none","2px",color,relicRows[i],{"id":"itemName","size":24,"font":"baseFont4","anchor":"middle"}))
             ry += 28
         }
     } else {
-        tempTip.push(text(svgArr[2],x+200,y+580,"0pt","50pt","none","2px",color,T(obj.desc),{"id":"itemName","size":26,"font":"baseFont4","anchor":"middle"}))
+        tpush(text(svgArr[2],x+200,y+580,"0pt","50pt","none","2px",color,T(obj.desc),{"id":"itemName","size":26,"font":"baseFont4","anchor":"middle"}))
     }
     if(obj.descFull) {
         let y1 = y
@@ -306,12 +345,12 @@ function tip (e,obj) {
             const nextDesc = cur === 1 ? obj.descFullL2 : obj.descFullL3
             let x2 = x - 414
             x2 < 10 && (x2 = 10)
-            tempTip.push(rect(svgArr[2],x2,y,400,600,color,"4px","black",{"id":"lvlTip","rx":"6px"}))
+            tpush(rect(svgArr[2],x2,y,400,600,color,"4px","black",{"id":"lvlTip","rx":"6px"}))
             //V60: длинное название — меньше шрифт и до двух строк (см. tipTitle)
             tipTitle(x2+200,y+45,color,itemName(obj),"lvlTipName")
-            tempTip.push(rect(svgArr[2],x2+71,y+66,258,258,color,"2px","black",{"id":"lvlTipFrame","rx":"6px"}))
-            tempTip.push(image(svgArr[2],x2+72,y+67,256,256,obj.img,{"blur":'filter: drop-shadow(0 0 4px '+color+')'}))
-            tempTip.push(text(svgArr[2],x2+200,y+346,"0pt","50pt","none","1px","#999999",T("tip.level",cur+1),{"id":"lvlTipLabel","size":20,"font":"baseFont4","anchor":"middle"}))
+            tpush(rect(svgArr[2],x2+71,y+66,258,258,color,"2px","black",{"id":"lvlTipFrame","rx":"6px"}))
+            tpush(image(svgArr[2],x2+72,y+67,256,256,obj.img,{"blur":'filter: drop-shadow(0 0 4px '+color+')'}))
+            tpush(text(svgArr[2],x2+200,y+346,"0pt","50pt","none","1px","#999999",T("tip.level",cur+1),{"id":"lvlTipLabel","size":20,"font":"baseFont4","anchor":"middle"}))
             addToSkill(x2,y1,T(nextDesc),color)
         }
     }
@@ -336,64 +375,64 @@ function compareTip(e,obj,lower=0) {
     x < 10 && (x = 10) //защита от выхода за левый край viewBox
     const y = c[1]
     const color = rarityColor(obj.rarity)
-    tempTip.push(rect(svgArr[2],x,y,400,600,color,"4px","black",{"id":"cmpTip","rx":"6px"}))
+    tpush(rect(svgArr[2],x,y,400,600,color,"4px","black",{"id":"cmpTip","rx":"6px"}))
     //V60: длинное название — меньше шрифт и до двух строк (см. tipTitle)
     tipTitle(x+200,y+45,color,itemName(obj),"itemName")
-    tempTip.push(rect(svgArr[2],x+71,y+66,258,258,color,"2px","black",{"id":"cmpTip","rx":"6px"}))
-    tempTip.push(image(svgArr[2],x+72,y+67,256,256,obj.img,{"blur":'filter: drop-shadow(0 0 4px '+color+')'}))
+    tpush(rect(svgArr[2],x+71,y+66,258,258,color,"2px","black",{"id":"cmpTip","rx":"6px"}))
+    tpush(image(svgArr[2],x+72,y+67,256,256,obj.img,{"blur":'filter: drop-shadow(0 0 4px '+color+')'}))
     //V111: оверлей пламени на иконке огненного оружия (окно сравнения)
-    obj.fire && tempTip.push(image(svgArr[2],x+72,y+67,256,256,"./images/effects/flameWeapon.png",{}))
+    obj.fire && tpush(image(svgArr[2],x+72,y+67,256,256,"./images/effects/flameWeapon.png",{}))
     //V133: оверлей слизи на иконке предмета с эффектом «слизь» (окно сравнения)
-    obj.slime && tempTip.push(image(svgArr[2],x+72,y+67,256,256,"./images/effects/slimeShield.png",{}))
+    obj.slime && tpush(image(svgArr[2],x+72,y+67,256,256,"./images/effects/slimeShield.png",{}))
     //V138: оверлей роста на иконке предмета с эффектом «рост» (окно сравнения)
-    obj.grow && tempTip.push(image(svgArr[2],x+72,y+67,256,256,"./images/effects/plantGrow.png",{}))
+    obj.grow && tpush(image(svgArr[2],x+72,y+67,256,256,"./images/effects/plantGrow.png",{}))
     //V140: оверлей «повязки» (подсказка/окно сравнения)
-    obj.barb && tempTip.push(image(svgArr[2],x+72,y+67,256,256,"./images/effects/barbTrue.png",{}))
+    obj.barb && tpush(image(svgArr[2],x+72,y+67,256,256,"./images/effects/barbTrue.png",{}))
     let strokeNum = 0
     if (obj.type!==undefined) {
         let desc
         obj.type.desc2 ? desc = T(obj.type.desc1)+" - "+T(obj.type.desc2) : desc = T(obj.type.desc1)
-        tempTip.push(text(svgArr[2],x+200,y+365+strokeNum*35,"0pt","50pt","none","2px","#CC9900",desc,{"id":"itemName","size":32,"font":"baseFont4","anchor":"middle"}))
+        tpush(text(svgArr[2],x+200,y+365+strokeNum*35,"0pt","50pt","none","2px","#CC9900",desc,{"id":"itemName","size":32,"font":"baseFont4","anchor":"middle"}))
         strokeNum++
     }
     if (obj.damage) {
-        tempTip.push(text(svgArr[2],x+200,y+365+strokeNum*35,"0pt","50pt","none","2px","#cc9966",T("tip.damage",obj.damage),{"id":"itemName","size":32,"font":"baseFont4","anchor":"middle"}))
+        tpush(text(svgArr[2],x+200,y+365+strokeNum*35,"0pt","50pt","none","2px","#cc9966",T("tip.damage",obj.damage),{"id":"itemName","size":32,"font":"baseFont4","anchor":"middle"}))
         strokeNum++
     }
     if (obj.attack !== undefined) {
-        tempTip.push(text(svgArr[2],x+200,y+365+strokeNum*35,"0pt","50pt","none","2px","#cc9966",T("tip.attack",T(basicData.data.attacks[obj.attack].name),basicData.data.attacks[obj.attack].cooldown),{"id":"itemName","size":32,"font":"baseFont4","anchor":"middle"}))
+        tpush(text(svgArr[2],x+200,y+365+strokeNum*35,"0pt","50pt","none","2px","#cc9966",T("tip.attack",T(basicData.data.attacks[obj.attack].name),basicData.data.attacks[obj.attack].cooldown),{"id":"itemName","size":32,"font":"baseFont4","anchor":"middle"}))
         strokeNum++
     }
     if (obj.stat!==undefined) {
-        tempTip.push(text(svgArr[2],x+200,y+365+strokeNum*35,"0pt","50pt","none","2px","#999999",T(statArr[obj.stat]) + " +" + obj.statCount,{"id":"itemName","size":32,"font":"baseFont4","anchor":"middle"}))
+        tpush(text(svgArr[2],x+200,y+365+strokeNum*35,"0pt","50pt","none","2px","#999999",T(statArr[obj.stat]) + " +" + obj.statCount,{"id":"itemName","size":32,"font":"baseFont4","anchor":"middle"}))
         strokeNum++
     }
     if (obj.dopType!==undefined) {
-        tempTip.push(text(svgArr[2],x+200,y+365+strokeNum*35,"0pt","50pt","none","2px","#9999FF",T(statArrDop[obj.dopType]) + " +" + obj.dop,{"id":"itemName","size":32,"font":"baseFont4","anchor":"middle"}))
+        tpush(text(svgArr[2],x+200,y+365+strokeNum*35,"0pt","50pt","none","2px","#9999FF",T(statArrDop[obj.dopType]) + " +" + obj.dop,{"id":"itemName","size":32,"font":"baseFont4","anchor":"middle"}))
         strokeNum++
     }
     if (obj.abil!==undefined) {
-        tempTip.push(text(svgArr[2],x+200,y+365+strokeNum*35,"0pt","50pt","none","2px","#9933CC",T(obj.abil.desc),{"id":"itemName","size":32,"font":"baseFont4","anchor":"middle"}))
+        tpush(text(svgArr[2],x+200,y+365+strokeNum*35,"0pt","50pt","none","2px","#9933CC",T(obj.abil.desc),{"id":"itemName","size":32,"font":"baseFont4","anchor":"middle"}))
         strokeNum++
     }
     //V111: огненное оружие — оранжевая надпись «огненное» во фрейме характеристик,
     //чуть выше художественного описания
     if (obj.fire) {
-        tempTip.push(text(svgArr[2],x+200,y+365+strokeNum*35,"0pt","50pt","none","2px","#FF8800",T("tip.fire"),{"id":"itemName","size":32,"font":"baseFont4","anchor":"middle"}))
+        tpush(text(svgArr[2],x+200,y+365+strokeNum*35,"0pt","50pt","none","2px","#FF8800",T("tip.fire"),{"id":"itemName","size":32,"font":"baseFont4","anchor":"middle"}))
         strokeNum++
     }
     //метка между картинкой и характеристиками: игроку сразу ясно, какое из двух окон «старое»
-    tempTip.push(text(svgArr[2],x+200,y+346,"0pt","50pt","none","1px","#999999",T("tip.worn"),{"id":"cmpLabel","size":20,"font":"baseFont4","anchor":"middle"}))
+    tpush(text(svgArr[2],x+200,y+346,"0pt","50pt","none","1px","#999999",T("tip.worn"),{"id":"cmpLabel","size":20,"font":"baseFont4","anchor":"middle"}))
     //V110: реликвии — перенос описания блоком, как в основном тултипе
     if (obj.relic !== undefined) {
         const relicRows = itWrap(T(obj.desc), 24, 364)
         let ry = y + 404
         for (let i = 0; i < relicRows.length; i++) {
-            tempTip.push(text(svgArr[2],x+200,ry,"0pt","50pt","none","2px",color,relicRows[i],{"id":"itemName","size":24,"font":"baseFont4","anchor":"middle"}))
+            tpush(text(svgArr[2],x+200,ry,"0pt","50pt","none","2px",color,relicRows[i],{"id":"itemName","size":24,"font":"baseFont4","anchor":"middle"}))
             ry += 28
         }
     } else {
-        tempTip.push(text(svgArr[2],x+200,y+580,"0pt","50pt","none","2px",color,T(obj.desc),{"id":"itemName","size":26,"font":"baseFont4","anchor":"middle"}))
+        tpush(text(svgArr[2],x+200,y+580,"0pt","50pt","none","2px",color,T(obj.desc),{"id":"itemName","size":26,"font":"baseFont4","anchor":"middle"}))
     }
 }
 //V53: окошко сета ПОД основным тултипом идентифицированной легендарки
@@ -423,27 +462,28 @@ function setTip(x,y,color,setN) {
     let headSize = 32
     if (headParts) while (headSize > 24 && headParts.some(p => itMeasure(p,headSize) > maxPx)) headSize -= 2
     const SET_H = 66 + (headParts && headParts.length > 1 ? 12 : 0) + lines*28 + 8*(set.bonuses.length-1) + 14
-    tempTip.push(rect(svgArr[2],x,y+614,400,SET_H,color,"4px","black",{"id":"setTip","rx":"6px"}))
+    tpush(rect(svgArr[2],x,y+614,400,SET_H,color,"4px","black",{"id":"setTip","rx":"6px"}))
     if (!headParts) {
-        tempTip.push(text(svgArr[2],x+200,y+625+38,"0pt","50pt","none","2px",color,head,{"id":"setName","size":32,"font":"baseFont4","anchor":"middle"}))
+        tpush(text(svgArr[2],x+200,y+625+38,"0pt","50pt","none","2px",color,head,{"id":"setName","size":32,"font":"baseFont4","anchor":"middle"}))
     } else if (headParts.length === 1) {
         //одно слово без пробелов не дробим — одна строка дозжатым шрифтом (как в tipTitle)
-        tempTip.push(text(svgArr[2],x+200,y+625+38,"0pt","50pt","none","2px",color,headParts[0],{"id":"setName","size":headSize,"font":"baseFont4","anchor":"middle"}))
+        tpush(text(svgArr[2],x+200,y+625+38,"0pt","50pt","none","2px",color,headParts[0],{"id":"setName","size":headSize,"font":"baseFont4","anchor":"middle"}))
     } else {
-        tempTip.push(text(svgArr[2],x+200,y+625+38-15,"0pt","50pt","none","2px",color,headParts[0],{"id":"setName","size":headSize,"font":"baseFont4","anchor":"middle"}))
-        tempTip.push(text(svgArr[2],x+200,y+625+38+15,"0pt","50pt","none","2px",color,headParts[1],{"id":"setName","size":headSize,"font":"baseFont4","anchor":"middle"}))
+        tpush(text(svgArr[2],x+200,y+625+38-15,"0pt","50pt","none","2px",color,headParts[0],{"id":"setName","size":headSize,"font":"baseFont4","anchor":"middle"}))
+        tpush(text(svgArr[2],x+200,y+625+38+15,"0pt","50pt","none","2px",color,headParts[1],{"id":"setName","size":headSize,"font":"baseFont4","anchor":"middle"}))
     }
     let rowY = y+614+76 + (headParts && headParts.length > 1 ? 12 : 0)
     for (let i = 0; i < set.bonuses.length; i++) {
         let active = worn >= set.bonuses[i].need
         for (let p = 0; p < rowsAll[i].length; p++) {
-            tempTip.push(text(svgArr[2],x+200,rowY + 10,"0pt","50pt","none","2px",active ? "#FFCC66" : "rgba(255, 204, 102, 0.4)",rowsAll[i][p],{"id":"setRow","size":24,"font":"baseFont4","anchor":"middle"}))
+            tpush(text(svgArr[2],x+200,rowY + 10,"0pt","50pt","none","2px",active ? "#FFCC66" : "rgba(255, 204, 102, 0.4)",rowsAll[i][p],{"id":"setRow","size":24,"font":"baseFont4","anchor":"middle"}))
             rowY += 28
         }
         rowY += 8
     }
 }
 function tipDel () {
+    tipHoverCancel()
     let length = tempTip.length
     for (let i = 0; i < length; i++) {
         tempTip[i].remove()
@@ -451,21 +491,21 @@ function tipDel () {
     tempTip = []
 }
 function helpWord(color,dop,x,y,arr1=statArrDop,arr2=statArrDopDesc) {
-    tempTip.push(rect(svgArr[2],x+420,y,300,250,color,"4px","black",{"id":"tip","rx":"6px"}))
-    tempTip.push(text(svgArr[2],x+570,y+45,"0pt","50pt","none","2px","#CC9900",T(arr1[dop]),{"id":"wordName","size":38,"font":"baseFont4","anchor":"middle"}))
-    tempTip.push(nativeHtml(svgArr[2],x+440,y+60,260,280,"none","2px","#CCCCCC",T(arr2[dop]),{"id":"wordNameText","size":32,"font":"baseFont4","anchor":"middle"}))
+    tpush(rect(svgArr[2],x+420,y,300,250,color,"4px","black",{"id":"tip","rx":"6px"}))
+    tpush(text(svgArr[2],x+570,y+45,"0pt","50pt","none","2px","#CC9900",T(arr1[dop]),{"id":"wordName","size":38,"font":"baseFont4","anchor":"middle"}))
+    tpush(nativeHtml(svgArr[2],x+440,y+60,260,280,"none","2px","#CCCCCC",T(arr2[dop]),{"id":"wordNameText","size":32,"font":"baseFont4","anchor":"middle"}))
 }
 function helpWord2(color,abil,x,y) {
-    tempTip.push(rect(svgArr[2],x+420,y,300,250,color,"4px","black",{"id":"tip","rx":"6px"}))
-    tempTip.push(text(svgArr[2],x+570,y+45,"0pt","50pt","none","2px","#CC9900",T(abil.desc),{"id":"wordName","size":38,"font":"baseFont4","anchor":"middle"}))
-    tempTip.push(nativeHtml(svgArr[2],x+440,y+60,260,280,"none","2px","#CCCCCC",T(abil.desc2),{"id":"wordNameText","size":32,"font":"baseFont4","anchor":"middle"}))
+    tpush(rect(svgArr[2],x+420,y,300,250,color,"4px","black",{"id":"tip","rx":"6px"}))
+    tpush(text(svgArr[2],x+570,y+45,"0pt","50pt","none","2px","#CC9900",T(abil.desc),{"id":"wordName","size":38,"font":"baseFont4","anchor":"middle"}))
+    tpush(nativeHtml(svgArr[2],x+440,y+60,260,280,"none","2px","#CCCCCC",T(abil.desc2),{"id":"wordNameText","size":32,"font":"baseFont4","anchor":"middle"}))
 }
 //V58: подписи статов 5/6 (ячейки/броня) — ключи локализации
 let superStatArr = ["supstat.0","supstat.1"]
 function helpWord3(color,stat,x,y) {
-    tempTip.push(rect(svgArr[2],x-300,y-250,300,250,color,"4px","black",{"id":"tip","rx":"6px"}))
-    tempTip.push(text(svgArr[2],x-150,y-205,"0pt","50pt","none","2px","#CC9900",T(statArr[stat]),{"id":"wordName","size":38,"font":"baseFont4","anchor":"middle"}))
-    tempTip.push(nativeHtml(svgArr[2],x-280,y-190,260,280,"none","2px","#CCCCCC",T(superStatArr[stat-5]),{"id":"wordNameText","size":32,"font":"baseFont4","anchor":"middle"}))
+    tpush(rect(svgArr[2],x-300,y-250,300,250,color,"4px","black",{"id":"tip","rx":"6px"}))
+    tpush(text(svgArr[2],x-150,y-205,"0pt","50pt","none","2px","#CC9900",T(statArr[stat]),{"id":"wordName","size":38,"font":"baseFont4","anchor":"middle"}))
+    tpush(nativeHtml(svgArr[2],x-280,y-190,260,280,"none","2px","#CCCCCC",T(superStatArr[stat-5]),{"id":"wordNameText","size":32,"font":"baseFont4","anchor":"middle"}))
 }
 //V161: окошко эффекта предмета слева от тултипа — стиль окна «Броня» (helpWord3):
 //заголовок 38px #CC9900, описание 32px #CCCCCC; вызывается в позиции НИЖЕ окна
@@ -476,19 +516,19 @@ function helpWord3(color,stat,x,y) {
 function effectWord(color,fx,x,y) {
     const rows = itWrap(T(fx[2]), 32, 260)
     const H = Math.max(250, rows.length * 38 + 66)
-    tempTip.push(rect(svgArr[2],x-300,y,300,H,color,"4px","black",{"id":"tip","rx":"6px"}))
-    tempTip.push(text(svgArr[2],x-150,y+45,"0pt","50pt","none","2px","#CC9900",T(fx[1]),{"id":"wordName","size":38,"font":"baseFont4","anchor":"middle"}))
+    tpush(rect(svgArr[2],x-300,y,300,H,color,"4px","black",{"id":"tip","rx":"6px"}))
+    tpush(text(svgArr[2],x-150,y+45,"0pt","50pt","none","2px","#CC9900",T(fx[1]),{"id":"wordName","size":38,"font":"baseFont4","anchor":"middle"}))
     let ry = y + 88
     for (let i = 0; i < rows.length; i++) {
-        tempTip.push(text(svgArr[2],x-150,ry,"0pt","50pt","none","2px","#CCCCCC",rows[i],{"id":"wordNameText","size":32,"font":"baseFont4","anchor":"middle"}))
+        tpush(text(svgArr[2],x-150,ry,"0pt","50pt","none","2px","#CCCCCC",rows[i],{"id":"wordNameText","size":32,"font":"baseFont4","anchor":"middle"}))
         ry += 38
     }
     return H
 }
 function addToSkill(x,y,descFull,color) {
     //MIGRATION: шрифт 40px не влезал во фрейм тултипа способности (репорт) — уменьшен до 32
-    tempTip.push(nativeHtml(svgArr[2],x+30,y+340,340,260,"none","2px","#CCCCCC",descFull,{"id":"deckSkillText","size":32,"font":"baseFont4","anchor":"middle"}))
+    tpush(nativeHtml(svgArr[2],x+30,y+340,340,260,"none","2px","#CCCCCC",descFull,{"id":"deckSkillText","size":32,"font":"baseFont4","anchor":"middle"}))
 }
 //V94: rarityColor отдаётся наружу — обводка редкости на ячейках (лобби/инвентарь/кукла/
 //алхимия/экран предметов) обязана совпадать по цвету с рамкой тултипа, один источник
-export { tip,tipDel,helpWord,showItemTip,itemTipTick,compareTip,rarityColor,itemFrameOn,itemGlowOn }
+export { tip,tipDel,helpWord,showItemTip,itemTipTick,compareTip,rarityColor,itemFrameOn,itemGlowOn,tipHoverStart,tipHoverCancel }

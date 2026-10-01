@@ -4,7 +4,7 @@ import { status } from "../scripts/start.js"
 import { ctxBar,ctxTx,nextLvlExp } from "../scripts/players.js"
 import * as basicData from "../scripts/data.js"
 import { drag,doubleClickItem } from "../scripts/drag.js"
-import { tip,tipDel,helpWord,rarityColor,itemFrameOn,itemGlowOn } from "../scripts/tip.js"
+import { tip,tipDel,helpWord,rarityColor,itemFrameOn,itemGlowOn,tipHoverStart } from "../scripts/tip.js"
 import { countDopStats } from "../scripts/countDopStats.js"
 import { changeHP, dollArmor } from "../scripts/takeDamage.js"
 import { musicDuck } from "../scripts/sound.js"
@@ -41,7 +41,7 @@ function doll() {
         //V95: рамку/свечение можно отключить в Настройках
         let rc = rarityColor(obj.rarity)
         itemFrameOn() && dollTemp.push(rect(svgArr[2],cellPickArr[i].x,cellPickArr[i].y,"128px","128px",rc,"2px","none",{"rx":"3px"}))
-        let dollOpts = {"id":i,"funcDrag":drag,"funcDbl":doubleClickItem,"funcShow":e => {rectCellShow(obj);e.buttons !== 1 ? tip(e,obj) : tipDel()},"funcShowOut":e => {tipDel();rectCellShowDel()},"item":status.inventory.doll[i]}
+        let dollOpts = {"id":i,"funcDrag":drag,"funcDbl":doubleClickItem,"funcShow":e => {rectCellShow(obj);e.buttons !== 1 ? tipHoverStart(e, ev => tip(ev,obj)) : tipDel()},"funcShowOut":e => {tipDel();rectCellShowDel()},"item":status.inventory.doll[i]}
         itemGlowOn() && (dollOpts.blur = "filter: drop-shadow(0 0 4px "+rc+")")
         dollTemp.push(image(svgArr[2],cellPickArr[i].x,cellPickArr[i].y,"128px","128px",status.inventory.doll[i].img,dollOpts))
         //V111: оверлей пламени на иконке огненного оружия (слоты куклы)
@@ -61,18 +61,18 @@ function doll() {
     dollTemp.push(image(svgArr[2],493,356,110,14,"./images/UI/panels/expBar.png"))
 
     dollTemp.push(image(svgArr[2],703,655,123,209,"./images/UI/panels/paramsBack.png"))
-    dollTemp.push(image(svgArr[2],720,666,32,32,"./images/UI/panels/fonIcon1.png",{"funcShow":e => helpWord(`rgb(204, 153, 102)`,0,e.target.x.animVal.value,e.target.y.animVal.value,statWordArr,statWordArrDesc),"funcShowOut":tipDel}))
-    dollTemp.push(image(svgArr[2],720,704,32,32,"./images/UI/panels/fonIcon2.png",{"funcShow":e => helpWord(`rgb(204, 153, 102)`,1,e.target.x.animVal.value,e.target.y.animVal.value,statWordArr,statWordArrDesc),"funcShowOut":tipDel}))
-    dollTemp.push(image(svgArr[2],720,742,32,32,"./images/UI/panels/fonIcon3.png",{"funcShow":e => helpWord(`rgb(204, 153, 102)`,2,e.target.x.animVal.value,e.target.y.animVal.value,statWordArr,statWordArrDesc),"funcShowOut":tipDel}))
-    dollTemp.push(image(svgArr[2],720,780,32,32,"./images/UI/panels/fonIcon4.png",{"funcShow":e => helpWord(`rgb(204, 153, 102)`,3,e.target.x.animVal.value,e.target.y.animVal.value,statWordArr,statWordArrDesc),"funcShowOut":tipDel}))
-    dollTemp.push(image(svgArr[2],720,818,32,32,"./images/UI/panels/fonIcon5.png",{"funcShow":e => helpWord(`rgb(204, 153, 102)`,4,e.target.x.animVal.value,e.target.y.animVal.value,statWordArr,statWordArrDesc),"funcShowOut":tipDel}))
+    dollTemp.push(image(svgArr[2],720,666,32,32,"./images/UI/panels/fonIcon1.png",{"funcShow":e => tipHoverStart(e, ev => helpWord(`rgb(204, 153, 102)`,0,e.target.x.animVal.value,e.target.y.animVal.value,statWordArr,statWordArrDesc)),"funcShowOut":tipDel}))
+    dollTemp.push(image(svgArr[2],720,704,32,32,"./images/UI/panels/fonIcon2.png",{"funcShow":e => tipHoverStart(e, ev => helpWord(`rgb(204, 153, 102)`,1,e.target.x.animVal.value,e.target.y.animVal.value,statWordArr,statWordArrDesc)),"funcShowOut":tipDel}))
+    dollTemp.push(image(svgArr[2],720,742,32,32,"./images/UI/panels/fonIcon3.png",{"funcShow":e => tipHoverStart(e, ev => helpWord(`rgb(204, 153, 102)`,2,e.target.x.animVal.value,e.target.y.animVal.value,statWordArr,statWordArrDesc)),"funcShowOut":tipDel}))
+    dollTemp.push(image(svgArr[2],720,780,32,32,"./images/UI/panels/fonIcon4.png",{"funcShow":e => tipHoverStart(e, ev => helpWord(`rgb(204, 153, 102)`,3,e.target.x.animVal.value,e.target.y.animVal.value,statWordArr,statWordArrDesc)),"funcShowOut":tipDel}))
+    dollTemp.push(image(svgArr[2],720,818,32,32,"./images/UI/panels/fonIcon5.png",{"funcShow":e => tipHoverStart(e, ev => helpWord(`rgb(204, 153, 102)`,4,e.target.x.animVal.value,e.target.y.animVal.value,statWordArr,statWordArrDesc)),"funcShowOut":tipDel}))
 
     //V58: слова статов и их описаний — ключи локализации
     let statWordArr = ["stat.0.0","stat.0.1","stat.0.2","stat.0.3","stat.0.4"]
         let statWordArrDesc = ["statdesc.0","statdesc.1","statdesc.2","statdesc.3","statdesc.4"]
     let lengthStats = basicData.data.heroes[status.hero.class].stats.length
     for (let i = 0; i < lengthStats; i++) {
-        dollTemp.push(text(svgArr[2],790,692+i*38,"0pt","50pt","none","1px",`rgb(204, 153, 102)`,status.info.stats[i].value,{"id":"statValue"+i,"size":32,"font":"baseFont4","anchor":"middle","funcShow":e => helpWord(`rgb(204, 153, 102)`,i,e.target.x.animVal[0].value,e.target.y.animVal[0].value,statWordArr,statWordArrDesc),"funcShowOut":tipDel}))
+        dollTemp.push(text(svgArr[2],790,692+i*38,"0pt","50pt","none","1px",`rgb(204, 153, 102)`,status.info.stats[i].value,{"id":"statValue"+i,"size":32,"font":"baseFont4","anchor":"middle","funcShow":e => tipHoverStart(e, ev => helpWord(`rgb(204, 153, 102)`,i,e.target.x.animVal[0].value,e.target.y.animVal[0].value,statWordArr,statWordArrDesc)),"funcShowOut":tipDel}))
     }
     dollTemp.push(image(svgArr[2],120,784,242,28,"./images/UI/panels/decor0.png"))
     dollTemp.push(image(svgArr[2],120,850,242,28,"./images/UI/panels/decor1.png"))
@@ -134,7 +134,7 @@ function viewStats() {
         for (let i = 0; i < lengthStats; i++) {
             let lengthDopStats = status.info.stats[i].dops.length
             for (let j = 0; j < lengthDopStats; j++) {
-                dopsView.push(text(svgArr[2],435,301+i*81+j*27,"0pt","50pt","none","2px",`rgb(204, 153, 102)`,T(status.info.stats[i].dops[j].name),{"id":"dopStatName","size":24,"font":"baseFont4","anchor":"start","funcShow":e => helpWord(`rgb(204, 153, 102)`,i*3+j,e.target.x.animVal[0].value,e.target.y.animVal[0].value),"funcShowOut":tipDel}))
+                dopsView.push(text(svgArr[2],435,301+i*81+j*27,"0pt","50pt","none","2px",`rgb(204, 153, 102)`,T(status.info.stats[i].dops[j].name),{"id":"dopStatName","size":24,"font":"baseFont4","anchor":"start","funcShow":e => tipHoverStart(e, ev => helpWord(`rgb(204, 153, 102)`,i*3+j,e.target.x.animVal[0].value,e.target.y.animVal[0].value)),"funcShowOut":tipDel}))
                 dopsView.push(text(svgArr[2],579,301+i*81+j*27,"0pt","50pt","none","2px",`rgb(204, 153, 102)`,status.info.stats[i].dops[j].value1,{"id":"dopStatValue1"+(i*3+j),"size":24,"font":"baseFont4","anchor":"middle"}))
                 dopsView.push(text(svgArr[2],627,301+i*81+j*27,"0pt","50pt","none","2px",`rgb(204, 153, 102)`,"("+status.info.stats[i].dops[j].value2+")",{"id":"buttonName","size":24,"font":"baseFont4","anchor":"middle"}))
             }

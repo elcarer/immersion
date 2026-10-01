@@ -2183,6 +2183,10 @@ function hitTestUI(cx, cy) {
         for (let i = ch.length - 1; i >= 0; i--) {
             const c = ch[i]
             if (!c.node || !c.node.visible || c.node.alpha === 0) continue
+            // V165 (репорт юзера: «инфо-окна перекрывают клики»): узлы тултипов
+            // (tip.js tpush ставит _noHit) прозрачны для мыши и в синтетическом
+            // хит-тесте — клики/курсор проваливаются сквозь окно на цель под ним
+            if (c._noHit) continue
             const deep = walk(c)
             if (deep) return deep
             if (c._interactive) {

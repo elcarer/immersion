@@ -1,7 +1,7 @@
 import { svgArr,image, text, rect } from "../scripts/svg.js"
 import { status } from "../scripts/start.js"
 import { T } from "../scripts/localization.js"
-import { tip,tipDel } from "../scripts/tip.js"
+import { tip,tipDel,tipHoverStart } from "../scripts/tip.js"
 import { data } from "../scripts/data.js"
 import { activeSkills,useSkill } from "../scripts/activeSkills.js"
 import { playback,strike,musicDuck } from "../scripts/sound.js"
@@ -60,7 +60,7 @@ function skillTree() {
         skillTreeTemp.push(image(svgArr[2],910+142*skill.x,280+150*skill.y,128,128,skill.img,{//"borderColor":`rgb(204, 153, 102)`,
         "func":() => shooseSkill(skill,i),
         "funcShow":e => {
-            tip(e,skill)},
+            tipHoverStart(e, ev => tip(ev,skill))},
         "funcShowOut":e => {
             tipDel()}
     }))

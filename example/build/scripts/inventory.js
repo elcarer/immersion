@@ -1,7 +1,7 @@
 import { svgArr,image,text,rect } from "../scripts/svg.js"
 import { status } from "../scripts/start.js"
 import { drag,doubleClickItem } from "../scripts/drag.js"
-import { tip,tipDel,compareTip,rarityColor,itemFrameOn,itemGlowOn } from "../scripts/tip.js"
+import { tip,tipDel,compareTip,rarityColor,itemFrameOn,itemGlowOn,tipHoverStart } from "../scripts/tip.js"
 //V53: isSetItem — ховеру идентифицированной легендарки окно сравнения встаёт по «сетовым» клампам
 import { isSetItem } from "../scripts/sets.js"
 import { playback,strike,musicDuck } from "../scripts/sound.js"
@@ -45,7 +45,7 @@ function inventory () {
                 //V95: рамку/свечение можно отключить в Настройках
                 let rc = rarityColor(obj.rarity)
                 itemFrameOn() && inventoryTemp.push(rect(svgArr[2],940 + i * 130,261 + j * 130,128,128,rc,"2px","none",{"rx":"3px"}))
-                let invOpts = {"id":13+num,"funcDrag":drag,"funcDbl":doubleClickItem,"funcShow":e => {rectCellShow(obj);e.buttons !== 1 ? (tip(e,obj),compareTip(e,equippedCompareOf(obj),isSetItem(obj))) : tipDel()},"funcShowOut":e => {tipDel();rectCellShowDel()},"item":status.inventory.inv[num]}
+                let invOpts = {"id":13+num,"funcDrag":drag,"funcDbl":doubleClickItem,"funcShow":e => {rectCellShow(obj);e.buttons !== 1 ? tipHoverStart(e, ev => {tip(ev,obj);compareTip(ev,equippedCompareOf(obj),isSetItem(obj))}) : tipDel()},"funcShowOut":e => {tipDel();rectCellShowDel()},"item":status.inventory.inv[num]}
                 itemGlowOn() && (invOpts.blur = "filter: drop-shadow(0 0 4px "+rc+")")
                 inventoryTemp.push(image(svgArr[2],940 + i * 130,261 + j * 130,128,128,status.inventory.inv[num].img,invOpts))
                 //V111: оверлей пламени на иконке огненного оружия (сетка инвентаря)
