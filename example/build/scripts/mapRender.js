@@ -125,6 +125,10 @@ function mapRender(level, tileX, tileY, layer) {
                 o[2] === 16 ? "./images/dungeon/objects/"+(14+status.levelFloor*20)+".png" :
                 o[2] === 17 ? "./images/dungeon/objects/"+(15+status.levelFloor*20)+".png" :
                 o[2] === 20 ? "./images/dungeon/objects/"+(o[7] ? "101d" : "101")+".png" :
+                //V168 (репорт юзера): алтарь-наковальня (24) на карте показывала спрайт
+                //чужого объекта по общей формуле (24+этаж*20) — ветка createRoom не была
+                //скопирована; тот же спрайт 103|103d по использованию, геометрия общая
+                o[2] === 24 ? "./images/dungeon/objects/"+(o[7] ? "103d" : "103")+".png" :
                     "./images/dungeon/objects/"+(o[2]+status.levelFloor*20)+".png"
             const isPillar = o[2] === 15
             const isStatue = o[2] === 16

@@ -11,7 +11,7 @@ import { status } from "../scripts/start.js"
 import { ctxBar,ctxTx } from "../scripts/players.js"
 import { objectValues } from "../scripts/del.js"
 import { svgArr, image, spritePos, moveSprite, releaseSprite, rectPos } from "../scripts/svg.js"
-import { checkCollision, peacefulEnemy } from "../scripts/damage.js"
+import { checkCollision, peacefulEnemy, startSpikeFly } from "../scripts/damage.js"
 import { damageEnemy } from "../scripts/enemyAI.js"
 import { collision } from "../scripts/collision.js"
 import { data } from "../scripts/data.js"
@@ -645,7 +645,11 @@ function shieldKnockback() {
     const cellY = Math.trunc((ny + 35) / 32)
     //не заталкивать в стену
     if (matrix && matrix[cellY] && matrix[cellY][cellX] === 1) {
-      moveSprite(e.img, tx, ty)
+      //V168 (поправка юзера): отброс летит ПО ПАРАБОЛЕ, как у «Каменного шипа»
+      //(startSpikeFly: 24 тика, дуга ~40px, на время полёта ИИ врага заменяет
+      //spikeFlyTick; целевая клетка заносится в xCell/yCell сразу, лежащий враг —
+      //мгновенный сдвиг как раньше). Раньше был мгновенный moveSprite
+      startSpikeFly(e, tx, ty)
       e.xCell = cellX
       e.yCell = cellY
       //V167 (поправка юзера): отброшенный щитом враг получает урон от допстата

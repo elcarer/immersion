@@ -5,7 +5,7 @@ import { data } from "../scripts/data.js"
 import { createCells } from "../scripts/encounters.js"
 import { dataGeneric } from "../scripts/sceneGenerate.js"
 //V164: проверка клетки приземления босса — ближайшая свободная по полю ИИ + объекты
-import { nearestFreeCell } from "../scripts/enemyAI.js"
+import { nearestFreeCell, ENEMY_STATE, setEnemyState } from "../scripts/enemyAI.js"
 import { collisionCheckObject } from "../scripts/collision.js"
 let boss
 let bossAttack = []
@@ -130,6 +130,15 @@ function bossDown() {
                 e.type = "enemy"
                 //V68: спуск завершён — спрайт снова виден (прятали в bossUp перед фазой дождя)
                 e.img.setAttribute("visibility", "visible")
+                //V168 (репорт юзера: босс после посадки «стоит на одном месте и ничего
+                //не делает»): bossUp в момент порога подменял текущую once-анимацию
+                //(урон/атака — единственный выход из STUN/ATTACK это конец once-анимации
+                //в checkEndAnim) на циклический wait и ставил once=1 — после посадки
+                //стан/атака не завершались никогда, босс замирал навсегда. Сбрасываем
+                //флаги фазы и зависшие состояния при посадке: дальше штатный enemyTick
+                //(герой рядом — заметит в тот же тик)
+                e.once = 0
+                if (e.state === ENEMY_STATE.STUN || e.state === ENEMY_STATE.ATTACK) setEnemyState(e, ENEMY_STATE.IDLE)
                 status.bossDown = undefined
                 bossDownTarget = null
             } else {

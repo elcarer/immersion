@@ -28,6 +28,10 @@ import { worldViewW, worldViewH } from "../scripts/zoomFx.js"
 //V123: совместный телепорт
 import { teleportPartners } from "../scripts/portalFx.js"
 import { checkNewRoom } from "../scripts/heroMove.js"
+//V168 (репорт юзера): панель экипировки (кукла) бывает открыта в момент перестройки
+//ряда (кнопка «СПОСОБНОСТИ» в сумке закрывает только сумку) — ряд обязан остаться
+//ПОД открытой панелью, см. конец activeSkills()
+import { dollTemp } from "../scripts/doll.js"
 
 let activeSkillsTemp = []
 //V16: кэш узлов секторов кулдауна — раньше activeSkillsCD делал getElementById(i+"P")
@@ -97,6 +101,12 @@ function activeSkills() {
         activeSkillsTemp.push(sector)
         }
     }
+    //V168 (репорт юзера: после прокачки активной способности её иконка «поверх панелей,
+    //а должна быть за ними сзади»): ряд аппендится в конец слоя ПОЗЖЕ узлов открытой
+    //панели экипировки (кукла остаётся открытой слева — кнопка «СПОСОБНОСТИ» в сумке
+    //закрывает только сумку) и накрывал её. Панели всегда выше ряда: поднимаем открытую
+    //куклу обратно в конец слоя (пере-append — легальный переезд, attachShim отстыковывает)
+    if (dollTemp.length) for (let i = 0; i < dollTemp.length; i++) svgArr[2].appendChild(dollTemp[i])
 }
 function activeSkillsDel() {
     let length = activeSkillsTemp.length

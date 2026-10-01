@@ -723,4 +723,4 @@ function playEffect(obj,effect,rectAs=1) {
     }
     return objectValues[objectValues.length - 1].img
 }
-export {damage,checkCollision,playEffect,dropKey,checkExp,createSplash,callAllies,reanimateCheck,relicReflect,spikeFlyTick,peacefulEnemy}
+export {damage,checkCollision,playEffect,dropKey,checkExp,createSplash,callAllies,reanimateCheck,relicReflect,spikeFlyTick,startSpikeFly,peacefulEnemy}
