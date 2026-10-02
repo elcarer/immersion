@@ -37,6 +37,11 @@ function dollArmor() {
 function takeDamage(damage, srcName, srcEnemy) {
     let x = status.hero.x
     let y = status.hero.y
+    //V170 (поправка юзера): Ветряной щит отбрасывает не только при полученном уроне, но при
+    //ЛЮБОМ контакте атаки/магии врага с защитой героя: удар по щиту неуязвимости рывка,
+    //поглощение бронёй или магическим щитом, уворот, блок. До сюда доходят только атаки
+    //врагов — ловушки/горение/яд пишут ХП напрямую, их отброс не задевает (как и раньше)
+    shieldKnockback()
     //неуязвимость валькирии после рывка (0.5с)
     if(dashInvulnActive()) return
     //броня: dollArmor() (V86) — своя + «Вечный сапфир» + сет «Турниры» (4) + баф магического
@@ -114,8 +119,6 @@ function takeDamage(damage, srcName, srcEnemy) {
         srcName && journalAdd(T("journ.herodmg",T(srcName),damage), J_RED)
         playEffect(status.hero.obj,data.effects[1])
         status.info.hp = status.info.hp - damage
-        //Ветряной щит валькирии: отбрасывает врагов в квадрате 96×96
-        shieldKnockback()
         checkFood()
         status.info.hp > 0 ? changeHP(ctxBar("hp"),ctxTx("hp"),"hp") : endGame()
     }
