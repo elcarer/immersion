@@ -41,6 +41,8 @@ import { openAncient,blessEcho } from "../scripts/blessFx.js"
 import { slimeQuestExtraDrop } from "../scripts/slimeQuest.js"
 //V140: квест «Гонка за сокровищами» — вклад героя в зачистку комнаты
 import { hrupQuestObjectUsed } from "../scripts/hrupQuest.js"
+//V171: срабатывание «Отмычек» — золото и строка в журнале
+import { journalAdd, J_YELLOW } from "../scripts/journal.js"
 
 let bars = []
 function useObject(obj,i0) {
@@ -190,6 +192,15 @@ function finishUsedObject(obj) {
     //V140: гонка — использованный героем объект даёт ему вклад в зачистку комнаты
     hrupQuestObjectUsed(obj)
 }
+//V171 (поправка юзера): срабатывание «Отмычек» (шанс keyLock сохранил ключ при вскрытии
+//сундука) приносит дополнительно 5 золота — фидбек как у «корыстности» в openRoom:
+//жёлтый floatText над героем + строка в журнале. Способность не куплена (keyLock 0) —
+//ветка срабатывания не достигается, золота нет
+function lockpickSave() {
+    status.info.gold += 5
+    floatText(status.hero.x - 16 + Math.trunc(Math.random() * 32),status.hero.y+8,5,"#FFCC66","18px","none")
+    journalAdd(T("journal.gold",5), J_YELLOW)
+}
 function actionsObject(obj) {
     switch (obj[2]) {
         case 1: drop(obj)
@@ -208,7 +219,7 @@ function actionsObject(obj) {
             break
         case 8: drop(obj)
             break
-        case 9: status.info.keyLock === 0 ? status.info.keys-- : Math.trunc(Math.random() * 100) < status.info.keyLock ? false : status.info.keys--; drop(obj,1)
+        case 9: status.info.keyLock === 0 ? status.info.keys-- : Math.trunc(Math.random() * 100) < status.info.keyLock ? lockpickSave() : status.info.keys--; drop(obj,1)
             break
         //V96: порог «ровно до следующего уровня» — ТА ЖЕ формула, что в checkExp (damage.js):
         //((1+20/lvl)^(lvl/20)−1)/(e−1)·100. Прежняя ((1+30/(lvl+3))^((lvl+3)/30)) совпадала
