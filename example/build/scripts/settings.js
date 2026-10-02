@@ -11,6 +11,8 @@ import { T,setLang,getLang } from "../scripts/localization.js"
 //V126: кнопка «Управление» — панель переназначения кнопок (обратная связь — хук, без цикла)
 import { openControls, controlsHooks } from "../scripts/controls.js"
 controlsHooks.toSettings = () => settings()
+//V174: закрытие настроек из лобби клавишами «как в игре» — раскладки панельных хоткеев
+import { ownerOfPanelKey } from "../scripts/devices.js"
 
 let settingsTemp = []
 let musicPoint
@@ -76,6 +78,22 @@ function refreshItemFxContext() {
     settingsDel(1)
     lobby(status.settings.lose,status.settings.next)
     settings()
+}
+//V174: клавиши закрытия настроек в ЛОББИ (репорт юзера: панель из таверны не закрыть —
+//кнопка «настройки» лобби осталась ПОД подложкой V149, а клавиатурного пути не было).
+//В забеге Escape/«>» обрабатывает buttonInit (sceneGenerate, гвард start===1) — здесь
+//слушатель вешается ТОЛЬКО когда настройки открыты из лобби, и снимается в settingsDel.
+//«Как в игре»: Escape закрывает, клавиша «настройки» из привязок (дефолт Period — «>»)
+//работает тумблером. Панель «Управление» (panels=12) не трогаем — у неё свой Escape
+let lobbyKeysFn = null
+function closeFromLobbyKeys(e) {
+    if (status.start === 1 || status.startScreen === 1 || status.panels === 12) return
+    if (e.code !== "Escape") {
+        const hit = ownerOfPanelKey(e.code)
+        if (!hit || hit.panel !== 3) return
+    }
+    playback(strike[14].vol,0,0,3*status.settings.soundVolume)
+    settingsDel(0)
 }
 const SLIDER_X = 975
 //V47: полоса громкости — спрайт soundBar.png (220×14, вдвое длиннее прежнего expBar 110×14):
@@ -191,6 +209,18 @@ function settings() {
         settingsTemp.push(text(svgArr[2],1210,861,"0pt","50pt","black","2px",`rgb(204, 153, 102)`,T("settings.mainmenu"),{"id":"delItemText","size":42,"font":"baseFont4","anchor":"middle"}))
     }
 
+    //V174: в ЛОББИ кнопка «настройки» таверны осталась ПОД гасящей подложкой V149 —
+    //повторным кликом панель больше не закрыть. Рисуем её копию ПОВЕРХ панели (те же
+    //координаты/подпись, что в lobby.js) — клик закрывает настройки; вешаем и клавиши
+    if (status.start !== 1 && status.startScreen === 0) {
+        settingsTemp.push(image(svgArr[2],560,10,"208px","60px","./images/UI/panels/buttons/icon4.png",{"glow":1,"func":()=>{playback(strike[14].vol,0,0,3*status.settings.soundVolume);settingsDel(0)}}))
+        settingsTemp.push(text(svgArr[2],690,51,"0pt","50pt","black","2px",`rgb(204, 153, 102)`,T("settings.title"),{"id":"delItemText","size":36,"font":"baseFont4","anchor":"middle"}))
+        if (!lobbyKeysFn) {
+            lobbyKeysFn = closeFromLobbyKeys
+            document.addEventListener("keydown", lobbyKeysFn)
+        }
+    }
+
     sliderDrag(musicPoint, setMusicFromX, playMusicFeedback)
     sliderDrag(effectPoint, setEffectFromX, playEffectFeedback)
 }
@@ -200,6 +230,11 @@ function settingsDel(nomusic=0) {
         settingsTemp[i].remove()
     }
     settingsTemp = []
+    //V174: слушатель клавиш лобби живёт только при открытых настройках
+    if (lobbyKeysFn) {
+        document.removeEventListener("keydown", lobbyKeysFn)
+        lobbyKeysFn = null
+    }
     //V60: если было открыто окно предупреждения — сбросить его пул (сами ноды уже удалены
     //выше вместе с settingsTemp), иначе повторный exitConfirm заблокируется защитой
     confirmTemp.length > 0 && exitConfirmDel()

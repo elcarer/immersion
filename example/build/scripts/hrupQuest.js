@@ -42,7 +42,9 @@ import { floatText } from "../scripts/floatText.js"
 import { journalAdd, J_STD, J_RED, J_YELLOW } from "../scripts/journal.js"
 import { openDialog, closeDialogHard } from "../scripts/dialog.js"
 import { save } from "../scripts/save.js"
-import { removeEntShadow } from "../scripts/groundShadow.js"
+//исчезающий Хруп уносит тень (как Волк/культист/Древоброд);
+//V174: тени разрушенных объектов снимаются вместе с ними (репорт юзера)
+import { removeEntShadow, removeObjShadow } from "../scripts/groundShadow.js"
 //полёт и посадка кучек-наград — как у Ростка (entQuest)
 import { placeDrop, dropFly } from "../scripts/dropSafe.js"
 import { playback, strike } from "../scripts/sound.js"
@@ -54,7 +56,8 @@ const NEAR = [[0,0],[0,-1],[1,-1],[-1,-1],[1,0],[-1,0],[1,1],[-1,1],[0,1]]
 const WANTED = 3                 //комнат до победы в гонке
 const NPC = 32                   //Хруп (hrup_64.png)
 const BELT_SLOT = 10             //слот ПОЯСА куклы («талия»)
-const RACER_SPEED = 24           //скорость Хрупа-гонщика: mv=2px/тик — как шаг героя
+const RACER_SPEED = 20           //скорость Хрупа-гонщика (V174: 24−4 по просьбе юзера;
+                                 //mv=1px/тик — stepAlongPath держит минимум 1px)
                                  //(V140a: было 12 (полускорость); со честными путями
                                  //(BFS только по полу) гонка при 12 не имела шансов)
 const FOE_RANGE = 44             //дистанция удара по врагу
@@ -646,6 +649,8 @@ function swingResolve(q, e) {
         if (img) {
             const href = img.getAttribute("href")
             href && img.setAttribute("href", href.replace(/e?\.png$/, "d.png"))
+            //V174 (репорт юзера): тень исчезает вместе с разрушенным объектом
+            removeObjShadow(img)
         }
         bumpScore(q, obj, 1)
         return

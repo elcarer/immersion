@@ -2103,6 +2103,27 @@ function commitTap() {
         pendingTap = null
     }
 }
+//V174 (репорт юзера: спрайт эффекта предмета — слизь/огонь/рост/повязка — не едет
+//вместе с предметом при перетаскивании, а висит в ячейке): оверлеи эффектов рисуются
+//ОТДЕЛЬНЫМИ узлами 128×128 поверх иконки (inventory.js/doll.js), и moveDragShim двигал
+//только узел предмета. Находим узлы эффектов СВОЕЙ ячейки и тянем синхронно; рамка
+//редкости по-прежнему гаснет на время drag (E-19), drag-glow не трогаем
+function findCellFx(shim) {
+    const x = +shim.attrs.x, y = +shim.attrs.y
+    const out = []
+    const ch = layers[2].children
+    for (let i = ch.length - 1; i >= 0; i--) {
+        const c = ch[i]
+        if (c === shim || c._dead || c.kind !== "image") continue
+        if (typeof c.attrs.href !== "string" || !c.attrs.href.startsWith("./images/effects/")) continue
+        if (+c.attrs.x !== x || +c.attrs.y !== y) continue
+        if (+c.attrs.width !== 128 || +c.attrs.height !== 128) continue
+        c._dragFx0X = x
+        c._dragFx0Y = y
+        out.push(c)
+    }
+    return out
+}
 function beginDragShim(shim, funcDrag, item, clientX, clientY) {
     // E-20 (репорт: «предметы копируются при частых перетаскиваниях»): мёртвый шим не
     // захватываем — его панель уже перерисована, funcDrag со старым id кладёт предмет
@@ -2117,7 +2138,7 @@ function beginDragShim(shim, funcDrag, item, clientX, clientY) {
     // prevShadow — свечение редкости ячейки (blur-опция): на время drag заменяется
     // drag-glow, endDrag вернёт его на месте (успешный дроп перерисует панели сам)
     dragData = { funcDrag, item, origX: ox, origY: oy, lifted: false, offX: pos.x - ox, offY: pos.y - oy,
-        prevShadow: shim._shadowStyleRaw || "", frame: findRarityFrame(shim) }
+        prevShadow: shim._shadowStyleRaw || "", frame: findRarityFrame(shim), fx: findCellFx(shim) }
     if (dragData.frame && !dragData.frame._dead && dragData.frame.node) dragData.frame.node.visible = false
     applyDropShadow(shim, "filter: drop-shadow(0 0 6px rgba(255, 255, 204, 0.8))")
     if (backendHooks.tipDel) backendHooks.tipDel()
@@ -2133,6 +2154,11 @@ function moveDragShim(cx, cy) {
     if (dragSelected._dead) { dragSelected = null; dragData = null; return }
     if (dragData && !dragData.lifted) {
         layers[2].append(dragSelected)
+        //V174: узлы эффектов поднимаются ВМЕСТЕ с предметом — оверлей остаётся НАД иконкой
+        for (let i = 0; i < dragData.fx.length; i++) {
+            const f = dragData.fx[i]
+            if (!f._dead && f.node) layers[2].append(f)
+        }
         dragData.lifted = true
     }
     const pos = dragClientToView(cx, cy)
@@ -2140,8 +2166,16 @@ function moveDragShim(cx, cy) {
         const dx = pos.x - dragData.origX, dy = pos.y - dragData.origY
         dx * dx + dy * dy > DRAG_TAP_PX * DRAG_TAP_PX && (pendingTap = null)
     }
-    dragSelected.setAttribute("x", pos.x - dragData.offX)
-    dragSelected.setAttribute("y", pos.y - dragData.offY)
+    const nx = pos.x - dragData.offX, ny = pos.y - dragData.offY
+    dragSelected.setAttribute("x", nx)
+    dragSelected.setAttribute("y", ny)
+    //V174: эффекты едут с тем же смещением от исходной ячейки
+    for (let i = 0; i < dragData.fx.length; i++) {
+        const f = dragData.fx[i]
+        if (f._dead) continue
+        f.setAttribute("x", f._dragFx0X + nx - dragData.origX)
+        f.setAttribute("y", f._dragFx0Y + ny - dragData.origY)
+    }
 }
 function endDragShim(shim, clientX, clientY) {
     if (!dragSelected) return
@@ -2162,6 +2196,16 @@ function endDragShim(shim, clientX, clientY) {
     // свечение редкости восстанавливается вместо жёлтого drag-glow (у отсоединённого
     // спрайта тени не монтируем — перерисовка создаст узлы заново)
     if (!el._dead) applyDropShadow(el, data.prevShadow)
+    //V174: эффекты. Успешный дроп перерисовал панели — узлы _dead, не трогаем; провал
+    //(возврат на исходную ячейку) — возвращаем оверлеи на место
+    for (let i = 0; i < data.fx.length; i++) {
+        const f = data.fx[i]
+        if (f._dead || !f.node) continue
+        f.setAttribute("x", f._dragFx0X)
+        f.setAttribute("y", f._dragFx0Y)
+        delete f._dragFx0X
+        delete f._dragFx0Y
+    }
 }
 // контейнер перетаскиваемых данных для фасада
 const backendHooks = { tipDel: null }

@@ -47,6 +47,16 @@ function animPlay() {
                     let result = checkEndAnim(d)
                     if (result==="stop") {stop = 1;d.stop=1}
                     if (d.type === "corpse") {
+                        //V174 (репорт юзера: трупы врагов, убитых Хрупом, «исчезали —
+                        //оставались только тени»): труп после доигрывания death-анимации
+                        //удаляется из objectValues, узел остаётся лежать до смены сцены,
+                        //но ecsRenderSync (culled) больше не обслуживает сущность. Убитый
+                        //ВНЕ КАДРА камеры (гонка Хрупа) труп замирал в culled-гасилке
+                        //visible=false — «трупа нет, тень есть». Принудительно показываем
+                        //узел: статичную картинку дальше никто не гасит, за вьюпортом её
+                        //не видно физически (слой камеры)
+                        d.img._hidden = 0
+                        d.img.node && (d.img.node.visible = true)
                         const idx = objectValues.indexOf(d)
                         idx !== -1 && objectValues.splice(idx,1)
                         continue

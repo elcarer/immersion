@@ -128,7 +128,9 @@ function refreshReforgeButton() {
     let item = anvilSelect.item
     let cost = 5 * item.statCount
     let can = status.info.gold >= cost
-    reforgeBtn.push(text(svgArr[2],1055,948,"0pt","50pt","black","2px",`rgb(204, 153, 102)`,T("anvil.will",T(statKey(item.stat)),item.statCount),{"id":"anvilWillText","size":28,"font":"baseFont4","anchor":"middle"}))
+    //V174 (просьба юзера): строка «какой стат поменяется» — под ячейками инвентаря на
+    //пустое место (справа от золота), а не над кнопкой перековки
+    reforgeBtn.push(text(svgArr[2],1545,925,"0pt","50pt","black","2px",`rgb(204, 153, 102)`,T("anvil.will",T(statKey(item.stat)),item.statCount),{"id":"anvilWillText","size":28,"font":"baseFont4","anchor":"middle"}))
     reforgeBtn.push(image(svgArr[2],865,980,380,57,"./images/UI/panels/buttons/button.png",can ? {"glow":1,"func":reforgeSelected} : {"opacity":"0.25"}))
     reforgeBtn.push(text(svgArr[2],1055,1020,"0pt","50pt","black","2px",can ? `rgb(204, 153, 102)` : "rgba(204, 153, 102, 0.35)",can ? T("anvil.reforge",cost) : T("anvil.nogold",cost),{"id":"anvilReforgeText","size":30,"font":"baseFont4","anchor":"middle"}))
 }
