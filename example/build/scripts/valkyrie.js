@@ -319,7 +319,9 @@ function whirlTick() {
   }
   const hx = status.hero.x + 16
   const hy = status.hero.y + 25
-  const r = 44
+  //V172 (поправка юзера): «Торнадо дротиков» увеличивает радиус круга, по которому
+  //вращаются дротики вихря, в 1,5 раза (44 → 66)
+  const r = info.tornadoAbil ? 66 : 44
   w.angleBase += 0.14
   for (let i = w.darts.length - 1; i >= 0; i--) {
     const dart = w.darts[i]
@@ -410,13 +412,32 @@ function dartsTick() {
     }
     //враги
     let hit = false
+    //V172: оттолкнувшийся дротик не бьёт «своего» врага повторно, пока с ним не разошёлся
+    //(умерший враг освобождает дротик сразу)
+    if (dart.bouncedEnemy && (dart.bouncedEnemy.type !== "enemy" || dart.bouncedEnemy.stats.hp <= 0 ||
+        !checkCollision(dart.x, dart.bouncedEnemy.rect.x.animVal.value, dart.w, dart.bouncedEnemy.rect.width.animVal.value,
+          dart.y, dart.bouncedEnemy.rect.y.animVal.value, dart.h, dart.bouncedEnemy.rect.height.animVal.value))) {
+      dart.bouncedEnemy = null
+    }
     for (let j = 0; j < objectValues.length && !hit; j++) {
       const e = objectValues[j]
       if (e.type !== "enemy" || e.stats.hp <= 0 || peacefulEnemy(e)) continue
+      if (e === dart.bouncedEnemy) continue
       if (checkCollision(dart.x, e.rect.x.animVal.value, dart.w, e.rect.width.animVal.value, dart.y, e.rect.y.animVal.value, dart.h, e.rect.height.animVal.value)) {
         damageEnemy(e, dartDamage(e))
-        releaseSprite(dart.img)
-        info.darts.splice(i, 1)
+        //V172 (поправка юзера): «Дротик-бумеранг» — при ПЕРВОМ столкновении с врагом
+        //дротик отталкивается (как от стены) и летит обратно, не уничтожаясь; урон
+        //врагу наносится. Без бумеранга или при повторном столкновении (дротик уже
+        //возвращается) — уничтожается, как раньше
+        if (info.boomerangAbil && !dart.returning) {
+          dart.returning = true
+          dart.bouncedEnemy = e
+          dart.dx = -dart.dx
+          dart.dy = -dart.dy
+        } else {
+          releaseSprite(dart.img)
+          info.darts.splice(i, 1)
+        }
         hit = true
       }
     }
