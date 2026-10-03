@@ -2,7 +2,7 @@ import { animPlay } from "../scripts/animPlay.js"
 import { status } from "../scripts/start.js"
 import { heroMove } from "../scripts/heroMove.js"
 import { checkAttack } from "../scripts/attack.js"
-import { bars } from "../scripts/useObject.js"
+import { bars,cleanupBarShims } from "../scripts/useObject.js"
 import { damage } from "../scripts/damage.js"
 import { timerFloat } from "../scripts/floatText.js"
 import * as basicData from "../scripts/data.js"
@@ -243,8 +243,20 @@ function checkBars() {
             //V114: полоска юза объекта принадлежит конкретному игроку — завершение
             //(ключи/лечение/эксп у владельца) исполняется в его контексте
             bar.owner !== undefined && status.players[bar.owner] && setContext(status.players[bar.owner])
-            bar.func(bar.obj)
-            bars[i] === bar && bars.splice(i,1)
+            try {
+                bar.func(bar.obj)
+            } finally {
+                //V175 (репорт коопа «полоска активации и её фон зависают и не удаляются»):
+                //сбой внутри finishUsedObject до stopUseObject вырезал запись полоски БЕЗ
+                //чистки — заливка/фон/подсветка оставались на экране навсегда, obj[5]
+                //блокировал объект, use=1 блокировал юз. Если func не снял полоску сам —
+                //снимаем принудительно
+                if (bars[i] === bar) {
+                    bars.splice(i,1)
+                    cleanupBarShims(bar)
+                    status.players[bar.owner] && (status.players[bar.owner].use = 0)
+                }
+            }
             setContext(status.players[0])
         }
     }

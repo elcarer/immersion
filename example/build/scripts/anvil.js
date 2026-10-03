@@ -11,6 +11,9 @@ import { changeDopStat } from "../scripts/drag.js"
 //V153: сет «Исследователь пустоты» — шанс, что наковальня не гаснет после перековки
 import { rollVoidReuse } from "../scripts/sets.js"
 import { playback,strike,musicDuck } from "../scripts/sound.js"
+//V175: как в alchemy.js — панель живёт на паузе вне пер-игроковой фазы, клики обязаны
+//исполняться в контексте открывателя (его золото на перековку, его статы при пересчёте)
+import { setContext } from "../scripts/players.js"
 
 //V155: алтарь-наковальня — интерактивный объект (тип 24, спрайты objects/103|103d.png,
 //один вид на все этажи). Меню в стиле алхимического стола (alchemy.js): кукла + инвентарь
@@ -24,6 +27,8 @@ import { playback,strike,musicDuck } from "../scripts/sound.js"
 //Выход (кнопка/ESC) объект НЕ расходует.
 let anvilTemp = []
 let anvilObj = null
+//V175: игрок-открыватель панели — его золото/предметы/статы живут во всех кликах панели
+let anvilOwner = null
 //выделение: {src:"inv"|"doll", idx, item} — item ЖИВОЙ (по нему замена стата), ровно одно
 let anvilSelect = null
 let selFrame = null
@@ -31,6 +36,9 @@ let reforgeBtn = []
 
 function openAnvil(obj) {
     anvilObj = obj
+    //V175: открыватель — контекст в этот момент ЕЩЁ его (вызов из finishUsedObject);
+    //после возврата из func контекст уйдёт на players[0]
+    anvilOwner = status.hero
     musicDuck(1)
     svgArr[2].style.display = 'none'
     //чёрная подложка — скрывает игровое поле (как у Карты, map.js)
@@ -98,6 +106,8 @@ function openAnvil(obj) {
 //statCount > 0). Реликвии (stat нет), пояса (stat 5), щиты/книги (stat 6) не выделяются
 //вообще. Повторный клик по выделенному снимает выделение; клик по другому переносит его
 function toggleAnvilSelect(e,src,idx,item,cx,cy) {
+    //V175: клики по паузе приходят вне пер-игроковой фазы — контекст возвращаем открывателю
+    anvilOwner && setContext(anvilOwner)
     if (item.stat === undefined || item.stat > 4 || !(item.statCount > 0)) return
     if (anvilSelect && anvilSelect.item === item) {
         anvilSelect = null
@@ -141,6 +151,8 @@ function statKey(stat) {
 }
 
 function reforgeSelected() {
+    //V175: оплата/замена стата/пересчёт — в контексте открывателя (его золото и предметы)
+    anvilOwner && setContext(anvilOwner)
     if (!anvilSelect || !anvilObj) return
     let item = anvilSelect.item
     let cost = 5 * item.statCount
@@ -187,6 +199,9 @@ function anvilDel(nomusic=0) {
     reforgeBtn = []
     anvilSelect = null
     anvilObj = null
+    //V175: контекст открывателя больше не нужен — игра продолжается от игрока 1
+    anvilOwner = null
+    setContext(status.players[0])
     status.move = 1
     status.panels = 0
     status.pause = 0

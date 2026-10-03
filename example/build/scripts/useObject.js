@@ -77,21 +77,27 @@ function stopUseObject(pi) {
         if (bars[i].type !== "use" || bars[i].owner !== pi) continue
         const bar = bars[i]
         bars.splice(i,1)
-        bar.obj.remove()
-        //V147: «надгробия» в screenPic — записи удалённых узлов зануляются, чтобы
-        //мёртвые шимы не копились в отрисовке (утечка у повторяемых объектов)
-        bar.objIdx !== undefined && (screenPic[bar.objIdx] = null)
-        bar.frameIdx !== undefined && (screenPic[bar.frameIdx] = null)
-        const lobj = bar.lobj
-        if (lobj && lobj[5] !== undefined) {
-            let barBg = picById(lobj[5]+"RI")
-            barBg && barBg.remove()
-            lobj[5] = undefined
-            let hl = picById(lobj[6]+"OI")
-            hl && hl.setAttribute("style", 'filter: none')
-        }
+        cleanupBarShims(bar)
     }
     status.players[pi] && (status.players[pi].use = 0)
+}
+//V175: чистка шимов ОДНОЙ полоски (заливка/фон/подсветка/obj[5]) — общий код stopUseObject
+//и аварийной уборки в gameLoop.checkBars: сбой func внутри finishUsedObject раньше
+//оставлял запись вырезанной, а заливку/фон/подсветку — на экране навсегда
+function cleanupBarShims(bar) {
+    bar.obj.remove()
+    //V147: «надгробия» в screenPic — записи удалённых узлов зануляются, чтобы
+    //мёртвые шимы не копились в отрисовке (утечка у повторяемых объектов)
+    bar.objIdx !== undefined && (screenPic[bar.objIdx] = null)
+    bar.frameIdx !== undefined && (screenPic[bar.frameIdx] = null)
+    const lobj = bar.lobj
+    if (lobj && lobj[5] !== undefined) {
+        let barBg = picById(lobj[5]+"RI")
+        barBg && barBg.remove()
+        lobj[5] = undefined
+        let hl = picById(lobj[6]+"OI")
+        hl && hl.setAttribute("style", 'filter: none')
+    }
 }
 function finishUsedObject(obj) {
     if(obj[2] === 9 && status.info.keys <= 0) {
@@ -355,4 +361,4 @@ function checkConsumable() {
     if (rand < 99) return lootTable[6]
     return lootTable[5]
 }
-export {useObject,stopUseObject,bars,dropArr,bossWeaponDrops,itemDrops}
+export {useObject,stopUseObject,cleanupBarShims,bars,dropArr,bossWeaponDrops,itemDrops}

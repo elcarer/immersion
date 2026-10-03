@@ -1,6 +1,8 @@
 import { status } from "../scripts/start.js"
 //V115: полосы ХП/опыта — суффиксы по игроку (players.js)
-import { ctxBar,ctxTx } from "../scripts/players.js"
+//V175: как в alchemy.js — клики по панели на паузе обязаны идти в контексте открывателя
+//(иначе благословение уходило первому игроку), закрытие возвращает players[0]
+import { ctxBar,ctxTx,setContext } from "../scripts/players.js"
 import { T } from "../scripts/localization.js"
 import { svgArr,image,worldImage,picById,text,rect,nativeHtml,uiRightEdge,uiBottomEdge } from "../scripts/svg.js"
 import { screenPic } from "../scripts/del.js"
@@ -40,6 +42,8 @@ function blessIcon(id) {
 }
 let ancientTemp = []
 let ancientObj = null
+//V175: игрок-открыватель панели — его список благословений/статы живут в кликах панели
+let ancientOwner = null
 let hintIcons = []
 let blessTip = []
 
@@ -66,6 +70,9 @@ function blessMaxHpMult() {
 //V145: иконка каждой карточки — своя, blessIcon(id)
 function openAncient(obj) {
     ancientObj = obj
+    //V175: открыватель — контекст в этот момент ЕЩЁ его (вызов из finishUsedObject);
+    //после возврата из func контекст уйдёт на players[0]
+    ancientOwner = status.hero
     status.pause = 1
     status.move = 0
     status.panels = 11
@@ -115,6 +122,8 @@ function openAncient(obj) {
 //неактивным (obj[7]=1 + спрайт 101d.png), иконка-подсказка встаёт в ряд, меню закрывается
 function grantBless(id,obj) {
     if (!id || !obj) return
+    //V175: клик по паузе приходит вне пер-игроковой фазы — контекст возвращаем открывателю
+    ancientOwner && setContext(ancientOwner)
     Array.isArray(status.info.blesses) || (status.info.blesses = [])
     status.info.blesses.push(id)
     if (id === 5) {
@@ -150,6 +159,9 @@ function ancientDel(nomusic=0) {
     }
     ancientTemp = []
     ancientObj = null
+    //V175: контекст открывателя больше не нужен — игра продолжается от игрока 1
+    ancientOwner = null
+    setContext(status.players[0])
     status.move = 1
     status.panels = 0
     status.pause = 0

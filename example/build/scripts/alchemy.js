@@ -10,6 +10,11 @@ import { itemGenerate } from "../scripts/itemGenerate.js"
 //V153: сет «Исследователь пустоты» — шанс, что стол не гаснет после объединения
 import { rollVoidReuse } from "../scripts/sets.js"
 import { playback,strike,musicDuck } from "../scripts/sound.js"
+//V175 (репорт коопа: «для объединения считается золото первого игрока»): панель ставит
+//игру на паузу, а gameLoop/checkBars после открытия возвращают контекст на players[0] —
+//все клики (выделение/слияние) читали status.info первого игрока. Теперь панель помнит
+//открывателя и на каждом клике восстанавливает ЕГО контекст (схема V117 для clickButton)
+import { setContext } from "../scripts/players.js"
 
 //V54: алхимический стол — интерактивный объект (тип 17, спрайты objects/15|35|55.png).
 //Меню в стиле metaItems: кукла + инвентарь БЕЗ перетаскивания/даблклика — только ячейки,
@@ -20,6 +25,8 @@ import { playback,strike,musicDuck } from "../scripts/sound.js"
 //itemGenerate качества+1 в инвентарь, объект получает obj[7]=1 и спрайт «d»-версии.
 let alchemyTemp = []
 let alchemyObj = null
+//V175: игрок-открыватель панели — его золото/инвентарь/статы живут во всех кликах панели
+let alchemyOwner = null
 //выделение: {src:"inv"|"doll", idx, item} — item ЖИВОЙ (по нему удаление), рамки параллельно
 let alchemySelect = []
 let selFrames = []
@@ -30,6 +37,9 @@ let mergeCost = [0,20,100]
 
 function openAlchemy(obj) {
     alchemyObj = obj
+    //V175: открыватель — контекст в этот момент ЕЩЁ его (вызов из finishUsedObject через
+    //checkBars с setContext владельца); после возврата из func контекст уйдёт на players[0]
+    alchemyOwner = status.hero
     musicDuck(1)
     svgArr[2].style.display = 'none'
     //чёрная подложка — скрывает игровое поле (как у Карты, map.js)
@@ -107,6 +117,8 @@ function openAlchemy(obj) {
 //уничтожать три реликвии ради «предмета качеством выше» нельзя) не выделяются вообще.
 //Выделений больше трёх быть может — кнопка при этом скрыта.
 function toggleAlchemySelect(e,src,idx,item,cx,cy) {
+    //V175: клики по паузе приходят вне пер-игроковой фазы — контекст возвращаем открывателю
+    alchemyOwner && setContext(alchemyOwner)
     if (item.rarity >= 3) return
     let found = -1
     let length = alchemySelect.length
@@ -172,6 +184,8 @@ function refreshMergeButton() {
 }
 
 function mergeSelected() {
+    //V175: оплата/удаление/генерация — в контексте открывателя (его золото и инвентарь)
+    alchemyOwner && setContext(alchemyOwner)
     if (alchemySelect.length !== 3 || !alchemyObj) return
     let rarity = alchemySelect[0].item.rarity
     for (let k = 1; k < 3; k++) {
@@ -238,6 +252,9 @@ function alchemyDel(nomusic=0) {
     mergeBtn = []
     alchemySelect = []
     alchemyObj = null
+    //V175: контекст открывателя больше не нужен — игра продолжается от игрока 1
+    alchemyOwner = null
+    setContext(status.players[0])
     status.move = 1
     status.panels = 0
     status.pause = 0
