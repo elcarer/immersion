@@ -161,10 +161,17 @@ function curTarget(e) {
     }
     return e.th
 }
-//Видит ли враг ХОТЬ одного героя; увиденный становится его целью (e.th)
+//Видит ли враг ХОТЬ одного героя; увиденный становится его целью (e.th).
+//V176 (репорт коопа «враги идут только за игроком 1»): при нескольких видимых героях
+//целью становится БЛИЖАЙШИЙ видимый (та же манхэттенская метрика, что у nearestHeroOf),
+//а не первый по порядку массива — прежний вариант обновлял th/thTick КАЖДЫЙ тик первым
+//живым P1, и пересчёт ближайшего в curTarget не срабатывал никогда: враг шёл на P1 мимо
+//стоящего вплотную P2. В соло игрок один — поведение прежнее.
 export function enemySeesHero(enemy) {
     const r = enemy.rect
     const pos = rectPos(r)
+    let seen = null
+    let bd = Infinity
     for (let i = 0; i < status.players.length; i++) {
         const P = status.players[i]
         if (P.obj.type !== "hero") continue
@@ -173,10 +180,14 @@ export function enemySeesHero(enemy) {
         if (checkCollision(
             pos[0] - range, P.x, r._w + 2 * range, 32,
             pos[1] - range, P.y, r._h + 2 * range, 51)) {
-            enemy.th = P
-            enemy.thTick = status.time
-            return true
+            const d = Math.abs(P.x - pos[0]) + Math.abs(P.y - pos[1])
+            if (d < bd) { bd = d; seen = P }
         }
+    }
+    if (seen) {
+        enemy.th = seen
+        enemy.thTick = status.time
+        return true
     }
     return false
 }

@@ -25,8 +25,9 @@ import { slimeQuestTakePile, slimeQuestFedLanded } from "../scripts/slimeQuest.j
 import { entQuestTakePile } from "../scripts/entQuest.js"
 //V140: эпик-кучки Хрупа (редкость 2) и Повязка (эффект пояса)
 import { hrupQuestTakeEpic, hrupQuestTakePile } from "../scripts/hrupQuest.js"
-//V67: новый предмет мог встать в 1-ю ячейку инвентаря — пересчёт копии «Вечного сапфира»
-import { changeDopStat } from "../scripts/drag.js"
+//V67: новый предмет мог встать в 1-ю ячейку инвентаря — пересчёт копии «Вечного сапфира»;
+//V176: tryAutoEquip — подобранный после выброса предмет сначала примеряет пустой слот куклы
+import { changeDopStat, tryAutoEquip } from "../scripts/drag.js"
 //V114: кооператив — контекст игрока (кучку забирает наступивший)
 //V126 (репорт юзера: еда не подбиралась ВООБЩЕ даже с малым ХП): takeFood зовёт
 //ctxBar/ctxTx (пер-игроковые id полос, players.js), но импорт их потерялся при
@@ -201,8 +202,18 @@ function takeFood() {
     return false
 }
 //V123: подбор КОНКРЕТНОГО предмета, выброшенного на пол через «УДАЛИТЬ» (кооп) —
-//никакой генерации: в инвентарь ложится тот же объект с теми же свойствами
+//никакой генерации: ложится тот же объект с теми же свойствами.
+//V176 (репорт коопа «выкинутый предмет не одевается обратно»): подбор ведёт себя как
+//сгенерированный (V102) — сначала пустой подходящий слот куклы (tryAutoEquip, контекст
+//подбирающего уже установлен в takeDropFor), иначе первая свободная ячейка инвентаря
 function takeExactItem(item) {
+    if (tryAutoEquip(item)) {
+        changeDopStat()
+        showItemTip(item)
+        const rarityEq = (item.img.match(/items\/(\d)\//) || [])[1]
+        journalAdd(T("journal.gotitem", itemName(item)), J_RARITY[rarityEq] || J_STD)
+        return true
+    }
     let countInv = 0
     let length = status.inventory.inv.length
     for (let i = 0; i < length; i++) {
@@ -214,7 +225,7 @@ function takeExactItem(item) {
     }
     changeDopStat()
     showItemTip(item)
-    const rarity = (item.img.match("/items/(\d)/") || [])[1]
+    const rarity = (item.img.match(/items\/(\d)\//) || [])[1]
     journalAdd(T("journal.gotitem", itemName(item)), J_RARITY[rarity] || J_STD)
     return true
 }

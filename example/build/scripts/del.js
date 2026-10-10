@@ -10,6 +10,8 @@ import { bars, dropArr } from "../scripts/useObject.js"
 import { resetBossFight } from "../scripts/spiderBossFight.js"
 import { resetValkyrie } from "../scripts/valkyrie.js"
 import { resetEmoFx } from "../scripts/enemyAI.js"
+//V176: сброс референсов полосы босса при разборке сцены
+import { resetBossBar } from "../scripts/hpBar.js"
 import { resetDashGhosts } from "../scripts/dashFx.js"
 import { resetCharmBullets } from "../scripts/charmFx.js"
 import { resetHowlZones } from "../scripts/howlFx.js"
@@ -114,6 +116,7 @@ function del() {
     }
     setContext(ctxHero && status.players.includes(ctxHero) ? ctxHero : status.players[0])
     resetEmoFx()
+    resetBossBar() //V176: референсы полосы босса не переживают сцену (иначе ресайз окна бил по уничтоженной маске)
     resetDashGhosts()
     resetCharmBullets()
     resetHowlZones()

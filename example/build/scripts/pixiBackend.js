@@ -1388,6 +1388,9 @@ class WorldSprite {
             this.node.mask = null
             if (m.parent) m.parent.removeChild(m)
             m.destroy()
+            //V176: ссылку на уничтоженную маску зануляем — applyMask по мёртвому
+            //шиму (ресайз после del()) больше не падает на clear
+            this._bar.mask = null
         }
         if (this._clipMask) {
             // клип-маска (R4.4: NativeGroup.setClip / nativeSector) — тоже sibling в слое
@@ -1502,6 +1505,9 @@ function createWorldBar(place, x, y, w, h, src, obj = {}) {
     ws._bar = { mask, x: num(x), y: num(y), w: num(w), h: num(h), col: 0, anchor: "left" }
     const applyMask = () => {
         const b = ws._bar
+        //V176: remove() уничтожает маску и зануляет ссылку — вызовы по мёртвому
+        //шиму (запоздалый ресайз) молча пропускаются вместо TypeError на clear
+        if (!b.mask) return
         b.mask.clear()
         if (b.col > 0) {
             b.mask.rect(b.anchor === "right" ? b.x + b.w - b.col : b.x, b.y, b.col, b.h).fill(0xffffff)

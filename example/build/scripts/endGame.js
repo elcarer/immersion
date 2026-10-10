@@ -41,8 +41,14 @@ let nextRun
 //endScreen — вход цепочки (игрок 1), endScreenBuild — отрисовка экрана ТЕКУЩЕГО
 //контекста. chapterStep=false на втором игроке: главы (page/pageMax) считаются один раз
 let endCoopIdx = 0
+//V176 (репорт коопа «очки за убитых и список врагов только у игрока 1»): этаж завершаемого
+//уровня снапшотится ДО первой отрисовки — в её конце levelFloor уже инкрементируется
+//(следующий этаж/сброс при смерти), и второй экран строил окно killedEnemes по СЛЕДУЮЩЕМУ
+//этажу: пустой список врагов и ноль очков у игрока 2
+let endFloorSnap = null
 function endScreen(lose,next) {
     endCoopIdx = 0
+    endFloorSnap = status.levelFloor
     status.players.length > 1 && setContext(status.players[0])
     endScreenBuild(lose,next,true)
 }
@@ -90,7 +96,9 @@ function endScreenBuild(lose,next,chapterStep) {
     let lengthKilledEnemes = status.meta.killedEnemes.length
     //V35: у монстров 3-го этажа собственные id 14-20 (раньше были дубли 7-13 заглушки) —
     //база смещения экрана результатов всегда этаж × 7
-    let floorBase = status.levelFloor * 7
+    //V176: окно врагов — по этажу, завершённому НА ВХОДЕ на экран (endFloorSnap),
+    //а не по текущему levelFloor: на втором экране коопа он уже инкрементирован
+    let floorBase = (endFloorSnap !== null ? endFloorSnap : status.levelFloor) * 7
     for(let i = floorBase; i < floorBase + 7 && i < lengthKilledEnemes; i++) {
         if(status.meta.killedEnemes[i]) {
             let enemy1 = enemyById[i]

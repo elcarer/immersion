@@ -94,7 +94,7 @@ let attack = data.attacks[weapon.attack]
 status.players[0].attack = {"img":attack.img,"target":undefined,"current":[],"stack":[{"timer":Math.trunc((attack.cooldown*1000)/16),"abil":attack}]}
 setContext(status.players[0])
 // МИГРАЦИЯ (M4): rAF-цикл с аккумулятором удалён — тики игры идут из тикера ядра
-// zero_engine (index.js: gameTickSystem, тот же фиксированный шаг 16мс ~62.5Гц)
+// zero_engine (index.js: gameTickSystem, тот же фиксированный шаг 16мс ~62_.5Гц)
 function start() {
     //V64: полоса загрузки — фон hpBar.png (407×64) по центру экрана, заливка hpBarCol1.png
     //(315×24, смещение внутри фона +49/+20 — геометрия полос героя из takeDamage.js) —
@@ -259,7 +259,7 @@ function drawStartScreen(animate) {
     document.title = T("app.title")
     //1) фон — появляется сразу
     screenPic.push(image(svgArr[0],0,0,1920,1080,"./images/UI/start.png"))
-    screenPic.push(text(svgArr[1],10,1060,"0pt","50pt","none","3px","#FFFF66","build 2.25",{"id":"title","size":24,"font":"baseFont4","anchor":"start"}))
+    screenPic.push(text(svgArr[1],10,1060,"0pt","50pt","none","3px","#FFFF66","build 2.26",{"id":"title","size":24,"font":"baseFont4","anchor":"start"}))
     //2) логотип-название — картинка по языку
     const logo = image(svgArr[1],1920/2-LOGO_W/2,110,LOGO_W,LOGO_H,"./images/UI/" + (getLang() === "ru" ? "logoRus.png" : "logoIng.png"))
     screenPic.push(logo)

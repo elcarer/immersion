@@ -75,6 +75,12 @@ function hideBossBar() {
     bossTemp = null
     bossHPMax = 0
 }
+//V176 (репорт: TypeError «null clear» из bossBarResize при ресайзе окна): del() сносит
+//узлы полосы вместе со сценой, но референсы hpBar оставались жить — ресайз дёргал
+//setBarOrigin у спрайта с уже уничтоженной маской. Вызывается из del() при разборке сцены
+function resetBossBar() {
+    bossBarEls.length > 0 && hideBossBar()
+}
 //вызов из enemyAI.enemyDie: умер владелец полосы. Медуза пустоты (id 26) — полоса ОБЩАЯ
 //на все осколки (тот же инвариант суммы, что в changeBossHP): снимается только с гибелью
 //ПОСЛЕДНЕГО живого осколка; остальные боссы — по совпадению с боссом, на которого полоса
@@ -105,4 +111,4 @@ function bossBarNodes() {
     return bossBarEls.slice()
 }
 onUiResize(bossBarResize)
-export {hpBar,changeBossHP,bossBarOwnerDied,bossBarNodes}
+export {hpBar,changeBossHP,bossBarOwnerDied,bossBarNodes,resetBossBar}
